@@ -5,6 +5,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import { CartaPresidente, Historico, Evento, Regimento } from "./pages/Apresentacao";
+import Programacao from "./pages/Programacao";
+import Inscricao from "./pages/Inscricao";
+import Noticias from "./pages/Noticias";
+import { LocalPage, Atracoes, ComoChegar, Transfer, Hospedagem, Passagem, Apoio } from "./pages/Local";
+import { CadernoTeses, RegulamentoTeses, VisualizarTeses } from "./pages/Teses";
+import Indicativos from "./pages/Indicativos";
+import Galeria from "./pages/Galeria";
+import Contato from "./pages/Contato";
 
 const queryClient = new QueryClient();
 
@@ -16,7 +25,26 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/apresentacao/carta-presidente" element={<CartaPresidente />} />
+          <Route path="/apresentacao/historico" element={<Historico />} />
+          <Route path="/apresentacao/evento" element={<Evento />} />
+          <Route path="/apresentacao/regimento" element={<Regimento />} />
+          <Route path="/programacao" element={<Programacao />} />
+          <Route path="/inscricao" element={<Inscricao />} />
+          <Route path="/noticias" element={<Noticias />} />
+          <Route path="/local" element={<LocalPage />} />
+          <Route path="/local/atracoes" element={<Atracoes />} />
+          <Route path="/local/como-chegar" element={<ComoChegar />} />
+          <Route path="/local/transfer" element={<Transfer />} />
+          <Route path="/local/hospedagem" element={<Hospedagem />} />
+          <Route path="/local/passagem" element={<Passagem />} />
+          <Route path="/local/apoio" element={<Apoio />} />
+          <Route path="/teses/caderno" element={<CadernoTeses />} />
+          <Route path="/teses/regulamento" element={<RegulamentoTeses />} />
+          <Route path="/teses/visualizar" element={<VisualizarTeses />} />
+          <Route path="/indicativos" element={<Indicativos />} />
+          <Route path="/galeria" element={<Galeria />} />
+          <Route path="/contato" element={<Contato />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
