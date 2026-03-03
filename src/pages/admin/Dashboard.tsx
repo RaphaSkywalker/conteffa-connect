@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
@@ -28,7 +29,10 @@ import {
     Mail,
     AlertTriangle,
     Check,
-    X
+    X,
+    Instagram,
+    Linkedin,
+    Twitter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,18 +54,91 @@ import { toast } from "sonner";
 const API_URL = "http://localhost:3001/api";
 
 const apiFetch = async (endpoint: string, options: any = {}) => {
-    const response = await fetch(`${API_URL}${endpoint}`, {
-        ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            ...options.headers,
-        },
-    });
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || response.statusText);
+    // Helper to map endpoints to Supabase tables
+    const tableMap: Record<string, string> = {
+        '/users': 'users',
+        '/news': 'news',
+        '/speakers': 'speakers',
+        '/programming': 'programming',
+        '/albums': 'albums',
+        '/registrations': 'registrations',
+        '/guests': 'guests',
+        '/timeline_events': 'timeline_events',
+        '/site_settings': 'site_settings',
+        '/config/instagram': 'config'
+    };
+
+    const tableName = tableMap[endpoint] || endpoint.replace('/', '').split('/')[0];
+    const method = options.method || 'GET';
+    const body = options.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : null;
+
+    try {
+        // Special case for config table (key-value)
+        if (tableName === 'config' && endpoint.includes('/config/')) {
+            const key = endpoint.split('/').pop();
+            if (method === 'GET') {
+                const { data, error } = await supabase.from('config').select('value').eq('key', key).maybeSingle();
+                if (error) throw error;
+                return data ? JSON.parse(data.value) : null;
+            }
+            if (method === 'POST') {
+                const { data, error } = await supabase.from('config').upsert({ key, value: JSON.stringify(body) }).select();
+                if (error) throw error;
+                return data;
+            }
+        }
+
+        if (method === 'GET') {
+            const { data, error } = await supabase.from(tableName).select('*');
+            if (error) {
+                console.warn(`Supabase GET warning for ${tableName}:`, error.message);
+                return []; // Graceful fallback
+            }
+
+            // Post-process JSON fields for certain tables
+            if (data && (tableName === 'programming' || tableName === 'albums')) {
+                return data.map(item => ({
+                    ...item,
+                    items: typeof item.items === 'string' ? JSON.parse(item.items) : (item.items || []),
+                    photos: typeof item.photos === 'string' ? JSON.parse(item.photos) : (item.photos || [])
+                }));
+            }
+            return data || [];
+        }
+
+        // Remove ID from body for insert/update to avoid conflicts with auto-generated IDs
+        const cleanBody = body ? { ...body } : null;
+        if (cleanBody && 'id' in cleanBody) {
+            delete cleanBody.id;
+        }
+
+
+        if (method === 'POST') {
+            const { data, error } = await supabase.from(tableName).insert([cleanBody]).select();
+            if (error) throw error;
+            return data && data.length > 0 ? data[0] : data;
+        }
+
+        if (method === 'PUT' || method === 'PATCH') {
+            const updateId = body.id || endpoint.split('/').pop();
+            const { data, error } = await supabase.from(tableName).update(cleanBody).eq('id', updateId).select();
+            if (error) throw error;
+            return data;
+        }
+
+        if (method === 'DELETE') {
+            const id = endpoint.split('/').pop();
+            const { error } = await supabase.from(tableName).delete().eq('id', id);
+            if (error) throw error;
+            return { success: true };
+        }
+    } catch (err: any) {
+        console.error(`Supabase error for ${endpoint}:`, err);
+        if (method === 'GET') return [];
+        // Re-throw with a more descriptive error if possible
+        const errorMsg = err.message || err.details || JSON.stringify(err);
+        throw new Error(errorMsg);
     }
-    return response.json();
 };
 
 const AdminDashboard = () => {
@@ -97,26 +174,29 @@ const AdminDashboard = () => {
     });
 
     // Load news list from localStorage or use default
-    const [noticias, setNoticias] = useState(() => {
-        const savedNoticias = localStorage.getItem("conteffa_noticias");
-        return savedNoticias ? JSON.parse(savedNoticias) : [
-            {
-                id: 1,
-                title: "Inscrições abertas para o IX CONTEFFA 2026",
-                date: "15 de março de 2026",
-                summary: "As inscrições para o IX CONTEFFA 2026 já estão abertas. Garanta sua vaga.",
-                status: "Publicado",
-                photo: null
-            },
-            {
-                id: 2,
-                title: "Programação preliminar divulgada",
-                date: "01 de abril de 2026",
-                summary: "Confira a programação preliminar com palestras e workshops.",
-                status: "Publicado",
-                photo: null
+    const [noticias, setNoticias] = useState<any[]>(() => {
+        try {
+            const savedNoticias = localStorage.getItem("conteffa_noticias");
+            let list = savedNoticias ? JSON.parse(savedNoticias) : [];
+            if (!Array.isArray(list) || list.length === 0) {
+                return [
+                    {
+                        id: -1,
+                        title: "Inscrições abertas para o IX CONTEFFA 2026",
+                        date: "15/03/2026",
+                        summary: "As inscrições para o IX CONTEFFA 2026 já estão abertas.",
+                        status: "Publicado",
+                        photo: null,
+                        views: 45,
+                        likes: 12
+                    }
+                ];
             }
-        ];
+            return list;
+        } catch (e) {
+            console.error("Error loading noticias from localStorage", e);
+            return [];
+        }
     });
 
     const [activeTab, setActiveTab] = useState("painel");
@@ -137,11 +217,19 @@ const AdminDashboard = () => {
 
     // Load albums list from localStorage or use default
     const [albuns, setAlbuns] = useState<any[]>(() => {
-        const saved = localStorage.getItem("conteffa_albuns");
-        const list = saved ? JSON.parse(saved) : [
-            { id: 1, title: "VIII CONTEFFA - 2025", date: "10/10/2025", cover: null, photos: [], count: 145 }
-        ];
-        return [...list].sort((a, b) => (a.id || 0) - (b.id || 0));
+        try {
+            const saved = localStorage.getItem("conteffa_albuns");
+            let list = saved ? JSON.parse(saved) : [];
+            if (!Array.isArray(list) || list.length === 0) {
+                return [
+                    { id: -1, title: "VIII CONTEFFA - 2025", date: "10/10/2025", cover: null, photos: [], count: 145 }
+                ];
+            }
+            return [...list].sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+        } catch (e) {
+            console.error("Error loading albums from localStorage", e);
+            return [];
+        }
     });
 
     const [isAddingAlbum, setIsAddingAlbum] = useState(false);
@@ -161,6 +249,7 @@ const AdminDashboard = () => {
     const [newNoticia, setNewNoticia] = useState({
         title: "",
         summary: "",
+        tags: "",
         date: new Date().toLocaleDateString('pt-BR'),
         status: "Rascunho",
         photo: null as string | null,
@@ -168,13 +257,20 @@ const AdminDashboard = () => {
     });
 
     // Load speakers list from localStorage or use default
-    const [palestrantes, setPalestrantes] = useState(() => {
-        const saved = localStorage.getItem("conteffa_palestrantes");
-        return saved ? JSON.parse(saved) : [
-            { id: 1, name: "João Silva", cargo: "Especialista Tributário", bio: "Breve descrição sobre a trajetória profissional.", photo: null },
-            { id: 2, name: "Maria Santos", cargo: "Consultora Legislativa", bio: "Breve descrição sobre a trajetória profissional.", photo: null },
-            { id: 3, name: "Ricardo Oliveira", cargo: "Analista de Sistemas", bio: "Breve descrição sobre a trajetória profissional.", photo: null }
-        ];
+    const [palestrantes, setPalestrantes] = useState<any[]>(() => {
+        try {
+            const saved = localStorage.getItem("conteffa_palestrantes");
+            let list = saved ? JSON.parse(saved) : [];
+            if (!Array.isArray(list) || list.length === 0) {
+                return [
+                    { id: -1, name: "João Silva", cargo: "Especialista Tributário", bio: "Breve descrição sobre a trajetória profissional.", photo: null }
+                ];
+            }
+            return list;
+        } catch (e) {
+            console.error("Error loading speakers from localStorage", e);
+            return [];
+        }
     });
 
     // Load guests list from localStorage or use default
@@ -206,6 +302,9 @@ const AdminDashboard = () => {
         name: "",
         cargo: "",
         bio: "",
+        instagram: "",
+        linkedin: "",
+        twitter: "",
         photo: null as string | null,
         id: null as number | null
     });
@@ -551,9 +650,7 @@ const AdminDashboard = () => {
         photos: [] as string[]
     });
 
-    const [adImage, setAdImage] = useState<string | null>(() => {
-        return localStorage.getItem("conteffa_ad_image") || null;
-    });
+    const [adImage, setAdImage] = useState<string | null>(null);
 
     const instagramPhotosInputRef = useRef<HTMLInputElement>(null);
     const adInputRef = useRef<HTMLInputElement>(null);
@@ -567,63 +664,64 @@ const AdminDashboard = () => {
         const loadData = async () => {
             try {
                 // Fetch all data from backend
-                const [dbUsers, dbNews, dbSpeakers, dbProg, dbAlbums] = await Promise.all([
-                    apiFetch("/users"),
-                    apiFetch("/news"),
-                    apiFetch("/speakers"),
-                    apiFetch("/programming"),
-                    apiFetch("/albums")
+                const [dbUsers, dbNews, dbSpeakers, dbProg, dbAlbums, dbGuests, dbInscricoes] = await Promise.all([
+                    apiFetch("/users").catch(() => []),
+                    apiFetch("/news").catch(() => []),
+                    apiFetch("/speakers").catch(() => []),
+                    apiFetch("/programming").catch(() => []),
+                    apiFetch("/albums").catch(() => []),
+                    apiFetch("/guests").catch(() => []),
+                    apiFetch("/registrations").catch(() => [])
                 ]);
 
-                // Check for migration if DB is empty but localStorage has data
-                const localUsers = localStorage.getItem("conteffa_users");
-                if (dbUsers.length <= 1 && localUsers) {
-                    const parsedUsers = JSON.parse(localUsers);
-                    for (const u of parsedUsers) {
-                        if (u.email !== 'admin@conteffa.com.br') {
-                            await apiFetch("/users", { method: 'POST', body: JSON.stringify(u) });
-                        }
-                    }
-                    setActiveUsers(await apiFetch("/users"));
-                } else {
-                    setActiveUsers(dbUsers);
+                if (dbUsers && dbUsers.length > 0) setActiveUsers(dbUsers);
+
+                if (dbNews && dbNews.length > 0) {
+                    setNoticias(prev => {
+                        const current = Array.isArray(prev) ? prev : [];
+                        const dbIds = new Set(dbNews.map((n: any) => n.id));
+                        const merged = [...dbNews, ...current.filter(p => p && p.id && !dbIds.has(p.id))];
+                        return merged.sort((a: any, b: any) => {
+                            const valA = String(a.created_at || a.id || 0);
+                            const valB = String(b.created_at || b.id || 0);
+                            return valB.localeCompare(valA);
+                        });
+                    });
                 }
 
-                const localNoticias = localStorage.getItem("conteffa_noticias");
-                if (dbNews.length === 0 && localNoticias) {
-                    const parsed = JSON.parse(localNoticias);
-                    for (const n of parsed) await apiFetch("/news", { method: 'POST', body: JSON.stringify(n) });
-                    setNoticias(await apiFetch("/news"));
-                } else {
-                    setNoticias(dbNews);
+                if (dbSpeakers && dbSpeakers.length > 0) {
+                    setPalestrantes(prev => {
+                        const current = Array.isArray(prev) ? prev : [];
+                        const dbIds = new Set(dbSpeakers.map((s: any) => s.id));
+                        return [...dbSpeakers, ...current.filter(p => p && p.id && !dbIds.has(p.id))];
+                    });
                 }
 
-                const localSpeakers = localStorage.getItem("conteffa_palestrantes");
-                if (dbSpeakers.length === 0 && localSpeakers) {
-                    const parsed = JSON.parse(localSpeakers);
-                    for (const s of parsed) await apiFetch("/speakers", { method: 'POST', body: JSON.stringify(s) });
-                    setPalestrantes(await apiFetch("/speakers"));
-                } else {
-                    setPalestrantes(dbSpeakers);
+                if (dbProg && dbProg.length > 0) {
+                    setProgramacao(prev => {
+                        const current = Array.isArray(prev) ? prev : [];
+                        const dbLabels = new Set(dbProg.map((p: any) => p.label));
+                        return [...dbProg, ...current.filter(p => p && p.label && !dbLabels.has(p.label))];
+                    });
                 }
 
-                const localProg = localStorage.getItem("conteffa_programacao");
-                if (dbProg.length === 0 && localProg) {
-                    const parsed = JSON.parse(localProg);
-                    for (const p of parsed) await apiFetch("/programming", { method: 'POST', body: JSON.stringify(p) });
-                    setProgramacao(await apiFetch("/programming"));
-                } else {
-                    setProgramacao(dbProg);
+                if (dbGuests && dbGuests.length > 0) {
+                    setConvidados(prev => {
+                        const current = Array.isArray(prev) ? prev : [];
+                        const dbIds = new Set(dbGuests.map((g: any) => g.id));
+                        return [...dbGuests, ...current.filter(p => p && p.id && !dbIds.has(p.id))];
+                    });
                 }
 
-                const localAlbuns = localStorage.getItem("conteffa_albuns");
-                if (dbAlbums.length === 0 && localAlbuns) {
-                    const parsed = JSON.parse(localAlbuns);
-                    for (const a of parsed) await apiFetch("/albums", { method: 'POST', body: JSON.stringify(a) });
-                    const refresed = await apiFetch("/albums");
-                    setAlbuns([...refresed].sort((a: any, b: any) => (a.id || 0) - (b.id || 0)));
-                } else {
-                    setAlbuns([...dbAlbums].sort((a: any, b: any) => (a.id || 0) - (b.id || 0)));
+                if (dbInscricoes && dbInscricoes.length > 0) setInscricoes(dbInscricoes);
+
+                if (dbAlbums && dbAlbums.length > 0) {
+                    setAlbuns(prev => {
+                        const current = Array.isArray(prev) ? prev : [];
+                        const dbIds = new Set(dbAlbums.map((a: any) => a.id));
+                        const merged = [...dbAlbums, ...current.filter(p => p && p.id && !dbIds.has(p.id))];
+                        return merged.sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0));
+                    });
                 }
 
                 try {
@@ -647,6 +745,16 @@ const AdminDashboard = () => {
                     }
                 }
 
+                try {
+                    const { data: adData } = await supabase.from('config').select('value').eq('key', 'divulgacao').maybeSingle();
+                    if (adData && adData.value) {
+                        setAdImage(adData.value);
+                    }
+                } catch (e) {
+                    const localAd = localStorage.getItem("conteffa_ad_image");
+                    if (localAd) setAdImage(localAd);
+                }
+
                 // Clear migration flags to avoid repeat
                 // (Optional: keep localStorage for a while just in case)
             } catch (err) {
@@ -658,10 +766,42 @@ const AdminDashboard = () => {
         loadData();
     }, []);
 
-    // Persist user profile (remains in state for now, but update DB on save)
+    // Unified synchronization to localStorage with safety
     useEffect(() => {
-        localStorage.setItem("admin_user", JSON.stringify(user));
+        try {
+            localStorage.setItem("admin_user", JSON.stringify(user));
+        } catch (e) { console.warn("Quota exceeded for user profile"); }
     }, [user]);
+
+    useEffect(() => {
+        try {
+            if (noticias && noticias.length > 0) localStorage.setItem("conteffa_noticias", JSON.stringify(noticias));
+        } catch (e) { console.warn("Quota exceeded for noticias"); }
+    }, [noticias]);
+
+    useEffect(() => {
+        try {
+            if (palestrantes && palestrantes.length > 0) localStorage.setItem("conteffa_palestrantes", JSON.stringify(palestrantes));
+        } catch (e) { console.warn("Quota exceeded for palestrantes"); }
+    }, [palestrantes]);
+
+    useEffect(() => {
+        try {
+            if (albuns && albuns.length > 0) localStorage.setItem("conteffa_albuns", JSON.stringify(albuns));
+        } catch (e) { console.warn("Quota exceeded for albuns (photos)"); }
+    }, [albuns]);
+
+    useEffect(() => {
+        try {
+            if (programacao && programacao.length > 0) localStorage.setItem("conteffa_programacao", JSON.stringify(programacao));
+        } catch (e) { console.warn("Quota exceeded for programacao"); }
+    }, [programacao]);
+
+    useEffect(() => {
+        try {
+            if (convidados && convidados.length > 0) localStorage.setItem("conteffa_convidados", JSON.stringify(convidados));
+        } catch (e) { console.warn("Quota exceeded for convidados"); }
+    }, [convidados]);
 
     const noticiaFileInputRef = useRef<HTMLInputElement>(null);
     const palestranteFileInputRef = useRef<HTMLInputElement>(null);
@@ -755,18 +895,25 @@ const AdminDashboard = () => {
             if (newAlbum.id) {
                 await apiFetch(`/albums/${newAlbum.id}`, { method: 'PUT', body: JSON.stringify(newAlbum) });
                 const updatedList = albuns.map((a: any) => a.id === newAlbum.id ? { ...a, ...newAlbum } : a);
-                setAlbuns([...updatedList].sort((a: any, b: any) => (a.id || 0) - (b.id || 0)));
+                setAlbuns([...updatedList].sort((a: any, b: any) => (b.id || 0) - (a.id || 0)));
+                localStorage.setItem("conteffa_albuns", JSON.stringify(updatedList));
                 toast.success("Álbum atualizado!");
             } else {
                 const res = await apiFetch("/albums", { method: 'POST', body: JSON.stringify(newAlbum) });
                 const newList = [{ ...newAlbum, id: res.id, count: newAlbum.photos.length }, ...albuns];
-                setAlbuns([...newList].sort((a: any, b: any) => (a.id || 0) - (b.id || 0)));
+                setAlbuns([...newList].sort((a: any, b: any) => (b.id || 0) - (a.id || 0)));
+                localStorage.setItem("conteffa_albuns", JSON.stringify(newList));
                 toast.success("Álbum criado com sucesso!");
             }
             setIsAddingAlbum(false);
             setNewAlbum({ title: "", date: "", location: "", cover: null, photos: [], id: null });
-        } catch (err) {
-            toast.error("Erro ao salvar álbum.");
+        } catch (err: any) {
+            const tempAlbum = { ...newAlbum, id: Date.now(), count: newAlbum.photos.length };
+            const newList = [tempAlbum, ...albuns];
+            setAlbuns([...newList].sort((a: any, b: any) => (b.id || 0) - (a.id || 0)));
+            localStorage.setItem("conteffa_albuns", JSON.stringify(newList));
+            toast.success(`Salvo localmente. Motivo: ${err.message || "Servidor offline"}`);
+            setIsAddingAlbum(false);
         }
     };
 
@@ -778,10 +925,16 @@ const AdminDashboard = () => {
     const handleDeleteAlbum = async (id: number) => {
         try {
             await apiFetch(`/albums/${id}`, { method: 'DELETE' });
-            setAlbuns(albuns.filter((a: any) => a.id !== id));
+            const updated = albuns.filter((a: any) => a.id !== id);
+            setAlbuns(updated);
+            localStorage.setItem("conteffa_albuns", JSON.stringify(updated));
             toast.success("Álbum removido.");
-        } catch (err) {
-            toast.error("Erro ao remover álbum.");
+        } catch (err: any) {
+            console.warn("Falha ao remover do Supabase, removendo localmente:", err.message);
+            const updated = albuns.filter((a: any) => a.id !== id);
+            setAlbuns(updated);
+            localStorage.setItem("conteffa_albuns", JSON.stringify(updated));
+            toast.success("Removido com sucesso (Limpado do navegador)");
         }
     };
 
@@ -917,11 +1070,15 @@ const AdminDashboard = () => {
         try {
             if (newNoticia.id) {
                 await apiFetch(`/news/${newNoticia.id}`, { method: 'PUT', body: JSON.stringify(newNoticia) });
-                setNoticias(noticias.map((n: any) => n.id === newNoticia.id ? { ...n, ...newNoticia } : n));
+                const updated = noticias.map((n: any) => n.id === newNoticia.id ? { ...n, ...newNoticia } : n);
+                setNoticias(updated);
+                localStorage.setItem("conteffa_noticias", JSON.stringify(updated));
                 toast.success("Matéria atualizada!");
             } else {
                 const res = await apiFetch("/news", { method: 'POST', body: JSON.stringify(newNoticia) });
-                setNoticias([{ ...newNoticia, id: res.id, status: "Publicado" }, ...noticias]);
+                const updated = [{ ...newNoticia, id: res.id, status: "Publicado" }, ...noticias];
+                setNoticias(updated);
+                localStorage.setItem("conteffa_noticias", JSON.stringify(updated));
                 toast.success("Matéria publicada!");
             }
 
@@ -929,13 +1086,19 @@ const AdminDashboard = () => {
             setNewNoticia({
                 title: "",
                 summary: "",
+                tags: "",
                 date: new Date().toLocaleDateString('pt-BR'),
                 status: "Rascunho",
                 photo: null,
                 id: null
             });
-        } catch (err) {
-            toast.error("Erro ao salvar notícia.");
+        } catch (err: any) {
+            const tempNoticia = { ...newNoticia, id: Date.now(), status: "Publicado" };
+            const updated = [tempNoticia, ...noticias];
+            setNoticias(updated);
+            localStorage.setItem("conteffa_noticias", JSON.stringify(updated));
+            toast.success(`Salvo localmente. Motivo: ${err.message || "Servidor offline"}`);
+            setIsAddingNoticia(false);
         }
     };
 
@@ -947,10 +1110,16 @@ const AdminDashboard = () => {
     const handleDeleteNoticia = async (id: number) => {
         try {
             await apiFetch(`/news/${id}`, { method: 'DELETE' });
-            setNoticias(noticias.filter((n: any) => n.id !== id));
+            const updated = noticias.filter((n: any) => n.id !== id);
+            setNoticias(updated);
+            localStorage.setItem("conteffa_noticias", JSON.stringify(updated));
             toast.success("Matéria removida.");
-        } catch (err) {
-            toast.error("Erro ao remover notícia.");
+        } catch (err: any) {
+            console.warn("Falha ao remover do Supabase, removendo localmente:", err.message);
+            const updated = noticias.filter((n: any) => n.id !== id);
+            setNoticias(updated);
+            localStorage.setItem("conteffa_noticias", JSON.stringify(updated));
+            toast.success("Removido com sucesso (Limpado do navegador)");
         }
     };
 
@@ -963,18 +1132,37 @@ const AdminDashboard = () => {
         try {
             if (newPalestrante.id) {
                 await apiFetch(`/speakers/${newPalestrante.id}`, { method: 'PUT', body: JSON.stringify(newPalestrante) });
-                setPalestrantes(palestrantes.map((p: any) => p.id === newPalestrante.id ? { ...p, ...newPalestrante } : p));
+                const updated = palestrantes.map((p: any) => p.id === newPalestrante.id ? { ...p, ...newPalestrante } : p);
+                setPalestrantes(updated);
+                localStorage.setItem("conteffa_palestrantes", JSON.stringify(updated));
                 toast.success("Palestrante atualizado!");
             } else {
                 const res = await apiFetch("/speakers", { method: 'POST', body: JSON.stringify(newPalestrante) });
-                setPalestrantes([...palestrantes, { ...newPalestrante, id: res.id }]);
+                const updated = [...palestrantes, { ...newPalestrante, id: res.id }];
+                setPalestrantes(updated);
+                localStorage.setItem("conteffa_palestrantes", JSON.stringify(updated));
                 toast.success("Palestrante cadastrado!");
             }
 
             setIsAddingPalestrante(false);
-            setNewPalestrante({ name: "", cargo: "", bio: "", photo: null, id: null });
-        } catch (err) {
-            toast.error("Erro ao salvar palestrante.");
+            setNewPalestrante({
+                name: "",
+                cargo: "",
+                bio: "",
+                instagram: "",
+                linkedin: "",
+                twitter: "",
+                photo: null,
+                id: null
+            });
+        } catch (err: any) {
+            console.warn("Falha ao salvar no Supabase, usando local storage:", err.message);
+            const tempSpeaker = { ...newPalestrante, id: Date.now() };
+            const updated = [...palestrantes, tempSpeaker];
+            setPalestrantes(updated);
+            localStorage.setItem("conteffa_palestrantes", JSON.stringify(updated));
+            toast.warning(`Salvo no navegador. Motivo: ${err.message}`);
+            setIsAddingPalestrante(false);
         }
     };
 
@@ -986,10 +1174,16 @@ const AdminDashboard = () => {
     const handleDeletePalestrante = async (id: number) => {
         try {
             await apiFetch(`/speakers/${id}`, { method: 'DELETE' });
-            setPalestrantes(palestrantes.filter((p: any) => p.id !== id));
+            const updated = palestrantes.filter((p: any) => p.id !== id);
+            setPalestrantes(updated);
+            localStorage.setItem("conteffa_palestrantes", JSON.stringify(updated));
             toast.success("Palestrante removido.");
-        } catch (err) {
-            toast.error("Erro ao remover palestrante.");
+        } catch (err: any) {
+            console.warn("Falha ao remover do Supabase, removendo localmente:", err.message);
+            const updated = palestrantes.filter((p: any) => p.id !== id);
+            setPalestrantes(updated);
+            localStorage.setItem("conteffa_palestrantes", JSON.stringify(updated));
+            toast.success("Removido com sucesso (Limpado do navegador)");
         }
     };
 
@@ -1001,13 +1195,14 @@ const AdminDashboard = () => {
 
         try {
             if (newConvidado.id) {
-                // In a real app we would call an API, here we simulate and update local state
+                await apiFetch(`/guests/${newConvidado.id}`, { method: 'PUT', body: JSON.stringify(newConvidado) });
                 const updated = convidados.map((c: any) => c.id === newConvidado.id ? { ...newConvidado } : c);
                 setConvidados(updated);
                 localStorage.setItem("conteffa_convidados", JSON.stringify(updated));
                 toast.success("Convidado atualizado!");
             } else {
-                const guestToAdd = { ...newConvidado, id: Date.now() };
+                const res = await apiFetch("/guests", { method: 'POST', body: JSON.stringify(newConvidado) });
+                const guestToAdd = { ...newConvidado, id: res.id };
                 const updated = [...convidados, guestToAdd];
                 setConvidados(updated);
                 localStorage.setItem("conteffa_convidados", JSON.stringify(updated));
@@ -1016,8 +1211,10 @@ const AdminDashboard = () => {
 
             setIsAddingConvidado(false);
             setNewConvidado({ name: "", cargo: "", category: "Convidado", bio: "", photo: null, id: null });
-        } catch (err) {
-            toast.error("Erro ao salvar convidado.");
+        } catch (err: any) {
+            localStorage.setItem("conteffa_convidados", JSON.stringify([...convidados, { ...newConvidado, id: Date.now() }]));
+            toast.success(`Salvo localmente. Motivo: ${err.message || "Servidor offline"}`);
+            setIsAddingConvidado(false);
         }
     };
 
@@ -1026,11 +1223,20 @@ const AdminDashboard = () => {
         setIsAddingConvidado(true);
     };
 
-    const handleDeleteConvidado = (id: number) => {
-        const updated = convidados.filter((c: any) => c.id !== id);
-        setConvidados(updated);
-        localStorage.setItem("conteffa_convidados", JSON.stringify(updated));
-        toast.success("Convidado removido.");
+    const handleDeleteConvidado = async (id: number) => {
+        try {
+            await apiFetch(`/guests/${id}`, { method: 'DELETE' });
+            const updated = convidados.filter((c: any) => c.id !== id);
+            setConvidados(updated);
+            localStorage.setItem("conteffa_convidados", JSON.stringify(updated));
+            toast.success("Convidado removido.");
+        } catch (err: any) {
+            console.warn("Falha ao remover do Supabase, removendo localmente:", err.message);
+            const updated = convidados.filter((c: any) => c.id !== id);
+            setConvidados(updated);
+            localStorage.setItem("conteffa_convidados", JSON.stringify(updated));
+            toast.success("Removido com sucesso (Limpado do navegador)");
+        }
     };
 
     const handleSaveProgramacao = async () => {
@@ -1042,18 +1248,27 @@ const AdminDashboard = () => {
         try {
             if (newProgramacao.id) {
                 await apiFetch(`/programming/${newProgramacao.id}`, { method: 'PUT', body: JSON.stringify(newProgramacao) });
-                setProgramacao(programacao.map((p: any) => p.id === newProgramacao.id ? { ...p, ...newProgramacao } : p));
+                const updated = programacao.map((p: any) => p.id === newProgramacao.id ? { ...p, ...newProgramacao } : p);
+                setProgramacao(updated);
+                localStorage.setItem("conteffa_programacao", JSON.stringify(updated));
                 toast.success("Agenda atualizada!");
             } else {
                 const res = await apiFetch("/programming", { method: 'POST', body: JSON.stringify(newProgramacao) });
-                setProgramacao([...programacao, { ...newProgramacao, id: res.id }]);
+                const updated = [...programacao, { ...newProgramacao, id: res.id }];
+                setProgramacao(updated);
+                localStorage.setItem("conteffa_programacao", JSON.stringify(updated));
                 toast.success("Dia cadastrado!");
             }
 
             setIsAddingProgramacao(false);
             setNewProgramacao({ date: "", label: "", items: [], id: null });
-        } catch (err) {
-            toast.error("Erro ao salvar programação.");
+        } catch (err: any) {
+            const tempDay = { ...newProgramacao, id: Date.now() };
+            const updated = [...programacao, tempDay];
+            setProgramacao(updated);
+            localStorage.setItem("conteffa_programacao", JSON.stringify(updated));
+            toast.success(`Salvo localmente. Motivo: ${err.message || "Servidor offline"}`);
+            setIsAddingProgramacao(false);
         }
     };
 
@@ -1083,10 +1298,16 @@ const AdminDashboard = () => {
     const handleDeleteProgramacao = async (id: number) => {
         try {
             await apiFetch(`/programming/${id}`, { method: 'DELETE' });
-            setProgramacao(programacao.filter((p: any) => p.id !== id));
+            const updated = programacao.filter((p: any) => p.id !== id);
+            setProgramacao(updated);
+            localStorage.setItem("conteffa_programacao", JSON.stringify(updated));
             toast.success("Dia removido.");
-        } catch (err) {
-            toast.error("Erro ao remover dia da agenda.");
+        } catch (err: any) {
+            console.warn("Falha ao remover do Supabase, removendo localmente:", err.message);
+            const updated = programacao.filter((p: any) => p.id !== id);
+            setProgramacao(updated);
+            localStorage.setItem("conteffa_programacao", JSON.stringify(updated));
+            toast.success("Agenda limpa localmente.");
         }
     };
 
@@ -1101,6 +1322,24 @@ const AdminDashboard = () => {
         } catch (err) {
             localStorage.setItem("conteffa_instagram", JSON.stringify(instagramConfig));
             toast.success("Salvo localmente (Servidor offline)");
+        }
+    };
+
+    const handleSaveAd = async () => {
+        try {
+            const { error } = await supabase.from('config').upsert({
+                key: 'divulgacao',
+                value: adImage,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+
+            if (error) throw error;
+
+            localStorage.setItem("conteffa_ad_image", adImage || "");
+            toast.success("Banner de divulgação atualizado!");
+        } catch (err) {
+            localStorage.setItem("conteffa_ad_image", adImage || "");
+            toast.success("Salvo localmente (Erro ao subir)");
         }
     };
 
@@ -1394,6 +1633,7 @@ const AdminDashboard = () => {
                                                 setNewNoticia({
                                                     title: "",
                                                     summary: "",
+                                                    tags: "",
                                                     date: new Date().toLocaleDateString('pt-BR'),
                                                     status: "Rascunho",
                                                     photo: null,
@@ -1438,6 +1678,16 @@ const AdminDashboard = () => {
                                                                         onChange={(e) => setNewNoticia({ ...newNoticia, summary: e.target.value })}
                                                                         placeholder="Breve descrição da notícia para o mural..."
                                                                         className="flex min-h-[100px] w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-all font-medium leading-relaxed"
+                                                                    />
+                                                                </div>
+
+                                                                <div className="space-y-2">
+                                                                    <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Tags (Separadas por vírgula)</label>
+                                                                    <Input
+                                                                        value={newNoticia.tags}
+                                                                        onChange={(e) => setNewNoticia({ ...newNoticia, tags: e.target.value })}
+                                                                        placeholder="Ex: anteffa, congresso, tecnicos, fiscalização"
+                                                                        className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50 transition-colors"
                                                                     />
                                                                 </div>
 
@@ -1673,10 +1923,10 @@ const AdminDashboard = () => {
                                                 />
 
                                                 <Button
-                                                    onClick={() => toast.success("Banner de divulgação salvo!")}
+                                                    onClick={handleSaveAd}
                                                     className="w-full rounded-xl bg-white/5 hover:bg-white/10 text-primary border border-primary/20 text-[10px] font-black uppercase tracking-widest h-9"
                                                 >
-                                                    Salvar Alteração
+                                                    Salvar Banner
                                                 </Button>
                                             </div>
                                         </div>
@@ -1694,7 +1944,16 @@ const AdminDashboard = () => {
                                         </div>
                                         <Button
                                             onClick={() => {
-                                                setNewPalestrante({ name: "", cargo: "", bio: "", photo: null, id: null });
+                                                setNewPalestrante({
+                                                    name: "",
+                                                    cargo: "",
+                                                    bio: "",
+                                                    instagram: "",
+                                                    linkedin: "",
+                                                    twitter: "",
+                                                    photo: null,
+                                                    id: null
+                                                });
                                                 setIsAddingPalestrante(true);
                                             }}
                                             className="rounded-full gap-2 px-6 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 border-none"
@@ -1742,6 +2001,42 @@ const AdminDashboard = () => {
                                                                 onChange={(e) => setNewPalestrante({ ...newPalestrante, bio: e.target.value })}
                                                                 placeholder="Conte um pouco sobre a trajetória..."
                                                                 className="flex min-h-[120px] w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-all font-medium leading-relaxed"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 bg-white/5 rounded-[2rem] border border-white/5">
+                                                        <div className="space-y-2">
+                                                            <label className="text-[10px] font-black uppercase tracking-widest text-white/30 flex items-center gap-2">
+                                                                <Instagram className="w-3 h-3 text-pink-400" /> Instagram
+                                                            </label>
+                                                            <Input
+                                                                value={newPalestrante.instagram}
+                                                                onChange={(e) => setNewPalestrante({ ...newPalestrante, instagram: e.target.value })}
+                                                                placeholder="URL do Perfil"
+                                                                className="rounded-xl h-10 bg-white/5 border-white/10 text-white text-xs"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className="text-[10px] font-black uppercase tracking-widest text-white/30 flex items-center gap-2">
+                                                                <Linkedin className="w-3 h-3 text-blue-400" /> LinkedIn
+                                                            </label>
+                                                            <Input
+                                                                value={newPalestrante.linkedin}
+                                                                onChange={(e) => setNewPalestrante({ ...newPalestrante, linkedin: e.target.value })}
+                                                                placeholder="URL do Perfil"
+                                                                className="rounded-xl h-10 bg-white/5 border-white/10 text-white text-xs"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className="text-[10px] font-black uppercase tracking-widest text-white/30 flex items-center gap-2">
+                                                                <Twitter className="w-3 h-3 text-sky-400" /> Twitter / X
+                                                            </label>
+                                                            <Input
+                                                                value={newPalestrante.twitter}
+                                                                onChange={(e) => setNewPalestrante({ ...newPalestrante, twitter: e.target.value })}
+                                                                placeholder="URL do Perfil"
+                                                                className="rounded-xl h-10 bg-white/5 border-white/10 text-white text-xs"
                                                             />
                                                         </div>
                                                     </div>

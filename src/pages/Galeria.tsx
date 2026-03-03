@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import PageLayout from "@/components/PageLayout";
 import PageBanner from "@/components/PageBanner";
 import SectionTitle from "@/components/SectionTitle";
@@ -13,19 +14,26 @@ const Galeria = () => {
   useEffect(() => {
     const fetchAlbuns = async () => {
       try {
-        const response = await fetch("http://localhost:3001/api/albums");
-        const data = await response.json();
-        setAlbuns([...data].sort((a: any, b: any) => (a.id || 0) - (b.id || 0)));
-      } catch (err) {
-        console.error("Failed to fetch albums", err);
-        // Fallback to localStorage if server is down during migration
-        const saved = localStorage.getItem("conteffa_albuns");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setAlbuns([...parsed].sort((a: any, b: any) => (a.id || 0) - (b.id || 0)));
+        const { data, error } = await supabase.from('albums').select('*').order('id', { ascending: false });
+        if (data && data.length > 0) {
+          setAlbuns(data);
+        } else {
+          loadDefaults();
         }
+      } catch (err) {
+        console.error("Failed to fetch albums from Supabase", err);
+        loadDefaults();
       }
     };
+
+    const loadDefaults = () => {
+      const saved = localStorage.getItem("conteffa_albuns");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setAlbuns([...parsed].sort((a: any, b: any) => (b.id || 0) - (a.id || 0)));
+      }
+    };
+
     fetchAlbuns();
   }, []);
 
@@ -72,7 +80,7 @@ const Galeria = () => {
                           )}
                           <div className="absolute top-6 left-6">
                             <span className="bg-primary text-white text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-tighter shadow-lg">
-                              {album.count || 0} FOTOS
+                              {(album.photos?.length || album.count || 0)} FOTOS
                             </span>
                           </div>
                         </div>
@@ -130,27 +138,44 @@ const Galeria = () => {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {/* If we had real photos, they would render here. 
-                      Since we use placeholders/simulated data, we show a grid. */}
-                  {Array.from({ length: selectedAlbum.count || 12 }).map((_, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="aspect-square rounded-3xl bg-slate-100 overflow-hidden group relative cursor-zoom-in"
-                    >
-                      <img
-                        src={`https://images.unsplash.com/photo-${1500000000000 + i}?auto=format&fit=crop&w=800&q=80`}
-                        alt="Photo"
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                        onError={(e) => {
-                          e.currentTarget.src = "https://images.unsplash.com/photo-1492724441997-5dc865305da7?auto=format&fit=crop&w=800&q=80";
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </motion.div>
-                  ))}
+                  {selectedAlbum.photos && selectedAlbum.photos.length > 0 ? (
+                    selectedAlbum.photos.map((photo: string, i: number) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="aspect-square rounded-3xl bg-slate-100 overflow-hidden group relative cursor-zoom-in shadow-md"
+                      >
+                        <img
+                          src={photo}
+                          alt={`Photo ${i + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        />
+                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </motion.div>
+                    ))
+                  ) : (
+                    Array.from({ length: selectedAlbum.count || 12 }).map((_, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="aspect-square rounded-3xl bg-slate-100 overflow-hidden group relative cursor-zoom-in"
+                      >
+                        <img
+                          src={`https://images.unsplash.com/photo-${1500000000000 + i}?auto=format&fit=crop&w=800&q=80`}
+                          alt="Photo"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          onError={(e) => {
+                            e.currentTarget.src = "https://images.unsplash.com/photo-1492724441997-5dc865305da7?auto=format&fit=crop&w=800&q=80";
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </motion.div>
+                    ))
+                  )}
                 </div>
               </motion.div>
             )}

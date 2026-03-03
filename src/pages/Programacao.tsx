@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import PageLayout from "@/components/PageLayout";
 import PageBanner from "@/components/PageBanner";
 import SectionTitle from "@/components/SectionTitle";
@@ -10,61 +11,59 @@ const Programacao = () => {
   const [people, setPeople] = useState<any[]>([]);
 
   useEffect(() => {
-    // Load speakers and guests to find photos
-    const savedPalestrantes = localStorage.getItem("conteffa_palestrantes");
-    const savedConvidados = localStorage.getItem("conteffa_convidados");
-
-    let allPeople: any[] = [];
-    if (savedPalestrantes) allPeople = [...allPeople, ...JSON.parse(savedPalestrantes)];
-    if (savedConvidados) allPeople = [...allPeople, ...JSON.parse(savedConvidados)];
-
-    setPeople(allPeople);
-
-    const fetchProgramacao = async () => {
+    const fetchAllData = async () => {
       try {
-        const response = await fetch("http://localhost:3001/api/programming");
-        const data = await response.json();
-        if (data.length > 0) {
-          setDays(data);
+        // 1. Carregar Palestrantes e Convidados do Supabase
+        const [{ data: speakers }, { data: guests }] = await Promise.all([
+          supabase.from('speakers').select('*'),
+          supabase.from('guests').select('*')
+        ]);
+
+        let allPeople: any[] = [];
+        if (speakers) allPeople = [...allPeople, ...speakers];
+        if (guests) allPeople = [...allPeople, ...guests];
+        setPeople(allPeople);
+
+        // 2. Carregar Programação do Supabase
+        const { data: progData } = await supabase.from('programming').select('*').order('id');
+        if (progData && progData.length > 0) {
+          setDays(progData);
         } else {
           loadDefaults();
         }
       } catch (err) {
-        console.error("Failed to fetch programming", err);
+        console.error("Failed to fetch programming data from Supabase", err);
         loadDefaults();
       }
     };
 
     const loadDefaults = () => {
+      // Fallback for people
+      const savedPalestrantes = localStorage.getItem("conteffa_palestrantes");
+      const savedConvidados = localStorage.getItem("conteffa_convidados");
+      let allPeople: any[] = [];
+      if (savedPalestrantes) allPeople = [...allPeople, ...JSON.parse(savedPalestrantes)];
+      if (savedConvidados) allPeople = [...allPeople, ...JSON.parse(savedConvidados)];
+      setPeople(allPeople);
+
+      // Fallback for days
       const saved = localStorage.getItem("conteffa_programacao");
       if (saved) {
         setDays(JSON.parse(saved));
       } else {
         setDays([
           {
-            date: "12 de Novembro",
-            label: "Dia 1 — Abertura",
+            date: "12 de Novembro", label: "Dia 1 — Abertura",
             items: [
               { time: "08:00", title: "Credenciamento", speaker: "" },
-              { time: "09:00", title: "Cerimônia de Abertura", speaker: "Presidente do CONTEFFA" },
-              { time: "10:30", title: "Palestra Magna: O Futuro da Profissão", speaker: "A confirmar" },
-              { time: "14:00", title: "Mesa Redonda: Desafios Contemporâneos", speaker: "Palestrantes convidados" },
-            ],
-          },
-          {
-            date: "13 de Novembro",
-            label: "Dia 2 — Palestras",
-            items: [
-              { time: "08:30", title: "Painel: Inovação e Tecnologia", speaker: "A confirmar" },
-              { time: "10:00", title: "Workshop: Boas Práticas", speaker: "A confirmar" },
-              { time: "14:00", title: "Apresentação de Teses — Bloco 1", speaker: "Diversos autores" },
-            ],
-          },
+              { time: "09:00", title: "Cerimônia de Abertura", speaker: "Presidente do CONTEFFA" }
+            ]
+          }
         ]);
       }
     };
 
-    fetchProgramacao();
+    fetchAllData();
   }, []);
 
   return (

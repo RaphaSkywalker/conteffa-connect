@@ -1,5 +1,7 @@
 import PageLayout from "@/components/PageLayout";
+import { useState, useEffect } from "react";
 import SectionTitle from "@/components/SectionTitle";
+import { supabase } from "@/lib/supabase";
 import PageBanner from "@/components/PageBanner";
 import { motion } from "framer-motion";
 import { User, Quote } from "lucide-react";
@@ -84,20 +86,70 @@ const CartaPresidente = () => (
 );
 
 const Historico = () => {
-  const timelineData = [
-    { year: "2002", title: "Fundação da ANTEFFA", description: "Início da trajetória oficial da Associação Nacional dos Técnicos de Fiscalização Federal Agropecuária." },
-    { year: "2003", title: "1º Encontro Nacional", description: "Primeira grande reunião de mobilização da categoria." },
-    { year: "2004", title: "2º Encontro Nacional", description: "Evento que consolidou a mobilização da categoria e preparou o caminho para a criação do congresso nacional." },
-    { year: "2005", title: "I CONTEFFA — Ilhéus", description: "O primeiro Congresso Nacional dos Técnicos de Fiscalização Federal Agropecuária." },
-    { year: "", title: "II CONTEFFA — Fortaleza", description: "Segunda edição com foco em estratégias de valorização." },
-    { year: "", title: "III CONTEFFA — Rondônia", description: "Terceira edição expandindo as fronteiras do debate técnico." },
-    { year: "", title: "IV CONTEFFA — Foz do Iguaçu", description: "Quarta edição em um dos principais polos turísticos e técnicos." },
-    { year: "2012", title: "V CONTEFFA — Uberlândia", description: "Um marco na discussão sobre a modernização da fiscalização." },
-    { year: "2014", title: "VI CONTEFFA — Bento Gonçalves", description: "Debates técnicos no sul do país, fortalecendo a união." },
-    { year: "2016", title: "VII CONTEFFA — Caldas Novas", description: "Sétima edição focada em inovação e novos processos." },
-    { year: "2023", title: "VIII CONTEFFA — Florianópolis", description: "Retomada histórica pós-pandemia com recorde de participação." },
-    { year: "2026", title: "IX CONTEFFA — Recife", description: "A nona edição, consolidada como o maior evento da história da ANTEFFA.", active: true },
-  ];
+  const [timelineData, setTimelineData] = useState<any[]>([]);
+  const [institutionalText, setInstitutionalText] = useState("");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Tentar carregar do Supabase primeiro
+        const { data: events, error: eventsError } = await supabase
+          .from('timeline_events')
+          .select('*')
+          .order('year', { ascending: true });
+
+        const { data: settings, error: settingsError } = await supabase
+          .from('site_settings')
+          .select('content')
+          .eq('id', 'institutional_text')
+          .single();
+
+        if (events && events.length > 0) {
+          // Remover duplicados (mesmo ano e título)
+          const uniqueEvents = events.filter((v: any, i: number, a: any[]) =>
+            a.findIndex((t: any) => t.year === v.year && t.title === v.title) === i
+          );
+          setTimelineData(uniqueEvents);
+        } else {
+          // Fallback para o localStorage se falhar o Supabase
+          const savedEvents = localStorage.getItem("conteffa_timeline_events");
+          if (savedEvents) {
+            const parsed = JSON.parse(savedEvents);
+            setTimelineData([...parsed].sort((a: any, b: any) => (a.year || '').localeCompare(b.year || '')));
+          } else {
+            // Dados estáticos originais como último recurso
+            setTimelineData([
+              { year: "2002", title: "Fundação da ANTEFFA", description: "Início da trajetória oficial da Associação Nacional dos Técnicos de Fiscalização Federal Agropecuária." },
+              { year: "2003", title: "1º Encontro Nacional", description: "Primeira grande reunião de mobilização da categoria." },
+              { year: "2004", title: "2º Encontro Nacional", description: "Evento que consolidou a mobilização da categoria e preparou o caminho para a criação do congresso nacional." },
+              { year: "2005", title: "I CONTEFFA — Ilhéus", description: "O primeiro Congresso Nacional dos Técnicos de Fiscalização Federal Agropecuária." },
+              { year: "2006", title: "II CONTEFFA — Fortaleza", description: "Segunda edição com foco em estratégias de valorização." },
+              { year: "2008", title: "III CONTEFFA — Rondônia", description: "Terceira edição expandindo as fronteiras do debate técnico." },
+              { year: "2010", title: "IV CONTEFFA — Foz do Iguaçu", description: "Quarta edição em um dos principais polos turísticos e técnicos." },
+              { year: "2012", title: "V CONTEFFA — Uberlândia", description: "Um marco na discussão sobre a modernização da fiscalização." },
+              { year: "2014", title: "VI CONTEFFA — Bento Gonçalves", description: "Debates técnicos no sul do país, fortalecendo a união." },
+              { year: "2016", title: "VII CONTEFFA — Caldas Novas", description: "Sétima edição focada em inovação e novos processos." },
+              { year: "2023", title: "VIII CONTEFFA — Florianópolis", description: "Retomada histórica pós-pandemia com recorde de participação." },
+              { year: "2026", title: "IX CONTEFFA — Recife", description: "A nona edição, consolidada como o maior evento da história da ANTEFFA.", active: true },
+            ]);
+          }
+        }
+
+        if (settings && !settingsError) {
+          setInstitutionalText(settings.content);
+        } else {
+          const savedText = localStorage.getItem("conteffa_timeline_text");
+          setInstitutionalText(savedText || `A Associação Nacional dos Técnicos de Fiscalização Federal Agropecuária – ANTEFFA, fundada em 2002, é a entidade representativa da categoria no âmbito federal. Nossa missão é lutar pela valorização profissional e pelo reconhecimento da importância técnica de nossos associados no cenário da agropecuária nacional.
+  
+  Ao longo de mais de duas décadas, a ANTEFFA tem sido protagonista em negociações fundamentais para a carreira dos técnicos, promovendo congressos nacionais (CONTEFFAs) e articulando diálogos institucionais para o fortalecimento da defesa agropecuária no Brasil. Nosso compromisso é com a excelência técnica e com a defesa dos interesses de nossos associados em todo o território nacional.`);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar do Supabase:", err);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   return (
     <PageLayout>
@@ -119,49 +171,52 @@ const Historico = () => {
             {/* Linha Central da Timeline */}
             <div className="absolute left-[30px] md:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-primary/0 via-primary/30 to-primary/0 -translate-x-1/2" />
 
-            {timelineData.map((item, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className={`relative flex items-center mb-16 last:mb-0 ${index % 2 === 0 ? 'md:flex-row-reverse' : 'md:flex-row'}`}
-              >
-                {/* O Ponto (Bullet) */}
-                <div className="absolute left-[30px] md:left-1/2 -translate-x-1/2 z-20">
-                  <div className={`w-4 h-4 rounded-full border-2 ${item.active ? 'bg-primary border-primary shadow-[0_0_15px_rgba(0,171,229,0.8)]' : 'bg-[#0B1B32] border-primary/50'}`}>
-                    {item.active && <div className="absolute inset-0 rounded-full animate-ping bg-primary opacity-50" />}
-                  </div>
-                </div>
-
-                {/* Conteúdo à Esquerda/Direita */}
-                <div className="w-full md:w-[45%] pl-20 md:pl-0">
-                  <div className={`p-8 rounded-[2rem] bg-white/[0.03] backdrop-blur-xl border border-white/5 shadow-2xl transition-all duration-500 hover:bg-white/[0.06] hover:-translate-y-1 group ${item.active ? 'border-primary/20' : ''}`}>
-                    {item.year && (
-                      <span className="inline-block px-4 py-1 rounded-full bg-primary/10 text-primary font-black text-xs uppercase tracking-[0.2em] mb-4">
-                        {item.year}
-                      </span>
-                    )}
-                    <h3 className={`text-xl md:text-2xl font-heading font-black mb-3 ${item.active ? 'text-white' : 'text-white/90'} group-hover:text-primary transition-colors`}>
-                      {item.title}
-                    </h3>
-                    <p className="text-white/50 text-base font-body leading-relaxed line-clamp-2 md:line-clamp-none">
-                      {item.description}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Ano flutuante opcional no lado oposto na desktop */}
-                <div className="hidden md:flex w-[45%] items-center justify-center">
-                  {item.year && (
-                    <div className="text-7xl font-heading font-black opacity-[0.03] text-white">
-                      {item.year}
+            {timelineData.map((item, index) => {
+              const isActive = item.active || item.year === "2026";
+              return (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  className={`relative flex items-center mb-16 last:mb-0 ${index % 2 === 0 ? 'md:flex-row-reverse' : 'md:flex-row'}`}
+                >
+                  {/* O Ponto (Bullet) */}
+                  <div className="absolute left-[30px] md:left-1/2 -translate-x-1/2 z-20">
+                    <div className={`w-4 h-4 rounded-full border-2 ${isActive ? 'bg-primary border-primary shadow-[0_0_15px_rgba(0,171,229,0.8)]' : 'bg-[#0B1B32] border-primary/50'}`}>
+                      {isActive && <div className="absolute inset-0 rounded-full animate-ping bg-primary opacity-50" />}
                     </div>
-                  )}
-                </div>
-              </motion.div>
-            ))}
+                  </div>
+
+                  {/* Conteúdo à Esquerda/Direita */}
+                  <div className="w-full md:w-[45%] pl-20 md:pl-0">
+                    <div className={`p-8 rounded-[2rem] bg-white/[0.03] backdrop-blur-xl border border-white/5 shadow-2xl transition-all duration-500 hover:bg-white/[0.06] hover:-translate-y-1 group ${isActive ? 'border-primary/20' : ''}`}>
+                      {item.year && (
+                        <span className="inline-block px-4 py-1 rounded-full bg-primary/10 text-primary font-black text-xs uppercase tracking-[0.2em] mb-4">
+                          {item.year}
+                        </span>
+                      )}
+                      <h3 className={`text-xl md:text-2xl font-heading font-black mb-3 ${isActive ? 'text-white' : 'text-white/90'} group-hover:text-primary transition-colors`}>
+                        {item.title}
+                      </h3>
+                      <p className="text-white/50 text-base font-body leading-relaxed line-clamp-2 md:line-clamp-none">
+                        {item.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Ano flutuante opcional no lado oposto na desktop */}
+                  <div className="hidden md:flex w-[45%] items-center justify-center">
+                    {item.year && (
+                      <div className="text-7xl font-heading font-black opacity-[0.03] text-white">
+                        {item.year}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
 
           {/* Texto Detalhado Pós-Timeline */}
@@ -181,30 +236,9 @@ const Historico = () => {
               </h3>
 
               <div className="space-y-8 text-white/70 text-lg leading-relaxed font-body">
-                <p>
-                  Entidade de classe de direito civil sem fins lucrativos com sede em Brasília – DF. Seus associados são os ocupantes dos cargos das Atividades Técnicas de Fiscalização Federal Agropecuária, de Agente de Atividades em Agropecuárias, Agente de Inspeção Sanitária e Industrial de Produtos de Origem Animal, Técnico de Laboratório, Auxiliar de Laboratório e Auxiliar Operacional em Agropecuária do Quadro de Pessoal do Ministério da Agricultura Pecuária e Abastecimento, <span className="text-white font-bold">MAPA</span>.
-                </p>
-                <p>
-                  Criada em <span className="text-primary font-bold">27 de agosto de 2002</span> hoje conta com associados em todo o território nacional. Tem como missão: <span className="italic">“Unir, representar, defender e fortalecer a classe, propugnando pela elevação do nível sociocultural, moral, cívico, técnico e profissional, junto à sociedade civil em geral, poderes públicos e demais instituições”</span>.
-                </p>
-                <p>
-                  Em 2003 e 2004 a ANTEFFA realizou na cidade de Morrinhos (GO) o 1º e o 2º Encontro Nacional dos Técnicos de Fiscalização Federal Agropecuária, com um público de cerca de 50 associados, que contribuíram para a realização do 1º Congresso Nacional dos Técnicos de Fiscalização Federal Agropecuária realizado em Ilhéus-BA, cuja anfitriã foi a Associação dos Técnicos de Fiscalização Federal Agropecuária do Estado da Bahia – <span className="text-white">ATEFFA-BA</span>, tido como um marco para a edição bianual do evento.
-                </p>
-                <p>
-                  O 2º Congresso foi realizado na cidade de Fortaleza – CE, tendo como organizadora a <span className="text-white">ATEFFA-CE</span>, o 3º Congresso ocorreu na cidade de Ouro-Preto do Oeste – RO, organizado pela <span className="text-white">ATEFFA-RO</span>. Já o 4º Congresso foi organizado pela <span className="text-white">ATEFFA-PR</span>, tendo como sede a cidade de Foz do Iguaçu – PR. Neste congresso foi comemorado dez anos do movimento chamado de Pró-Técnico de Fiscalização Federal Agropecuária e contou com a participação de 369 congressistas. Além dos congressistas participaram deste evento inúmero familiares dos associados o que têm se constituído uma característica muito especial e contribuído para um ambiente propício na busca do conhecimento, a discussão dos problemas da classe e a integração entre os servidores e suas famílias.
-                </p>
-                <p>
-                  O 5º Congresso foi realizado nos dias 30 de julho a 02 de agosto de 2012, na cidade de Uberlândia – MG e teve como anfitriã a <span className="text-white">ATEFFA – MG</span>. O tema central do V Congresso Nacional foi: <span className="italic text-white/90">“Juntos Com Responsabilidade, Cuidando das fontes Alimentares do Agronegócio Tendo Atitude Sustentável em Benefício do Homem”</span> A organização do evento foi o ponto alto e preparou-se um grande projeto onde se desenvolveu atividades que, sem dúvida, proporcionaram integração, intercâmbio de conhecimento e capacitação para os participantes.
-                </p>
-                <p>
-                  Nos dias 17 a 21 de novembro e 2014, no Hotel Dall’Onder situado na Bela Cidade de Bento Gonçalves, Região da Serra Gaúcha, sob o tema <span className="italic text-white/90">“A organização dos TFFA’s frente aos desafios do momento atual”</span> foi realizado o 6º Congresso Nacional dos Técnicos de Fiscalização Federal Agropecuária, VI CONTEFFA, este evento foi marcante para a categoria, pois os organizadores colocou em prática um pleito de grande parte dos TFFAs de transformá-lo numa instância de debate mais focada nos problemas da categoria, fugindo do “modelo capacitação”, desta forma, criou-se a possibilidade de apresentação de teses, que foram eleitas, discutidas nas oficinas e submetidas à plenária. O Modelo foi aprovado pela categoria e incorporado para ser adotado nos eventos seguintes.
-                </p>
-                <p>
-                  Neste ano de 2016 com o tema <span className="italic text-white/90">“Fortalecendo a classe e contribuindo para o desenvolvimento do agronegócio brasileiro”</span> voltaremos a se reunir na cidade de Caldas Novas (GO), neste evento será mantido o mesmo formato do Congresso de Bento Gonçalves, serão debatidos temas pertinentes aos interesses das categorias, suas demandas relativas às condições de trabalho, política e organização da classe e também será eleita a sede do VII CONTEFFA. A apresentação de teses será mantida que deverão versar sobre os seguintes eixos temáticos: Plano de lutas da categoria; modernização do MAPA; ética na função pública, direitos e deveres do servidor público; o agronegócio brasileiro e a preservação ambiental.
-                </p>
-                <p>
-                  Caldas se constitui como um dos mais importantes polos turísticos do estado de Goiás e tende a se tornar um grande polo turístico internacional, sua infraestrutura hoteleira conta hoje com mais de 80 hotéis, das mais diversas categorias, desde os mais sofisticados até os mais simples, todos dotados de piscinas termais para uso de seus hóspedes.
-                </p>
+                {institutionalText.split('\n\n').map((paragraph, idx) => (
+                  <p key={idx}>{paragraph}</p>
+                ))}
               </div>
             </div>
           </motion.div>

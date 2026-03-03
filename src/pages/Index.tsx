@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+import { supabase } from "@/lib/supabase";
 import { motion, animate, useInView } from "framer-motion";
 import { Link } from "react-router-dom";
-import { CalendarDays, Users, Mic, MapPin, FileText, ArrowRight, User, Calendar, Newspaper, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, Users, Mic, MapPin, FileText, ArrowRight, User, Calendar, Newspaper, ChevronLeft, ChevronRight, Instagram, Linkedin, Twitter } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import Countdown from "@/components/Countdown";
 import SectionTitle from "@/components/SectionTitle";
@@ -40,13 +41,13 @@ const highlights = [
 
 const StatCounter = ({ value }: { value: string }) => {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true });
+  const isInView = useInView(ref);
   const [displayValue, setDisplayValue] = useState("0");
 
   useEffect(() => {
     if (isInView) {
-      const numericPart = parseInt(value.replace(/\D/g, ""));
-      const suffix = value.replace(/[0-9.]/g, "");
+      const numericPart = parseInt(value.replace(/\D/g, "")) || 0;
+      const suffix = value.replace(/[0-9]/g, "");
 
       const controls = animate(0, numericPart, {
         duration: 2,
@@ -56,8 +57,10 @@ const StatCounter = ({ value }: { value: string }) => {
         },
       });
       return () => controls.stop();
+    } else {
+      setDisplayValue(value);
     }
-  }, [isInView, value]);
+  }, [value, isInView]);
 
   return <span ref={ref}>{displayValue}</span>;
 };
@@ -85,26 +88,33 @@ const Index = () => {
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        const [speakersRes, newsRes] = await Promise.all([
-          fetch("http://localhost:3001/api/speakers"),
-          fetch("http://localhost:3001/api/news")
-        ]);
+        // 1. Palestrantes do Supabase
+        const { data: speakersData } = await supabase.from('speakers').select('*').limit(6);
 
-        const speakersData = await speakersRes.json();
-        const newsData = await newsRes.json();
+        // 2. Notícias do Supabase
+        const { data: newsData } = await supabase.from('news').select('*').order('created_at', { ascending: false }).limit(3);
 
-        if (speakersData.length > 0) {
-          setPalestrantes(speakersData);
-        } else {
-          loadDefaultData();
+        // 3. Contagem de Inscritos do Supabase
+        const { data: regs, error: regError } = await supabase.from('registrations').select('id');
+        const regCount = regs ? regs.length : 0;
+        if (regError) {
+          console.error("Erro ao carregar inscritos:", regError.message);
         }
 
-        if (newsData.length > 0) {
+        if (speakersData && speakersData.length > 0) {
+          setPalestrantes(speakersData);
+        }
+
+        if (newsData && newsData.length > 0) {
           setNoticias(newsData);
+        }
+
+        if (regs) {
+          // Use Math.max to avoid overwriting local data with 0 from cloud if local exists
+          setInscritosCount(prev => Math.max(prev, regCount));
         }
       } catch (err) {
         console.error("Failed to fetch home data", err);
-        loadDefaultData();
       }
     };
 
@@ -112,26 +122,36 @@ const Index = () => {
       // Speakers
       const savedPalestrantes = localStorage.getItem("conteffa_palestrantes");
       if (savedPalestrantes) {
-        setPalestrantes(JSON.parse(savedPalestrantes));
-      } else {
-        setPalestrantes([
-          { id: 1, name: "José Bezerra da Rocha", cargo: "Presidente da ANTEFFA", bio: "Liderando a organização do IX CONTEFFA para fortalecer a categoria.", photo: "/presidente-jose-v2.jpg" },
-          { id: 2, name: "Dr. Roberto Silva", cargo: "Especialista em Defesa Agropecuária", bio: "Palestrante confirmado para discutir os novos rumos da fiscalização federal.", photo: null },
-          { id: 3, name: "Comissão Organizadora", cargo: "Recife 2026", bio: "Equipe dedicada ao planejamento estratégico do evento no Mar Hotel Conventions.", photo: null }
-        ]);
+        const parsed = JSON.parse(savedPalestrantes);
+        if (parsed.length > 0) {
+          setPalestrantes(parsed);
+          return;
+        }
       }
 
+      setPalestrantes([
+        { id: 1, name: "José Bezerra da Rocha", cargo: "Presidente da ANTEFFA", bio: "Liderando a organização do IX CONTEFFA para fortalecer a categoria.", photo: "/presidente-jose-v2.jpg" },
+        { id: 2, name: "Dr. Roberto Silva", cargo: "Especialista em Defesa Agropecuária", bio: "Palestrante confirmado para discutir os novos rumos da fiscalização federal.", photo: null },
+        { id: 3, name: "Comissão Organizadora", cargo: "Recife 2026", bio: "Equipe dedicada ao planejamento estratégico do evento no Mar Hotel Conventions.", photo: null }
+      ]);
+    };
+
+    const loadDefaultNews = () => {
       // News
       const savedNoticias = localStorage.getItem("conteffa_noticias");
       if (savedNoticias) {
-        setNoticias(JSON.parse(savedNoticias));
-      } else {
-        setNoticias([
-          { title: "Inscrições abertas para o IX CONTEFFA 2026", date: "15 de março de 2026", photo: "https://images.unsplash.com/photo-1591115765373-520b7a217157?w=800&auto=format&fit=crop&q=60" },
-          { title: "Programação preliminar divulgada", date: "01 de abril de 2026", photo: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop&q=60" },
-          { title: "Previsão de recorde de público", date: "10 de abril de 2026", photo: "https://images.unsplash.com/photo-1505373676834-4bd3dec6e73c?w=800&auto=format&fit=crop&q=60" }
-        ]);
+        const parsed = JSON.parse(savedNoticias);
+        if (parsed.length > 0) {
+          setNoticias(parsed);
+          return;
+        }
       }
+
+      setNoticias([
+        { title: "Inscrições abertas para o IX CONTEFFA 2026", date: "15 de março de 2026", photo: "https://images.unsplash.com/photo-1591115765373-520b7a217157?w=800&auto=format&fit=crop&q=60" },
+        { title: "Programação preliminar divulgada", date: "01 de abril de 2026", photo: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop&q=60" },
+        { title: "Previsão de recorde de público", date: "10 de abril de 2026", photo: "https://images.unsplash.com/photo-1505373676834-4bd3dec6e73c?w=800&auto=format&fit=crop&q=60" }
+      ]);
     };
 
     const loadInscritosCount = () => {
@@ -143,6 +163,30 @@ const Index = () => {
 
     fetchAllData();
     loadInscritosCount();
+
+    // -- REALTIME SUBSCRIPTIONS --
+    const channel = supabase
+      .channel('home_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'speakers' },
+        () => fetchAllData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'news' },
+        () => fetchAllData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'registrations' },
+        () => fetchAllData()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
@@ -277,7 +321,7 @@ const Index = () => {
       </section>
 
       {/* Palestrantes Section */}
-      <section className="py-24 bg-background relative">
+      <section className="py-16 bg-background relative">
         <div className="container mx-auto px-4 relative z-10">
           <div className="relative mb-4">
             <SectionTitle
@@ -288,65 +332,89 @@ const Index = () => {
             />
           </div>
 
-          <div className="relative px-12 md:px-20">
-            {palestrantes.length > 3 && (
-              <>
-                <button
-                  onClick={() => scroll('left')}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full border border-primary/20 flex items-center justify-center bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90"
-                >
-                  <ChevronLeft className="w-6 h-6" />
-                </button>
-                <button
-                  onClick={() => scroll('right')}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full border border-primary/20 flex items-center justify-center bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90"
-                >
-                  <ChevronRight className="w-6 h-6" />
-                </button>
-              </>
-            )}
+          {palestrantes.length > 0 && (
+            <div className="relative px-12 md:px-20">
+              {palestrantes.length > 3 && (
+                <>
+                  <button
+                    onClick={() => scroll('left')}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full border border-primary/20 flex items-center justify-center bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={() => scroll('right')}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full border border-primary/20 flex items-center justify-center bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                </>
+              )}
 
-            <div
-              ref={scrollContainerRef}
-              className={`flex overflow-x-auto gap-8 py-24 px-4 -mx-4 no-scrollbar scroll-smooth ${palestrantes.length <= 3 ? 'justify-center' : ''}`}
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              {palestrantes.map((p: any, i: number) => (
-                <motion.div
-                  key={p.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                  className="w-full max-w-[350px] flex-shrink-0 group relative p-10 rounded-[3rem] bg-card border border-border/50 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden text-center flex flex-col items-center"
-                >
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-[5rem] group-hover:bg-primary/10 transition-colors" />
+              <div
+                ref={scrollContainerRef}
+                className={`flex overflow-x-auto gap-8 py-12 px-4 -mx-4 no-scrollbar scroll-smooth ${palestrantes.length <= 3 ? 'justify-center' : ''}`}
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {palestrantes.map((p: any, i: number) => (
+                  <motion.div
+                    key={p.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}
+                    className="w-full max-w-[300px] flex-shrink-0 group relative p-6 rounded-[2.5rem] bg-[#0B1B32] border border-white/10 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden text-center flex flex-col items-center"
+                  >
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-bl-[4rem] group-hover:bg-primary/10 transition-colors" />
 
-                  <div className="relative z-10 w-full flex flex-col items-center">
-                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6 border-[3px] border-white shadow-lg group-hover:scale-110 transition-transform duration-500 overflow-hidden">
-                      {p.photo ? (
-                        <img src={p.photo} alt={p.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <User className="w-10 h-10 text-primary" />
+                    <div className="relative z-10 w-full flex flex-col items-center">
+                      <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-4 border-[3px] border-white/10 shadow-lg group-hover:scale-110 transition-transform duration-500 overflow-hidden">
+                        {p.photo ? (
+                          <img src={p.photo} alt={p.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-8 h-8 text-primary" />
+                        )}
+                      </div>
+                      <h3 className="text-xl font-heading font-black mb-1 text-white group-hover:text-primary transition-colors leading-tight">
+                        {p.name}
+                      </h3>
+                      <p className="text-[11px] font-bold text-primary uppercase tracking-wider mb-3">
+                        {p.cargo}
+                      </p>
+                      {p.bio && (
+                        <p className="text-xs text-white/60 font-body leading-relaxed mb-4 line-clamp-2">
+                          {p.bio}
+                        </p>
                       )}
+
+                      <div className="flex items-center justify-center gap-3 mt-auto pt-4 border-t border-border/10 w-full">
+                        {p.instagram && (
+                          <a href={p.instagram} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-pink-500/10 text-pink-500 hover:bg-pink-500 hover:text-white transition-all duration-300">
+                            <Instagram className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        {p.linkedin && (
+                          <a href={p.linkedin} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white transition-all duration-300">
+                            <Linkedin className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        {p.twitter && (
+                          <a href={p.twitter} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-sky-500/10 text-sky-500 hover:bg-sky-500 hover:text-white transition-all duration-300">
+                            <Twitter className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        {!p.instagram && !p.linkedin && !p.twitter && (
+                          <div className="flex items-center justify-center text-primary text-xs font-bold gap-2 group-hover:translate-x-1 transition-transform cursor-pointer">
+                            Ver detalhes <ArrowRight className="w-3 h-3" />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <h3 className="text-2xl font-heading font-black mb-2 text-foreground group-hover:text-primary transition-colors leading-tight">
-                      {p.name}
-                    </h3>
-                    <p className="text-sm font-bold text-primary uppercase tracking-wider mb-4">
-                      {p.cargo}
-                    </p>
-                    <p className="text-muted-foreground font-body leading-relaxed mb-6 line-clamp-3">
-                      {p.bio}
-                    </p>
-                    <div className="flex items-center justify-center text-primary font-bold gap-2 group-hover:translate-x-2 transition-transform cursor-pointer mt-auto">
-                      Ver detalhes <ArrowRight className="w-4 h-4" />
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
 
@@ -396,59 +464,61 @@ const Index = () => {
             light={true}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {noticias.slice(0, 3).map((post: any, i: number) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="group flex flex-col bg-white rounded-[2rem] overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
-              >
-                <div className="relative h-64 overflow-hidden bg-slate-100 flex items-center justify-center">
-                  {post.photo ? (
-                    <img
-                      src={post.photo}
-                      alt={post.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                    />
-                  ) : (
-                    <Newspaper className="w-12 h-12 text-slate-300" />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                </div>
+          {noticias.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+              {noticias.slice(0, 3).map((post: any, i: number) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="group group flex flex-col bg-white rounded-[2rem] overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
+                >
+                  <div className="relative h-64 overflow-hidden bg-slate-100 flex items-center justify-center">
+                    {post.photo ? (
+                      <img
+                        src={post.photo}
+                        alt={post.title}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      />
+                    ) : (
+                      <Newspaper className="w-12 h-12 text-slate-300" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                  </div>
 
-                <div className="p-8 flex flex-col flex-1">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-primary font-bold uppercase tracking-wider mb-3">
-                    <div className="flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5" />
-                      Assessoria Conteffa
+                  <div className="p-8 flex flex-col flex-1">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-primary font-bold uppercase tracking-wider mb-3">
+                      <div className="flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5" />
+                        Assessoria Conteffa
+                      </div>
+                      <span className="w-1 h-1 rounded-full bg-slate-300" />
+                      <span className="text-slate-500 font-medium">{post.date}</span>
                     </div>
-                    <span className="w-1 h-1 rounded-full bg-slate-300" />
-                    <span className="text-slate-500 font-medium">{post.date}</span>
-                  </div>
 
-                  <h3 className="text-xl font-heading font-black mb-6 leading-tight text-slate-900 group-hover:text-primary transition-colors line-clamp-2">
-                    {post.title}
-                  </h3>
+                    <h3 className="text-xl font-heading font-black mb-6 leading-tight text-slate-900 group-hover:text-primary transition-colors line-clamp-2">
+                      {post.title}
+                    </h3>
 
-                  <div className="mt-auto">
-                    <Link to="/noticias">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full rounded-xl border-primary/20 text-primary font-bold text-xs uppercase tracking-[0.2em] hover:bg-primary hover:text-white transition-all h-11"
-                      >
-                        LER MAIS
-                        <ArrowRight className="w-4 h-4 ml-2" />
-                      </Button>
-                    </Link>
+                    <div className="mt-auto">
+                      <Link to="/noticias">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full rounded-xl border-primary/20 text-primary font-bold text-xs uppercase tracking-[0.2em] hover:bg-primary hover:text-white transition-all h-11"
+                        >
+                          LER MAIS
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

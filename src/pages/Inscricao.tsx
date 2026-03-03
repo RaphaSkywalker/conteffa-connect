@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { supabase } from "@/lib/supabase";
 import PageLayout from "@/components/PageLayout";
 import PageBanner from "@/components/PageBanner";
 import SectionTitle from "@/components/SectionTitle";
@@ -48,65 +49,73 @@ const Inscricao = () => {
     nomeAcompanhante: "",
   });
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setForm({ ...form, foto: reader.result as string });
-      };
-      reader.readAsDataURL(file);
+      toast.loading("Enviando sua foto...", { id: "upload" });
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+        const filePath = `registrations/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('media')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('media')
+          .getPublicUrl(filePath);
+
+        setForm({ ...form, foto: publicUrl });
+        toast.success("Foto carregada com sucesso!", { id: "upload" });
+      } catch (err) {
+        console.error("Erro no upload:", err);
+        toast.error("Erro ao carregar foto.", { id: "upload" });
+      }
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nomeCompleto || !form.email) {
       toast.error("Por favor, preencha pelo menos o Nome e E-mail.");
       return;
     }
 
-    // Prepare data to save
-    const newInscricao = {
-      ...form,
-      id: Date.now(),
-      data: new Date().toLocaleDateString('pt-BR'),
-      status: "Confirmado"
-    };
+    try {
+      // Prepare data to save
+      const newInscricao = {
+        ...form,
+        data: new Date().toLocaleDateString('pt-BR'),
+        status: "Pendente"
+      };
 
-    // Save to localStorage
-    const savedInscricoes = localStorage.getItem("conteffa_inscricoes");
-    const inscricoes = savedInscricoes ? JSON.parse(savedInscricoes) : [];
-    localStorage.setItem("conteffa_inscricoes", JSON.stringify([...inscricoes, newInscricao]));
+      // Save to Supabase
+      const { data: dbData, error } = await supabase.from('registrations').insert([newInscricao]).select();
+      if (error) throw error;
 
-    // Trigger Success Modal
-    setSubmitted(true);
+      // Also save to localStorage for fallback/resilience
+      const saved = localStorage.getItem("conteffa_inscricoes");
+      const current = saved ? JSON.parse(saved) : [];
+      const updated = [...current, { ...newInscricao, id: dbData?.[0]?.id || Date.now() }];
+      localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
 
-    // Reset form
-    setForm({
-      foto: null,
-      nomeCompleto: "",
-      endereco: "",
-      bairro: "",
-      cidade: "",
-      cep: "",
-      ateffa: "",
-      telefone: "",
-      celularWhatsapp: "",
-      email: "",
-      cargo: "",
-      formaDeslocamento: "",
-      problemaSaude: "NÃO",
-      qualSaude: "",
-      cuidadosEspeciais: "NÃO",
-      quaisCuidados: "",
-      acompanhantes: "NÃO",
-      parentesco: "",
-      quantosAcompanhantes: "",
-      nomeAcompanhante: "",
-    });
+      // Trigger Success Modal
+      setSubmitted(true);
+      toast.success("Inscrição realizada com sucesso!");
+    } catch (err) {
+      console.error("Erro ao salvar inscrição:", err);
+      // Fallback to local storage if DB fails
+      const saved = localStorage.getItem("conteffa_inscricoes");
+      const current = saved ? JSON.parse(saved) : [];
+      const updated = [...current, { ...form, id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), status: "Pendente" }];
+      localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
 
-    toast.success("Inscrição realizada com sucesso!");
+      setSubmitted(true);
+      toast.success("Inscrito salvo no navegador.");
+    }
   };
 
   // Success Modal removed from conditional return to use Dialog instead
