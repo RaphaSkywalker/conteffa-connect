@@ -1,33 +1,164 @@
+import { useState, useEffect } from "react";
 import PageLayout from "@/components/PageLayout";
+import PageBanner from "@/components/PageBanner";
 import SectionTitle from "@/components/SectionTitle";
-import { motion } from "framer-motion";
-import { Image } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Image as ImageIcon, Calendar, MapPin, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-const Galeria = () => (
-  <PageLayout>
-    <section className="section-padding">
-      <div className="container mx-auto max-w-5xl">
-        <SectionTitle title="Galeria" subtitle="Fotos e vídeos dos congressos anteriores e do IX CONTEFFA 2026" />
+const Galeria = () => {
+  const [albuns, setAlbuns] = useState<any[]>([]);
+  const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h3 className="text-xl font-semibold mb-6 text-foreground">IX CONTEFFA 2026</h3>
-          <div className="bg-muted rounded-xl p-12 text-center mb-12">
-            <Image className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Galeria em breve. As fotos serão publicadas durante e após o evento.</p>
-          </div>
+  useEffect(() => {
+    const fetchAlbuns = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/api/albums");
+        const data = await response.json();
+        setAlbuns([...data].sort((a: any, b: any) => (a.id || 0) - (b.id || 0)));
+      } catch (err) {
+        console.error("Failed to fetch albums", err);
+        // Fallback to localStorage if server is down during migration
+        const saved = localStorage.getItem("conteffa_albuns");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setAlbuns([...parsed].sort((a: any, b: any) => (a.id || 0) - (b.id || 0)));
+        }
+      }
+    };
+    fetchAlbuns();
+  }, []);
 
-          <h3 className="text-xl font-semibold mb-6 text-foreground">Congressos Anteriores</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="aspect-square rounded-lg bg-muted flex items-center justify-center">
-                <Image className="w-8 h-8 text-muted-foreground/50" />
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-    </section>
-  </PageLayout>
-);
+  return (
+    <PageLayout>
+      <PageBanner title="GALERIA DE FOTOS" />
+      <section className="section-padding min-h-[60vh]">
+        <div className="container mx-auto px-4 max-w-7xl">
+          <AnimatePresence mode="wait">
+            {!selectedAlbum ? (
+              <motion.div
+                key="list"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="space-y-12"
+              >
+                <SectionTitle
+                  label="REGISTROS"
+                  title="Momentos e Memórias"
+                  subtitle="Fotos dos congressos anteriores e registros do IX CONTEFFA 2026"
+                />
+
+                {albuns.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {albuns.map((album) => (
+                      <motion.div
+                        key={album.id}
+                        whileHover={{ y: -10 }}
+                        className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden group hover:shadow-2xl transition-all duration-500 cursor-pointer"
+                        onClick={() => setSelectedAlbum(album)}
+                      >
+                        <div className="h-64 bg-slate-100 relative overflow-hidden">
+                          {album.cover ? (
+                            <img
+                              src={album.cover}
+                              alt={album.title}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ImageIcon className="w-16 h-16 text-slate-300" />
+                            </div>
+                          )}
+                          <div className="absolute top-6 left-6">
+                            <span className="bg-primary text-white text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-tighter shadow-lg">
+                              {album.count || 0} FOTOS
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-8">
+                          <h4 className="font-heading font-black text-2xl text-[#0B1B32] mb-4 leading-tight group-hover:text-primary transition-colors">
+                            {album.title}
+                          </h4>
+                          <div className="space-y-2">
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-primary" /> {album.date}
+                            </p>
+                            {album.location && (
+                              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                                <MapPin className="w-4 h-4 text-primary" /> {album.location}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 rounded-[3rem] p-20 text-center border-2 border-dashed border-slate-200">
+                    <ImageIcon className="w-20 h-20 text-slate-300 mx-auto mb-6" />
+                    <h3 className="text-2xl font-heading font-black text-[#0B1B32] mb-2">Nenhum álbum encontrado</h3>
+                    <p className="text-slate-500 max-w-md mx-auto">As fotos estão sendo processadas e serão publicadas em breve pela nossa equipe.</p>
+                  </div>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="detail"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="space-y-8"
+              >
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+                  <div className="flex items-center gap-6">
+                    <Button
+                      onClick={() => setSelectedAlbum(null)}
+                      variant="outline"
+                      className="rounded-full w-14 h-14 p-0 shrink-0 border-slate-200 hover:bg-primary hover:text-white hover:border-primary transition-all"
+                    >
+                      <ArrowLeft className="w-6 h-6" />
+                    </Button>
+                    <div>
+                      <h2 className="text-3xl md:text-4xl font-heading font-black text-[#0B1B32] mb-2">{selectedAlbum.title}</h2>
+                      <p className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-4">
+                        <span className="flex items-center gap-2"><Calendar className="w-4 h-4" /> {selectedAlbum.date}</span>
+                        {selectedAlbum.location && <span className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {selectedAlbum.location}</span>}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {/* If we had real photos, they would render here. 
+                      Since we use placeholders/simulated data, we show a grid. */}
+                  {Array.from({ length: selectedAlbum.count || 12 }).map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="aspect-square rounded-3xl bg-slate-100 overflow-hidden group relative cursor-zoom-in"
+                    >
+                      <img
+                        src={`https://images.unsplash.com/photo-${1500000000000 + i}?auto=format&fit=crop&w=800&q=80`}
+                        alt="Photo"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        onError={(e) => {
+                          e.currentTarget.src = "https://images.unsplash.com/photo-1492724441997-5dc865305da7?auto=format&fit=crop&w=800&q=80";
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </section>
+    </PageLayout>
+  );
+};
 
 export default Galeria;

@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
+        body: ["Poppins", "Inter", "sans-serif"],
+        heading: ["Poppins", "sans-serif"],
         sans: ["Inter", "system-ui", "sans-serif"],
-        display: ["Playfair Display", "Georgia", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -70,7 +71,14 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
       },
+      boxShadow: {
+        card: "0 10px 40px rgba(0, 0, 0, 0.04)",
+        "card-hover": "0 20px 60px rgba(0, 0, 0, 0.08)",
+      },
       borderRadius: {
+        xl: "1rem",
+        "2xl": "1.5rem",
+        "3xl": "2rem",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",

@@ -1,6 +1,7 @@
-import { motion } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { motion, animate, useInView } from "framer-motion";
 import { Link } from "react-router-dom";
-import { CalendarDays, Users, Mic, MapPin, FileText, ArrowRight } from "lucide-react";
+import { CalendarDays, Users, Mic, MapPin, FileText, ArrowRight, User, Calendar, Newspaper, ChevronLeft, ChevronRight } from "lucide-react";
 import PageLayout from "@/components/PageLayout";
 import Countdown from "@/components/Countdown";
 import SectionTitle from "@/components/SectionTitle";
@@ -8,7 +9,7 @@ import heroBg from "@/assets/hero-congress.jpg";
 import { Button } from "@/components/ui/button";
 
 const stats = [
-  { icon: Users, value: "1.200+", label: "Inscritos" },
+  { icon: Users, value: "320+", label: "Inscritos" },
   { icon: Mic, value: "45", label: "Palestrantes" },
   { icon: CalendarDays, value: "5", label: "Dias de Evento" },
   { icon: FileText, value: "80+", label: "Teses" },
@@ -37,156 +38,446 @@ const highlights = [
   },
 ];
 
+const StatCounter = ({ value }: { value: string }) => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true });
+  const [displayValue, setDisplayValue] = useState("0");
+
+  useEffect(() => {
+    if (isInView) {
+      const numericPart = parseInt(value.replace(/\D/g, ""));
+      const suffix = value.replace(/[0-9.]/g, "");
+
+      const controls = animate(0, numericPart, {
+        duration: 2,
+        ease: "easeOut",
+        onUpdate(v) {
+          setDisplayValue(Math.floor(v).toLocaleString('pt-BR') + suffix);
+        },
+      });
+      return () => controls.stop();
+    }
+  }, [isInView, value]);
+
+  return <span ref={ref}>{displayValue}</span>;
+};
+
 const Index = () => {
+  const [palestrantes, setPalestrantes] = useState<any[]>([]);
+  const [noticias, setNoticias] = useState<any[]>([]);
+  const [inscritosCount, setInscritosCount] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, clientWidth } = scrollContainerRef.current;
+      const scrollTo = direction === 'left'
+        ? scrollLeft - clientWidth / 1.5
+        : scrollLeft + clientWidth / 1.5;
+
+      scrollContainerRef.current.scrollTo({
+        left: scrollTo,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  useEffect(() => {
+    const fetchAllData = async () => {
+      try {
+        const [speakersRes, newsRes] = await Promise.all([
+          fetch("http://localhost:3001/api/speakers"),
+          fetch("http://localhost:3001/api/news")
+        ]);
+
+        const speakersData = await speakersRes.json();
+        const newsData = await newsRes.json();
+
+        if (speakersData.length > 0) {
+          setPalestrantes(speakersData);
+        } else {
+          loadDefaultData();
+        }
+
+        if (newsData.length > 0) {
+          setNoticias(newsData);
+        }
+      } catch (err) {
+        console.error("Failed to fetch home data", err);
+        loadDefaultData();
+      }
+    };
+
+    const loadDefaultData = () => {
+      // Speakers
+      const savedPalestrantes = localStorage.getItem("conteffa_palestrantes");
+      if (savedPalestrantes) {
+        setPalestrantes(JSON.parse(savedPalestrantes));
+      } else {
+        setPalestrantes([
+          { id: 1, name: "José Bezerra da Rocha", cargo: "Presidente da ANTEFFA", bio: "Liderando a organização do IX CONTEFFA para fortalecer a categoria.", photo: "/presidente-jose-v2.jpg" },
+          { id: 2, name: "Dr. Roberto Silva", cargo: "Especialista em Defesa Agropecuária", bio: "Palestrante confirmado para discutir os novos rumos da fiscalização federal.", photo: null },
+          { id: 3, name: "Comissão Organizadora", cargo: "Recife 2026", bio: "Equipe dedicada ao planejamento estratégico do evento no Mar Hotel Conventions.", photo: null }
+        ]);
+      }
+
+      // News
+      const savedNoticias = localStorage.getItem("conteffa_noticias");
+      if (savedNoticias) {
+        setNoticias(JSON.parse(savedNoticias));
+      } else {
+        setNoticias([
+          { title: "Inscrições abertas para o IX CONTEFFA 2026", date: "15 de março de 2026", photo: "https://images.unsplash.com/photo-1591115765373-520b7a217157?w=800&auto=format&fit=crop&q=60" },
+          { title: "Programação preliminar divulgada", date: "01 de abril de 2026", photo: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&auto=format&fit=crop&q=60" },
+          { title: "Previsão de recorde de público", date: "10 de abril de 2026", photo: "https://images.unsplash.com/photo-1505373676834-4bd3dec6e73c?w=800&auto=format&fit=crop&q=60" }
+        ]);
+      }
+    };
+
+    const loadInscritosCount = () => {
+      const savedInscricoes = localStorage.getItem("conteffa_inscricoes");
+      if (savedInscricoes) {
+        setInscritosCount(JSON.parse(savedInscricoes).length);
+      }
+    };
+
+    fetchAllData();
+    loadInscritosCount();
+  }, []);
+
   return (
     <PageLayout>
       {/* Hero */}
-      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         <div
-          className="absolute inset-0 bg-cover bg-center"
+          className="absolute inset-0 bg-cover bg-fixed bg-center"
           style={{ backgroundImage: `url(${heroBg})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--hero-overlay)/0.85)] via-[hsl(var(--hero-overlay)/0.7)] to-[hsl(var(--hero-overlay)/0.9)]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--hero-overlay)/0.9)] via-[hsl(var(--hero-overlay)/0.75)] to-[hsl(var(--hero-overlay)/0.95)]" />
+
+        {/* Animated background logos */}
+        <div className="absolute bottom-[15%] -left-32 w-[420px] h-[420px] opacity-[0.05] pointer-events-none animate-bounce [animation-duration:9s]">
+          <img src="/bg-logo.png" alt="" className="w-full h-full object-contain" />
+        </div>
+        <div className="absolute top-[15%] -right-32 w-[420px] h-[420px] opacity-[0.05] pointer-events-none animate-bounce [animation-duration:8s]">
+          <img src="/bg-logo.png" alt="" className="w-full h-full object-contain" />
+        </div>
 
         <div className="relative z-10 container mx-auto px-4 text-center">
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-primary-foreground/70 text-sm md:text-base uppercase tracking-[0.3em] mb-4"
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="inline-block bg-primary/20 backdrop-blur-md px-6 py-2 rounded-full border border-primary/30 text-primary font-bold text-sm uppercase tracking-widest mb-4"
           >
-            Congresso Nacional
-          </motion.p>
+            INSCRIÇÕES ABERTAS
+          </motion.div>
 
           <motion.h1
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: -30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="font-display text-5xl md:text-7xl lg:text-8xl font-bold text-primary-foreground mb-4"
+            transition={{ delay: 0.2, duration: 0.8 }}
+            className="font-heading text-[38px] sm:text-[49.5px] md:text-[74.2px] lg:text-[93px] font-black text-white mb-0 leading-tight tracking-tighter"
           >
-            IX CONTEFFA 2026
+            IX CONTEFFA
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="text-lg md:text-xl text-primary-foreground/80 max-w-2xl mx-auto mb-8"
+            transition={{ delay: 0.4 }}
+            className="text-2xl sm:text-3xl md:text-[35px] text-[#00ABE5] max-w-5xl mx-auto mt-2 md:-mt-4 mb-6 md:mb-4 font-black uppercase tracking-wider leading-snug md:leading-relaxed"
           >
-            Reunindo os maiores profissionais do país para discutir, debater e construir
-            o futuro juntos. Cinco dias de imersão, conhecimento e transformação.
+            12 a 16 NOV 2026, Recife-PE
           </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="flex flex-col items-center gap-2 mb-10"
-          >
-            <div className="flex items-center gap-2 text-primary-foreground/80">
-              <CalendarDays className="w-5 h-5" />
-              <span className="font-medium">12 a 16 de novembro de 2026 — Início às 08:00</span>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.7 }}
-            className="flex justify-center mb-12"
-          >
-            <Countdown />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.2 }}
+            transition={{ delay: 0.8 }}
+            className="flex flex-col md:flex-row justify-center items-center gap-5"
           >
             <Link to="/inscricao">
-              <Button size="lg" className="text-lg px-10 py-6 rounded-full shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-shadow">
-                Inscreva-se no Congresso
-                <ArrowRight className="w-5 h-5 ml-2" />
+              <Button className="text-[15px] font-medium uppercase tracking-wider px-10 h-12 rounded-full group shadow-xl shadow-primary/20">
+                INSCRIÇÃO
+              </Button>
+            </Link>
+            <Link to="/programacao">
+              <Button variant="outline" className="text-[15px] font-medium uppercase tracking-wider px-10 h-12 rounded-full border-2 border-white bg-transparent text-white hover:bg-white/10 hover:text-white transition-all">
+                VER PROGRAMAÇÃO
               </Button>
             </Link>
           </motion.div>
+
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="relative -mt-16 z-20">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stats.map((stat, i) => (
+      {/* Highlights & Countdown Union */}
+      <section className="relative pb-24 overflow-visible bg-primary">
+        <div className="absolute top-0 left-0 w-full h-full opacity-10 flex items-center justify-center pointer-events-none">
+          <img src="/bg-logo.png" alt="" className="w-[500px] h-[500px] object-contain -rotate-12" />
+        </div>
+
+        {/* Countdown Overlapping the boundary */}
+        <div className="container mx-auto px-4 flex justify-center relative z-30 -translate-y-1/2">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 1.2 }}
+            className="bg-[#0B1B32]/90 backdrop-blur-xl rounded-[2.5rem] p-5 md:p-12 shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10 max-w-fit relative mt-8 md:mt-0"
+          >
+            {/* Countdown Badge Title */}
+            <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-primary px-4 sm:px-6 md:px-8 py-2 md:py-2.5 rounded-full shadow-lg border border-white/20 whitespace-nowrap">
+              <h3 className="text-[10px] sm:text-xs md:text-[14px] font-bold text-white uppercase tracking-[0.1em]">
+                NOSSO EVENTO COMEÇA EM:
+              </h3>
+            </div>
+
+            <Countdown />
+          </motion.div>
+        </div>
+
+        <div className="container relative z-10 mx-auto px-10 md:px-4 -mt-12 md:-mt-20">
+          <SectionTitle
+            title="Destaques do IX CONTEFFA"
+            subtitle="Uma jornada de 5 dias pensada para impulsionar sua carreira e expandir seus horizontes profissionais."
+            light={true}
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-10">
+            {highlights.map((item, i) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1, duration: 0.6 }}
+                className="group relative p-10 rounded-[3rem] bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-[5rem] group-hover:bg-white/10 transition-colors" />
+
+                <div className="relative z-10">
+                  <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500">
+                    <item.icon className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-heading font-black mb-4 text-white group-hover:text-white/80 transition-colors leading-tight">
+                    {item.title}
+                  </h3>
+                  <p className="text-lg text-white/70 font-body leading-relaxed mb-6">
+                    {item.description}
+                  </p>
+                  <div className="flex items-center text-white font-bold gap-2 group-hover:translate-x-2 transition-transform">
+                    Saiba mais <ArrowRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Palestrantes Section */}
+      <section className="py-24 bg-background relative">
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="relative mb-4">
+            <SectionTitle
+              title="Palestrantes Confirmados"
+              subtitle="Conheça os especialistas que irão compartilhar seus conhecimentos e experiências no palco principal."
+              centered={true}
+              className="mb-0"
+            />
+          </div>
+
+          <div className="relative px-12 md:px-20">
+            {palestrantes.length > 3 && (
+              <>
+                <button
+                  onClick={() => scroll('left')}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full border border-primary/20 flex items-center justify-center bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  onClick={() => scroll('right')}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full border border-primary/20 flex items-center justify-center bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
+            )}
+
+            <div
+              ref={scrollContainerRef}
+              className={`flex overflow-x-auto gap-8 py-24 px-4 -mx-4 no-scrollbar scroll-smooth ${palestrantes.length <= 3 ? 'justify-center' : ''}`}
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {palestrantes.map((p: any, i: number) => (
+                <motion.div
+                  key={p.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="w-full max-w-[350px] flex-shrink-0 group relative p-10 rounded-[3rem] bg-card border border-border/50 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden text-center flex flex-col items-center"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-[5rem] group-hover:bg-primary/10 transition-colors" />
+
+                  <div className="relative z-10 w-full flex flex-col items-center">
+                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6 border-[3px] border-white shadow-lg group-hover:scale-110 transition-transform duration-500 overflow-hidden">
+                      {p.photo ? (
+                        <img src={p.photo} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-10 h-10 text-primary" />
+                      )}
+                    </div>
+                    <h3 className="text-2xl font-heading font-black mb-2 text-foreground group-hover:text-primary transition-colors leading-tight">
+                      {p.name}
+                    </h3>
+                    <p className="text-sm font-bold text-primary uppercase tracking-wider mb-4">
+                      {p.cargo}
+                    </p>
+                    <p className="text-muted-foreground font-body leading-relaxed mb-6 line-clamp-3">
+                      {p.bio}
+                    </p>
+                    <div className="flex items-center justify-center text-primary font-bold gap-2 group-hover:translate-x-2 transition-transform cursor-pointer mt-auto">
+                      Ver detalhes <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="bg-primary py-20 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full opacity-10 flex items-center justify-center pointer-events-none">
+          <img src="/bg-logo.png" alt="" className="w-[400px] h-[400px] object-contain" />
+        </div>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              { icon: Users, value: String(inscritosCount), label: "Inscritos" },
+              { icon: Mic, value: String(palestrantes.length), label: "Palestrantes" },
+              { icon: CalendarDays, value: "5", label: "Dias de Evento" },
+              { icon: FileText, value: "80+", label: "Teses" },
+            ].map((stat, i) => (
               <motion.div
                 key={stat.label}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="bg-card rounded-xl p-6 shadow-lg border border-border text-center"
+                className="flex flex-col items-center text-center p-4 group transition-transform hover:-translate-y-2"
               >
-                <stat.icon className="w-8 h-8 text-primary mx-auto mb-3" />
-                <div className="text-3xl font-bold text-foreground mb-1">{stat.value}</div>
-                <div className="text-sm text-muted-foreground">{stat.label}</div>
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-6 group-hover:scale-110 transition-all duration-500 border border-white/20">
+                  <stat.icon className="w-8 h-8 text-white" />
+                </div>
+                <div className="text-5xl md:text-6xl font-heading font-black text-white mb-2 drop-shadow-md">
+                  <StatCounter value={stat.value} />
+                </div>
+                <div className="text-xs md:text-sm font-bold text-white/70 uppercase tracking-widest">{stat.label}</div>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Highlights */}
-      <section className="section-padding">
-        <div className="container mx-auto">
+      {/* Latest News & Blog Section */}
+      <section className="bg-[#0B1B32] py-24 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5" />
+        <div className="container mx-auto px-10 md:px-4 relative z-10">
           <SectionTitle
-            title="Destaques do Evento"
-            subtitle="O IX CONTEFFA 2026 oferece uma experiência completa para todos os participantes."
+            label="NOTÍCIAS"
+            title="Últimas Notícias"
+            subtitle="Fique por dentro das novidades e atualizações do CONTEFFA em tempo real através do nosso canal oficial de notícias."
+            centered={true}
+            light={true}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {highlights.map((item, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            {noticias.slice(0, 3).map((post: any, i: number) => (
               <motion.div
-                key={item.title}
+                key={i}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="group p-6 rounded-xl border border-border bg-card hover:shadow-lg hover:border-primary/30 transition-all duration-300"
+                className="group flex flex-col bg-white rounded-[2rem] overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
               >
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                  <item.icon className="w-6 h-6 text-primary" />
+                <div className="relative h-64 overflow-hidden bg-slate-100 flex items-center justify-center">
+                  {post.photo ? (
+                    <img
+                      src={post.photo}
+                      alt={post.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    />
+                  ) : (
+                    <Newspaper className="w-12 h-12 text-slate-300" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2 text-foreground">{item.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+
+                <div className="p-8 flex flex-col flex-1">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-primary font-bold uppercase tracking-wider mb-3">
+                    <div className="flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5" />
+                      Assessoria Conteffa
+                    </div>
+                    <span className="w-1 h-1 rounded-full bg-slate-300" />
+                    <span className="text-slate-500 font-medium">{post.date}</span>
+                  </div>
+
+                  <h3 className="text-xl font-heading font-black mb-6 leading-tight text-slate-900 group-hover:text-primary transition-colors line-clamp-2">
+                    {post.title}
+                  </h3>
+
+                  <div className="mt-auto">
+                    <Link to="/noticias">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full rounded-xl border-primary/20 text-primary font-bold text-xs uppercase tracking-[0.2em] hover:bg-primary hover:text-white transition-all h-11"
+                      >
+                        LER MAIS
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="bg-primary section-padding">
-        <div className="container mx-auto text-center">
+      {/* CTA Section */}
+      <section className="relative py-24 md:py-32 overflow-hidden bg-primary">
+        <div className="absolute top-0 left-0 w-full h-full opacity-10 flex items-center justify-center pointer-events-none">
+          <img src="/bg-logo.png" alt="" className="w-[500px] h-[500px] object-contain rotate-12" />
+        </div>
+
+        <div className="container relative z-10 mx-auto text-center px-4">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-primary-foreground mb-4">
-              Garanta sua vaga no IX CONTEFFA 2026
+            <h2 className="text-4xl md:text-7xl font-heading font-black text-white mb-8 leading-[1.1]">
+              Sua presença é fundamental <br /> para o <span className="underline decoration-white/30 decoration-8 underline-offset-8">nosso sucesso</span>.
             </h2>
-            <p className="text-primary-foreground/80 text-lg max-w-xl mx-auto mb-8">
-              Não perca a oportunidade de participar do maior congresso nacional.
-              Vagas limitadas.
+            <p className="text-white/80 text-xl md:text-2xl max-w-2xl font-body mx-auto mb-12">
+              Garanta agora sua participação no maior evento nacional da categoria. O primeiro lote está disponível por tempo limitado.
             </p>
             <Link to="/inscricao">
               <Button
                 size="lg"
                 variant="secondary"
-                className="text-lg px-10 py-6 rounded-full"
+                className="font-body font-medium text-[15px] px-10 h-12 rounded-full hover:scale-105 transition-transform shadow-2xl shadow-black/20 uppercase tracking-widest"
               >
-                Fazer Inscrição
-                <ArrowRight className="w-5 h-5 ml-2" />
+                GARANTIR INSCRIÇÃO
+                <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
           </motion.div>

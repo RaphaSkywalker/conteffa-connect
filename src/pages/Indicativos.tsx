@@ -1,10 +1,12 @@
 import PageLayout from "@/components/PageLayout";
+import PageBanner from "@/components/PageBanner";
 import SectionTitle from "@/components/SectionTitle";
 import { motion } from "framer-motion";
 import { FileText } from "lucide-react";
 
 const Indicativos = () => (
   <PageLayout>
+    <PageBanner title="INDICATIVOS" />
     <section className="section-padding">
       <div className="container mx-auto max-w-4xl">
         <SectionTitle title="Indicativos" subtitle="Documentos e orientações oficiais do congresso" />

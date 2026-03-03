@@ -15,6 +15,10 @@ import Indicativos from "./pages/Indicativos";
 import Galeria from "./pages/Galeria";
 import Contato from "./pages/Contato";
 
+// Admin Pages
+import AdminLogin from "./pages/admin/Login";
+import AdminDashboard from "./pages/admin/Dashboard";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -45,6 +49,11 @@ const App = () => (
           <Route path="/indicativos" element={<Indicativos />} />
           <Route path="/galeria" element={<Galeria />} />
           <Route path="/contato" element={<Contato />} />
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

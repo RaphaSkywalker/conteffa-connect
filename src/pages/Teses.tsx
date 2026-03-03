@@ -1,10 +1,12 @@
 import PageLayout from "@/components/PageLayout";
+import PageBanner from "@/components/PageBanner";
 import SectionTitle from "@/components/SectionTitle";
 import { motion } from "framer-motion";
 import { FileText, BookOpen, Eye } from "lucide-react";
 
 const CadernoTeses = () => (
   <PageLayout>
+    <PageBanner title="CADERNO DE TESES" />
     <section className="section-padding">
       <div className="container mx-auto max-w-4xl">
         <SectionTitle title="Caderno de Teses" subtitle="Publicação oficial com todas as teses do congresso" />
@@ -19,6 +21,7 @@ const CadernoTeses = () => (
 
 const RegulamentoTeses = () => (
   <PageLayout>
+    <PageBanner title="REGULAMENTO DE TESES" />
     <section className="section-padding">
       <div className="container mx-auto max-w-4xl">
         <SectionTitle title="Regulamento de Teses" subtitle="Regras para submissão de teses" />
@@ -41,6 +44,7 @@ const RegulamentoTeses = () => (
 
 const VisualizarTeses = () => (
   <PageLayout>
+    <PageBanner title="VISUALIZAR TESES" />
     <section className="section-padding">
       <div className="container mx-auto max-w-4xl">
         <SectionTitle title="Visualizar Teses" subtitle="Teses submetidas para o IX CONTEFFA 2026" />

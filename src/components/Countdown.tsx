@@ -23,23 +23,23 @@ const Countdown = () => {
   }, []);
 
   return (
-    <div className="flex gap-3 md:gap-6">
+    <div className="flex justify-center gap-1.5 sm:gap-3 md:gap-4">
       {Object.entries(timeLeft).map(([label, value], i) => (
         <motion.div
           key={label}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 + i * 0.1 }}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.5 + i * 0.1 }}
           className="flex flex-col items-center"
         >
-          <div className="w-16 h-16 md:w-20 md:h-20 rounded-lg bg-primary/20 backdrop-blur-md border border-primary-foreground/20 flex items-center justify-center">
-            <span className="text-2xl md:text-3xl font-bold text-primary-foreground">
+          <div className="w-[65px] h-16 sm:w-20 sm:h-20 md:w-32 md:h-28 rounded-xl md:rounded-2xl bg-primary/20 border border-primary/10 flex flex-col items-center justify-center gap-0.5 md:gap-1 shadow-sm">
+            <span className="text-2xl sm:text-3xl md:text-[40px] font-black text-white leading-none">
               {String(value).padStart(2, "0")}
             </span>
+            <span className="text-[8px] sm:text-[10px] md:text-xs text-primary font-bold uppercase tracking-wider">
+              {label}
+            </span>
           </div>
-          <span className="text-xs md:text-sm mt-2 text-primary-foreground/70 uppercase tracking-wider">
-            {label}
-          </span>
         </motion.div>
       ))}
     </div>

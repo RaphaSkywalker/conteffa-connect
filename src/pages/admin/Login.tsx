@@ -13,25 +13,32 @@ const AdminLogin = () => {
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
 
-        // simulated auth check
-        setTimeout(() => {
-            // Check for customized password in localStorage
-            const savedUser = localStorage.getItem("admin_user");
-            const userData = savedUser ? JSON.parse(savedUser) : null;
-            const currentStoredPassword = userData?.password || "Conteffa01";
+        try {
+            const response = await fetch("http://localhost:3001/api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password })
+            });
 
-            if (username === "Admin" && password === currentStoredPassword) {
+            const data = await response.json();
+
+            if (data.success) {
+                // Save user session
+                localStorage.setItem("admin_user", JSON.stringify(data.user));
                 toast.success("Login realizado com sucesso! Bem-vindo ao painel.");
                 navigate("/admin/dashboard");
             } else {
-                toast.error("Usuário ou senha incorretos.");
+                toast.error(data.message || "Usuário ou senha incorretos.");
             }
+        } catch (err) {
+            toast.error("Erro ao conectar com o servidor.");
+        } finally {
             setIsLoading(false);
-        }, 1000);
+        }
     };
 
     return (

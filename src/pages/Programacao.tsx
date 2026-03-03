@@ -1,96 +1,131 @@
+import { useState, useEffect } from "react";
 import PageLayout from "@/components/PageLayout";
+import PageBanner from "@/components/PageBanner";
 import SectionTitle from "@/components/SectionTitle";
 import { motion } from "framer-motion";
 import { Clock, User } from "lucide-react";
 
-const days = [
-  {
-    date: "12 de Novembro",
-    label: "Dia 1 — Abertura",
-    items: [
-      { time: "08:00", title: "Credenciamento", speaker: "" },
-      { time: "09:00", title: "Cerimônia de Abertura", speaker: "Presidente do CONTEFFA" },
-      { time: "10:30", title: "Palestra Magna: O Futuro da Profissão", speaker: "A confirmar" },
-      { time: "14:00", title: "Mesa Redonda: Desafios Contemporâneos", speaker: "Palestrantes convidados" },
-    ],
-  },
-  {
-    date: "13 de Novembro",
-    label: "Dia 2 — Palestras",
-    items: [
-      { time: "08:30", title: "Painel: Inovação e Tecnologia", speaker: "A confirmar" },
-      { time: "10:00", title: "Workshop: Boas Práticas", speaker: "A confirmar" },
-      { time: "14:00", title: "Apresentação de Teses — Bloco 1", speaker: "Diversos autores" },
-    ],
-  },
-  {
-    date: "14 de Novembro",
-    label: "Dia 3 — Debates",
-    items: [
-      { time: "08:30", title: "Painel: Regulamentação e Legislação", speaker: "A confirmar" },
-      { time: "14:00", title: "Apresentação de Teses — Bloco 2", speaker: "Diversos autores" },
-      { time: "16:00", title: "Debate Aberto", speaker: "Participantes" },
-    ],
-  },
-  {
-    date: "15 de Novembro",
-    label: "Dia 4 — Integração",
-    items: [
-      { time: "08:30", title: "Sessão Plenária", speaker: "Comissão organizadora" },
-      { time: "14:00", title: "Atividades Culturais e Turísticas", speaker: "" },
-      { time: "20:00", title: "Jantar de Confraternização", speaker: "" },
-    ],
-  },
-  {
-    date: "16 de Novembro",
-    label: "Dia 5 — Encerramento",
-    items: [
-      { time: "08:30", title: "Votação de Indicativos", speaker: "Delegados" },
-      { time: "10:00", title: "Palestra de Encerramento", speaker: "A confirmar" },
-      { time: "12:00", title: "Cerimônia de Encerramento", speaker: "Presidente do CONTEFFA" },
-    ],
-  },
-];
-
 const Programacao = () => {
+  const [days, setDays] = useState<any[]>([]);
+  const [people, setPeople] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Load speakers and guests to find photos
+    const savedPalestrantes = localStorage.getItem("conteffa_palestrantes");
+    const savedConvidados = localStorage.getItem("conteffa_convidados");
+
+    let allPeople: any[] = [];
+    if (savedPalestrantes) allPeople = [...allPeople, ...JSON.parse(savedPalestrantes)];
+    if (savedConvidados) allPeople = [...allPeople, ...JSON.parse(savedConvidados)];
+
+    setPeople(allPeople);
+
+    const fetchProgramacao = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/api/programming");
+        const data = await response.json();
+        if (data.length > 0) {
+          setDays(data);
+        } else {
+          loadDefaults();
+        }
+      } catch (err) {
+        console.error("Failed to fetch programming", err);
+        loadDefaults();
+      }
+    };
+
+    const loadDefaults = () => {
+      const saved = localStorage.getItem("conteffa_programacao");
+      if (saved) {
+        setDays(JSON.parse(saved));
+      } else {
+        setDays([
+          {
+            date: "12 de Novembro",
+            label: "Dia 1 — Abertura",
+            items: [
+              { time: "08:00", title: "Credenciamento", speaker: "" },
+              { time: "09:00", title: "Cerimônia de Abertura", speaker: "Presidente do CONTEFFA" },
+              { time: "10:30", title: "Palestra Magna: O Futuro da Profissão", speaker: "A confirmar" },
+              { time: "14:00", title: "Mesa Redonda: Desafios Contemporâneos", speaker: "Palestrantes convidados" },
+            ],
+          },
+          {
+            date: "13 de Novembro",
+            label: "Dia 2 — Palestras",
+            items: [
+              { time: "08:30", title: "Painel: Inovação e Tecnologia", speaker: "A confirmar" },
+              { time: "10:00", title: "Workshop: Boas Práticas", speaker: "A confirmar" },
+              { time: "14:00", title: "Apresentação de Teses — Bloco 1", speaker: "Diversos autores" },
+            ],
+          },
+        ]);
+      }
+    };
+
+    fetchProgramacao();
+  }, []);
+
   return (
     <PageLayout>
+      <PageBanner title="PROGRAMAÇÃO" />
       <section className="section-padding">
-        <div className="container mx-auto max-w-5xl">
+        <div className="container mx-auto max-w-7xl">
           <SectionTitle title="Programação" subtitle="Confira a agenda completa do IX CONTEFFA 2026" />
 
-          <div className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {days.map((day, di) => (
               <motion.div
-                key={day.date}
+                key={day.id || day.date}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: di * 0.1 }}
-                className="bg-card rounded-xl border border-border overflow-hidden"
+                className="group bg-white rounded-[2rem] border border-border/50 card-shadow overflow-hidden h-fit"
               >
-                <div className="bg-primary px-6 py-4">
-                  <h3 className="text-lg font-bold text-primary-foreground">{day.date}</h3>
-                  <p className="text-primary-foreground/70 text-sm">{day.label}</p>
+                <div className="bg-navy px-8 py-6 text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-primary/20 rounded-bl-[3rem]" />
+                  <div className="relative z-10">
+                    <h3 className="text-xl md:text-2xl font-heading font-black">{day.date}</h3>
+                    <p className="text-white/60 font-medium uppercase tracking-widest text-[10px] mt-1">{day.label}</p>
+                  </div>
                 </div>
-                <div className="divide-y divide-border">
-                  {day.items.map((item, i) => (
-                    <div key={i} className="px-6 py-4 flex items-start gap-4">
-                      <div className="flex items-center gap-2 text-primary shrink-0 w-20">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-sm font-semibold">{item.time}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{item.title}</p>
-                        {item.speaker && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                            <User className="w-3.5 h-3.5" />
-                            {item.speaker}
-                          </p>
+                <div className="divide-y divide-border/50">
+                  {day.items.map((item: any, i: number) => {
+                    const speakerObj = people.find((p: any) => p.name === item.speaker);
+                    return (
+                      <div key={i} className="px-8 py-5 flex items-center justify-between gap-4 hover:bg-primary/5 transition-colors group/row">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
+                          <div className="flex items-center gap-2 text-primary shrink-0 sm:w-28 bg-primary/10 px-3 py-1.5 rounded-full justify-center sm:justify-start">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span className="text-sm font-black">{item.time}</span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-base font-heading font-bold text-foreground leading-tight group-hover/row:text-primary transition-colors">{item.title}</p>
+                            {item.speaker && item.speaker !== "none" && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <User className="w-3 h-3 text-primary" />
+                                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{item.speaker}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {item.speaker && item.speaker !== "none" && speakerObj && (
+                          <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-100 border-2 border-white shadow-lg overflow-hidden shrink-0 transition-transform group-hover/row:scale-110 duration-300">
+                            {speakerObj.photo ? (
+                              <img src={speakerObj.photo} alt={speakerObj.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-primary/5">
+                                <User className="w-6 h-6 text-primary/20" />
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </motion.div>
             ))}
