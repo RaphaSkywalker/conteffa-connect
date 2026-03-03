@@ -17,7 +17,17 @@ const Galeria = () => {
       try {
         const { data, error } = await supabase.from('albums').select('*').order('id', { ascending: false });
         if (data && data.length > 0) {
-          setAlbuns(data);
+          const formatted = data.map(album => {
+            if (album.date && typeof album.date === 'string' && album.date.includes('-') && !album.date.includes('/')) {
+              const parts = album.date.split('-');
+              if (parts.length === 3) {
+                const [y, m, d] = parts;
+                return { ...album, date: `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}` };
+              }
+            }
+            return album;
+          });
+          setAlbuns(formatted);
         } else {
           loadDefaults();
         }

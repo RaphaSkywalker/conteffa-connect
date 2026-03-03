@@ -102,13 +102,24 @@ const apiFetch = async (endpoint: string, options: any = {}) => {
                 return []; // Graceful fallback
             }
 
-            // Post-process JSON fields for certain tables
-            if (data && (tableName === 'programming' || tableName === 'albums')) {
-                return data.map(item => ({
-                    ...item,
-                    items: typeof item.items === 'string' ? JSON.parse(item.items) : (item.items || []),
-                    photos: typeof item.photos === 'string' ? JSON.parse(item.photos) : (item.photos || [])
-                }));
+            if (data) {
+                return data.map(item => {
+                    const newItem = { ...item };
+                    // Formatar data para exibição (YYYY-MM-DD -> DD/MM/YYYY)
+                    if (newItem.date && typeof newItem.date === 'string' && newItem.date.includes('-') && !newItem.date.includes('/')) {
+                        const parts = newItem.date.split('-');
+                        if (parts.length === 3) {
+                            const [y, m, d] = parts;
+                            newItem.date = `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+                        }
+                    }
+                    // Campos JSON
+                    if (tableName === 'programming' || tableName === 'albums') {
+                        newItem.items = typeof item.items === 'string' ? JSON.parse(item.items) : (item.items || []);
+                        newItem.photos = typeof item.photos === 'string' ? JSON.parse(item.photos) : (item.photos || []);
+                    }
+                    return newItem;
+                });
             }
             return data || [];
         }
@@ -117,8 +128,17 @@ const apiFetch = async (endpoint: string, options: any = {}) => {
         const cleanBody = body ? { ...body } : null;
         if (cleanBody) {
             if ('id' in cleanBody) delete cleanBody.id;
-            // Álbuns não possuem coluna 'items' (isso é usado na tabela Programação)
+            // Álbuns não possuem coluna 'items'
             if (tableName === 'albums' && 'items' in cleanBody) delete cleanBody.items;
+
+            // Formatar data para o banco (DD/MM/YYYY -> YYYY-MM-DD)
+            if (cleanBody.date && typeof cleanBody.date === 'string' && cleanBody.date.includes('/')) {
+                const parts = cleanBody.date.split('/');
+                if (parts.length === 3) {
+                    const [d, m, y] = parts;
+                    cleanBody.date = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                }
+            }
         }
 
 
@@ -1702,14 +1722,25 @@ const AdminDashboard = () => {
                                                                     />
                                                                 </div>
 
-                                                                <div className="space-y-2">
-                                                                    <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Tags (Separadas por vírgula)</label>
-                                                                    <Input
-                                                                        value={newNoticia.tags}
-                                                                        onChange={(e) => setNewNoticia({ ...newNoticia, tags: e.target.value })}
-                                                                        placeholder="Ex: anteffa, congresso, tecnicos, fiscalização"
-                                                                        className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50 transition-colors"
-                                                                    />
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Tags (Separadas por vírgula)</label>
+                                                                        <Input
+                                                                            value={newNoticia.tags}
+                                                                            onChange={(e) => setNewNoticia({ ...newNoticia, tags: e.target.value })}
+                                                                            placeholder="Ex: anteffa, congresso, tecnicos"
+                                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50 transition-colors"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Data de Publicação</label>
+                                                                        <Input
+                                                                            value={newNoticia.date}
+                                                                            onChange={(e) => setNewNoticia({ ...newNoticia, date: e.target.value })}
+                                                                            placeholder="Ex: 03/03/2026"
+                                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50 transition-colors"
+                                                                        />
+                                                                    </div>
                                                                 </div>
 
                                                                 <div className="flex flex-col md:flex-row gap-6 p-6 bg-white/5 rounded-[2rem] border border-white/5">
