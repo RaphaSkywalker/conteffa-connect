@@ -200,6 +200,7 @@ const AdminDashboard = () => {
     const [isAddingPalestrante, setIsAddingPalestrante] = useState(false);
     const [isAddingConvidado, setIsAddingConvidado] = useState(false);
     const [isAddingProgramacao, setIsAddingProgramacao] = useState(false);
+    const [dashboardProgDayIndex, setDashboardProgDayIndex] = useState(0);
 
     const [newPalestrante, setNewPalestrante] = useState({
         name: "",
@@ -1214,22 +1215,22 @@ const AdminDashboard = () => {
                             {/* Painel (Visão Geral) Tab */}
                             {activeTab === "painel" && (
                                 <div className="space-y-6 pb-10">
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#122442] p-6 rounded-[2rem] shadow-xl border border-white/10">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#122442] p-4 rounded-xl shadow-xl border border-white/10">
                                         <div>
-                                            <h3 className="font-heading font-black text-2xl text-white">Dashboard Geral</h3>
-                                            <p className="text-white/40 text-[14px] font-medium">Bem-vindo, {user.name}.</p>
+                                            <h3 className="font-heading font-black text-lg text-white">Dashboard Geral</h3>
+                                            <p className="text-white/40 text-[12px] font-medium">Bem-vindo, {user.name}.</p>
                                         </div>
-                                        <div className="flex items-center gap-5 bg-white/5 px-6 py-4 rounded-[2rem] border border-white/5 shadow-2xl">
+                                        <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-xl border border-white/5 shadow-2xl">
                                             <div className="text-right">
-                                                <div className="text-4xl font-heading font-black text-white flex items-baseline justify-end gap-1.5 leading-none">
+                                                <div className="text-xl font-heading font-black text-white flex items-baseline justify-end gap-1 leading-none">
                                                     {new Date().getDate()}
-                                                    <span className="text-primary text-4xl uppercase font-black">
+                                                    <span className="text-primary text-xl uppercase font-black">
                                                         {new Date().toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20 shadow-xl shadow-primary/5">
-                                                <Calendar className="w-7 h-7 text-primary" />
+                                            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center border border-primary/20 shadow-xl shadow-primary/5">
+                                                <Calendar className="w-5 h-5 text-primary" />
                                             </div>
                                         </div>
                                     </div>
@@ -1245,25 +1246,25 @@ const AdminDashboard = () => {
                                         ].map((metric, i) => (
                                             <motion.div
                                                 key={i}
-                                                whileHover={{ y: -5, backgroundColor: "rgba(255,255,255,0.08)" }}
-                                                className={`bg-white/5 p-6 rounded-[2.5rem] border ${metric.border} shadow-xl relative overflow-hidden group transition-all h-32 flex items-center justify-between`}
+                                                whileHover={{ y: -3, backgroundColor: "rgba(255,255,255,0.08)" }}
+                                                className={`bg-white/5 p-5 rounded-2xl border ${metric.border} shadow-xl relative overflow-hidden group transition-all h-24 flex items-center justify-between`}
                                             >
                                                 {/* Main Content & Right Icon */}
                                                 <div className="flex-1 relative z-10">
-                                                    <div className="text-5xl font-heading font-black text-white mb-0.5 tracking-tighter group-hover:text-primary transition-colors">
+                                                    <div className="text-4xl font-heading font-black text-white mb-0.5 tracking-tighter group-hover:text-primary transition-colors">
                                                         {metric.value}
                                                     </div>
-                                                    <div className="text-white/30 text-[12px] font-black uppercase tracking-[0.2em] mt-1">
+                                                    <div className="text-white/30 text-[10px] font-black uppercase tracking-[0.2em] mt-0.5">
                                                         {metric.label}
                                                     </div>
                                                 </div>
 
-                                                <div className={`w-16 h-16 rounded-3xl ${metric.bg} flex items-center justify-center -mr-2 rotate-12 group-hover:rotate-0 transition-transform duration-500 relative z-10`}>
-                                                    <metric.icon className={`w-8 h-8 ${metric.color}`} />
+                                                <div className={`w-12 h-12 rounded-2xl ${metric.bg} flex items-center justify-center -mr-1 rotate-12 group-hover:rotate-0 transition-transform duration-500 relative z-10`}>
+                                                    <metric.icon className={`w-6 h-6 ${metric.color}`} />
                                                 </div>
 
                                                 {/* Background Decorative Element */}
-                                                <div className={`absolute -bottom-6 -right-6 w-32 h-32 ${metric.bg} rounded-full blur-3xl opacity-20 group-hover:opacity-40 transition-opacity`} />
+                                                <div className={`absolute -bottom-4 -right-4 w-24 h-24 ${metric.bg} rounded-full blur-2xl opacity-10 group-hover:opacity-30 transition-opacity`} />
                                             </motion.div>
                                         ))}
                                     </div>
@@ -1271,11 +1272,11 @@ const AdminDashboard = () => {
                                     {/* Gráfico de Andamento - Compacto e Escuro */}
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                         {/* Progresso Radial */}
-                                        <div className="lg:col-span-1 bg-white/5 p-8 rounded-[2.5rem] border border-white/10 shadow-xl flex flex-col items-center justify-center text-center relative overflow-hidden group">
-                                            <h4 className="font-black text-white/30 text-[11px] uppercase tracking-[0.2em] mb-4">Status Geral</h4>
+                                        <div className="lg:col-span-1 bg-white/5 p-6 rounded-2xl border border-white/10 shadow-xl flex flex-col items-center justify-center text-center relative overflow-hidden group h-[400px]">
+                                            <h4 className="font-black text-white/30 text-[10px] uppercase tracking-[0.2em] mb-4">Status Geral</h4>
 
-                                            <div className="relative w-64 h-64 mb-6 flex items-center justify-center">
-                                                <svg className="w-full h-full -rotate-90">
+                                            <div className="relative w-44 h-44 mb-6 flex items-center justify-center">
+                                                <svg className="w-full h-full -rotate-90" viewBox="0 0 256 256">
                                                     <circle cx="128" cy="128" r="114" className="stroke-white/5" strokeWidth="16" fill="none" />
                                                     <motion.circle
                                                         cx="128" cy="128" r="114" className="stroke-primary" strokeWidth="16" fill="none"
@@ -1287,18 +1288,18 @@ const AdminDashboard = () => {
                                                     />
                                                 </svg>
                                                 <div className="absolute flex flex-col items-center">
-                                                    <span className="text-5xl font-black text-white">65%</span>
+                                                    <span className="text-4xl font-black text-white">65%</span>
                                                 </div>
                                             </div>
 
-                                            <p className="text-sm text-white/50 font-medium px-4">
+                                            <p className="text-xs text-white/50 font-medium px-4">
                                                 Faltam <span className="text-primary font-black">2 atividades</span> pendentes.
                                             </p>
                                         </div>
 
                                         {/* Journey Timeline Dark */}
-                                        <div className="lg:col-span-2 bg-[#0B1B32] p-8 rounded-[2.5rem] border border-white/10 shadow-2xl relative">
-                                            <div className="flex items-center justify-between mb-8">
+                                        <div className="lg:col-span-2 bg-[#0B1B32] p-6 rounded-2xl border border-white/10 shadow-2xl relative flex flex-col h-[400px]">
+                                            <div className="flex items-center justify-between mb-6 shrink-0">
                                                 <div className="flex items-center gap-3 px-3 py-1.5 bg-white/5 rounded-xl border border-white/10">
                                                     <Clock className="w-3.5 h-3.5 text-primary" />
                                                     <h4 className="font-bold text-[13px] text-white uppercase tracking-wider">Cronograma Real</h4>
@@ -1309,47 +1310,70 @@ const AdminDashboard = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="relative space-y-2 before:absolute before:left-[13px] before:top-2 before:bottom-2 before:w-[1px] before:bg-white/10">
-                                                {[
-                                                    { time: "08:00 - 09:00", title: "Credenciamento", status: "finished", speaker: "Equipe Anteffa", icon: Users },
-                                                    { time: "09:00 - 10:30", title: "Abertura Oficial", status: "active", speaker: "Presidente ANTEFFA", icon: Mic },
-                                                    { time: "11:00 - 12:30", title: "Fórum Legislativo", status: "pending", speaker: "Convidados", icon: TrendingUp },
-                                                ].map((item, i) => (
-                                                    <div
-                                                        key={i}
-                                                        className="relative pl-10"
+                                            {/* Date Switcher Tabs */}
+                                            <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-4 scrollbar-hide shrink-0 px-1">
+                                                {programacao.map((day, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => setDashboardProgDayIndex(idx)}
+                                                        className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap border ${dashboardProgDayIndex === idx
+                                                            ? "bg-primary text-white border-primary/50 shadow-[0_0_20px_rgba(30,174,219,0.3)] ring-1 ring-white/20"
+                                                            : "bg-white/5 text-white/30 border-white/5 hover:bg-white/10 hover:text-white/60"
+                                                            }`}
                                                     >
-                                                        <div className={`absolute left-0 top-1 w-7 h-7 rounded-full border-2 border-[#0B1B32] shadow-xl flex items-center justify-center z-10 
-                                                            ${item.status === 'finished' ? 'bg-emerald-500' : item.status === 'active' ? 'bg-primary' : 'bg-white/10'}`}>
-                                                            {item.status === 'finished' ? (
-                                                                <Check className="w-3 h-3 text-white" />
-                                                            ) : (
-                                                                <item.icon className="w-3 h-3 text-white" />
-                                                            )}
-                                                        </div>
-
-                                                        <div className={`p-2.5 rounded-2xl border transition-all duration-300 relative ${item.status === 'active'
-                                                            ? 'bg-white/5 border-primary/30 shadow-lg shadow-primary/5'
-                                                            : 'bg-transparent border-transparent'}`}>
-
-                                                            <div className="flex justify-between items-start mb-1">
-                                                                <span className={`text-[11px] font-black uppercase tracking-widest ${item.status === 'active' ? 'text-primary' : 'text-white/20'}`}>
-                                                                    {item.time} {item.status === 'active' && '— AGORA'}
-                                                                </span>
-                                                            </div>
-
-                                                            <h5 className={`font-heading font-bold text-base leading-tight mb-0.5 ${item.status === 'active' ? 'text-white' : 'text-white/40'}`}>
-                                                                {item.title}
-                                                            </h5>
-
-                                                            <div className="flex items-center gap-2">
-                                                                <span className={`text-[12px] font-bold uppercase tracking-wider ${item.status === 'active' ? 'text-white/60' : 'text-white/20'}`}>
-                                                                    {item.speaker}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                                        {day.label || `Dia ${idx + 1}`}
+                                                    </button>
                                                 ))}
+                                            </div>
+
+                                            <div className="relative space-y-2 before:absolute before:left-[13px] before:top-2 before:bottom-2 before:w-[1px] before:bg-white/10 overflow-y-auto pr-2 custom-scrollbar flex-1">
+                                                {programacao[dashboardProgDayIndex]?.items.map((item, i) => {
+                                                    // Visual status logic: first is finished, second is active, rest pending (static for dashboard feel)
+                                                    const status = i === 0 ? 'finished' : i === 1 ? 'active' : 'pending';
+                                                    return (
+                                                        <div
+                                                            key={i}
+                                                            className="relative pl-10 mb-4"
+                                                        >
+                                                            <div className={`absolute left-0 top-1 w-7 h-7 rounded-full border-2 border-[#0B1B32] shadow-xl flex items-center justify-center z-10 
+                                                                ${status === 'finished' ? 'bg-emerald-500' : status === 'active' ? 'bg-primary' : 'bg-white/10'}`}>
+                                                                {status === 'finished' ? (
+                                                                    <Check className="w-3 h-3 text-white" />
+                                                                ) : (
+                                                                    <Mic className="w-3 h-3 text-white" />
+                                                                )}
+                                                            </div>
+
+                                                            <div className={`p-3 rounded-2xl border transition-all duration-300 relative ${status === 'active'
+                                                                ? 'bg-white/5 border-primary/30 shadow-lg shadow-primary/5'
+                                                                : 'bg-transparent border-transparent'}`}>
+
+                                                                <div className="flex justify-between items-start mb-1">
+                                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${status === 'active' ? 'text-primary' : 'text-white/20'}`}>
+                                                                        {item.time} {status === 'active' && '— AGORA'}
+                                                                    </span>
+                                                                </div>
+
+                                                                <h5 className={`font-heading font-bold text-sm leading-tight mb-0.5 ${status === 'active' ? 'text-white' : 'text-white/40'}`}>
+                                                                    {item.title}
+                                                                </h5>
+
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className={`text-[11px] font-bold uppercase tracking-wider ${status === 'active' ? 'text-white/60' : 'text-white/20'}`}>
+                                                                        {item.speaker || "Sem Palestrante"}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+
+                                                {(!programacao[dashboardProgDayIndex]?.items || programacao[dashboardProgDayIndex].items.length === 0) && (
+                                                    <div className="flex flex-col items-center justify-center py-10 text-white/20">
+                                                        <Calendar className="w-10 h-10 mb-2 opacity-20" />
+                                                        <p className="text-xs font-black uppercase tracking-widest">Nenhuma atividade registrada</p>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
