@@ -22,12 +22,35 @@ const Noticias = () => {
       try {
         const { data: newsData } = await supabase.from('news').select('*').order('created_at', { ascending: false });
         if (newsData) {
-          setNoticias(newsData);
+          // Carregar stats locais (likes/views) como fallback
+          const localStats = JSON.parse(localStorage.getItem('news_stats') || '{}');
 
-          // Auto-increment views for visible news (just for demo/initial load)
-          newsData.forEach(async (n: any) => {
+          const enrichedNews = newsData.map((n: any) => ({
+            ...n,
+            likes: n.likes || localStats[n.id]?.likes || 0,
+            views: n.views || localStats[n.id]?.views || 0
+          }));
+
+          setNoticias(enrichedNews);
+
+          // Sincronizar posts já curtidos para evitar duplicidade após Refresh
+          const likedStats = JSON.parse(localStorage.getItem('news_liked_status') || '[]');
+          setLikedPosts(likedStats);
+
+          // Auto-increment views
+          enrichedNews.forEach(async (n: any) => {
             if (!viewedPosts.includes(n.id)) {
-              await supabase.from('news').update({ views: (n.views || 0) + 1 }).eq('id', n.id);
+              // Atualizar local
+              const stats = JSON.parse(localStorage.getItem('news_stats') || '{}');
+              if (!stats[n.id]) stats[n.id] = { likes: 0, views: 0 };
+              stats[n.id].views = (stats[n.id].views || 0) + 1;
+              localStorage.setItem('news_stats', JSON.stringify(stats));
+
+              // Tentar atualizar remoto (falha silenciosamente se a coluna não existir)
+              try {
+                await supabase.from('news').update({ views: (n.views || 0) + 1 }).eq('id', n.id);
+              } catch (e) { }
+
               setViewedPosts(prev => [...prev, n.id]);
             }
           });
@@ -79,19 +102,33 @@ const Noticias = () => {
     );
   };
 
-  const handleLike = async (id: number, currentLikes: number) => {
-    if (likedPosts.includes(id)) {
+  const handleLike = async (id: number | string, currentLikes: number) => {
+    if (likedPosts.includes(id as any)) {
       toast.info("Você já curtiu esta matéria!");
       return;
     }
 
     try {
-      const { error } = await supabase.from('news').update({ likes: (currentLikes || 0) + 1 }).eq('id', id);
-      if (!error) {
-        setNoticias(prev => prev.map(n => n.id === id ? { ...n, likes: (n.likes || 0) + 1 } : n));
-        setLikedPosts(prev => [...prev, id]);
-        toast.success("Obrigado pelo seu Like!", { icon: "❤️" });
-      }
+      // 1. Atualizar LocalStorage imediatamente para feedback instantâneo
+      const stats = JSON.parse(localStorage.getItem('news_stats') || '{}');
+      if (!stats[id]) stats[id] = { likes: 0, views: 0 };
+      stats[id].likes = (stats[id].likes || 0) + 1;
+      localStorage.setItem('news_stats', JSON.stringify(stats));
+
+      // 2. Atualizar estado UI
+      setNoticias(prev => prev.map(n => n.id === id ? { ...n, likes: (n.likes || 0) + 1 } : n));
+
+      const newLikedStatus = [...likedPosts, id as any];
+      setLikedPosts(newLikedStatus);
+      localStorage.setItem('news_liked_status', JSON.stringify(newLikedStatus));
+
+      toast.success("Obrigado pelo seu Like!", { icon: "❤️" });
+
+      // 3. Tentar atualizar banco de dados de forma assíncrona
+      supabase.from('news').update({ likes: (currentLikes || 0) + 1 }).eq('id', id).then(({ error }) => {
+        if (error) console.warn("Supabase: Coluna 'likes' não encontrada, usando apenas LocalStorage.");
+      });
+
     } catch (err) {
       console.error("Erro ao curtir:", err);
     }
