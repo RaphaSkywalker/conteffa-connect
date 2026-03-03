@@ -4,12 +4,13 @@ import PageLayout from "@/components/PageLayout";
 import PageBanner from "@/components/PageBanner";
 import SectionTitle from "@/components/SectionTitle";
 import { motion, AnimatePresence } from "framer-motion";
-import { Image as ImageIcon, Calendar, MapPin, ArrowLeft } from "lucide-react";
+import { Image as ImageIcon, Calendar, MapPin, ArrowLeft, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Galeria = () => {
   const [albuns, setAlbuns] = useState<any[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
+  const [photoIndex, setPhotoIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchAlbuns = async () => {
@@ -36,6 +37,35 @@ const Galeria = () => {
 
     fetchAlbuns();
   }, []);
+
+  const photosToDisplay = selectedAlbum?.photos?.length > 0
+    ? selectedAlbum.photos
+    : Array.from({ length: selectedAlbum?.count || 0 }).map((_, i) =>
+      `https://images.unsplash.com/photo-${1500000000000 + i}?auto=format&fit=crop&w=1200&q=80`
+    );
+
+  const handleNext = () => {
+    if (photoIndex !== null) {
+      setPhotoIndex((photoIndex + 1) % photosToDisplay.length);
+    }
+  };
+
+  const handlePrev = () => {
+    if (photoIndex !== null) {
+      setPhotoIndex((photoIndex - 1 + photosToDisplay.length) % photosToDisplay.length);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (photoIndex === null) return;
+      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "ArrowLeft") handlePrev();
+      if (e.key === "Escape") setPhotoIndex(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [photoIndex]);
 
   return (
     <PageLayout>
@@ -138,44 +168,88 @@ const Galeria = () => {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {selectedAlbum.photos && selectedAlbum.photos.length > 0 ? (
-                    selectedAlbum.photos.map((photo: string, i: number) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.05 }}
-                        className="aspect-square rounded-3xl bg-slate-100 overflow-hidden group relative cursor-zoom-in shadow-md"
-                      >
-                        <img
-                          src={photo}
-                          alt={`Photo ${i + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                        />
-                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </motion.div>
-                    ))
-                  ) : (
-                    Array.from({ length: selectedAlbum.count || 12 }).map((_, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.05 }}
-                        className="aspect-square rounded-3xl bg-slate-100 overflow-hidden group relative cursor-zoom-in"
-                      >
-                        <img
-                          src={`https://images.unsplash.com/photo-${1500000000000 + i}?auto=format&fit=crop&w=800&q=80`}
-                          alt="Photo"
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                          onError={(e) => {
-                            e.currentTarget.src = "https://images.unsplash.com/photo-1492724441997-5dc865305da7?auto=format&fit=crop&w=800&q=80";
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </motion.div>
-                    ))
-                  )}
+                  {photosToDisplay.map((photo: string, i: number) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      whileHover={{ scale: 1.02 }}
+                      className="aspect-square rounded-3xl bg-slate-100 overflow-hidden group relative cursor-zoom-in shadow-md"
+                      onClick={() => setPhotoIndex(i)}
+                    >
+                      <img
+                        src={photo}
+                        alt={`Photo ${i + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      />
+                      <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center scale-0 group-hover:scale-100 transition-transform duration-500">
+                          <img src="/bg-logo.png" alt="Logo" className="w-8 h-8 object-contain brightness-0 invert" />
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Light-box Modal */}
+          <AnimatePresence>
+            {photoIndex !== null && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] bg-[#0B1B32]/95 backdrop-blur-xl flex items-center justify-center p-4 md:p-12"
+              >
+                <div className="absolute top-8 right-8 flex gap-4 z-50">
+                  <span className="text-white/40 text-xs font-black uppercase tracking-widest self-center">
+                    {photoIndex + 1} / {photosToDisplay.length}
+                  </span>
+                  <Button
+                    onClick={() => setPhotoIndex(null)}
+                    variant="ghost"
+                    className="rounded-full w-12 h-12 bg-white/10 hover:bg-white/20 text-white"
+                  >
+                    <X className="w-6 h-6" />
+                  </Button>
+                </div>
+
+                <Button
+                  onClick={handlePrev}
+                  variant="ghost"
+                  className="absolute left-4 md:left-8 rounded-full w-14 h-14 bg-white/5 hover:bg-white/20 text-white z-50"
+                >
+                  <ChevronLeft className="w-8 h-8" />
+                </Button>
+
+                <Button
+                  onClick={handleNext}
+                  variant="ghost"
+                  className="absolute right-4 md:right-8 rounded-full w-14 h-14 bg-white/5 hover:bg-white/20 text-white z-50"
+                >
+                  <ChevronRight className="w-8 h-8" />
+                </Button>
+
+                <motion.div
+                  key={photoIndex}
+                  initial={{ opacity: 0, scale: 0.9, x: 50 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, x: -50 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                  className="relative w-full h-full flex items-center justify-center"
+                >
+                  <img
+                    src={photosToDisplay[photoIndex]}
+                    alt="Full View"
+                    className="max-w-full max-h-full object-contain rounded-xl shadow-2xl selection:bg-transparent"
+                  />
+                </motion.div>
+
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center text-white/60 text-xs font-bold uppercase tracking-[0.2em]">
+                  {selectedAlbum.title}
                 </div>
               </motion.div>
             )}

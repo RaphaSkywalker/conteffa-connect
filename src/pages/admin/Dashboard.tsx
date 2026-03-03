@@ -89,7 +89,14 @@ const apiFetch = async (endpoint: string, options: any = {}) => {
         }
 
         if (method === 'GET') {
-            const { data, error } = await supabase.from(tableName).select('*');
+            let query = supabase.from(tableName).select('*');
+
+            // Ordem decrescente para tabelas que precisam dos mais novos primeiro
+            if (['news', 'albums', 'registrations'].includes(tableName)) {
+                query = query.order('id', { ascending: false });
+            }
+
+            const { data, error } = await query;
             if (error) {
                 console.warn(`Supabase GET warning for ${tableName}:`, error.message);
                 return []; // Graceful fallback
@@ -108,8 +115,10 @@ const apiFetch = async (endpoint: string, options: any = {}) => {
 
         // Remove ID from body for insert/update to avoid conflicts with auto-generated IDs
         const cleanBody = body ? { ...body } : null;
-        if (cleanBody && 'id' in cleanBody) {
-            delete cleanBody.id;
+        if (cleanBody) {
+            if ('id' in cleanBody) delete cleanBody.id;
+            // Álbuns não possuem coluna 'items' (isso é usado na tabela Programação)
+            if (tableName === 'albums' && 'items' in cleanBody) delete cleanBody.items;
         }
 
 
@@ -358,6 +367,7 @@ const AdminDashboard = () => {
     };
 
     const [userToDelete, setUserToDelete] = useState<any>(null);
+    const [albumToDelete, setAlbumToDelete] = useState<any>(null);
     const [passwordData, setPasswordData] = useState({
         newPassword: "",
         confirmPassword: ""
@@ -830,6 +840,9 @@ const AdminDashboard = () => {
                     setNewPalestrante({ ...newPalestrante, photo: base64String });
                 } else if (type === 'convidado') {
                     setNewConvidado({ ...newConvidado, photo: base64String });
+                } else if (type === 'albumCover') {
+                    setNewAlbum({ ...newAlbum, cover: base64String });
+                    toast.success("Capa do álbum definida!");
                 } else if (type === 'albumPhotos') {
                     setNewAlbum({ ...newAlbum, photos: [...newAlbum.photos, base64String] });
                 } else if (type === 'instagramPhotos') {
@@ -856,32 +869,33 @@ const AdminDashboard = () => {
             setIsUploading(true);
             setUploadProgress(0);
 
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.floor(Math.random() * 15) + 5;
-                if (progress >= 100) {
-                    progress = 100;
-                    setUploadProgress(100);
-                    clearInterval(interval);
+            const fileArray = Array.from(files);
+            const totalFiles = fileArray.length;
+            let loadedFiles = 0;
+            const newPhotos: string[] = [];
 
-                    // Simulate processing after upload
-                    setTimeout(() => {
-                        const newPhotos: string[] = [];
-                        // Just as a simulation since processing many base64 would be heavy
-                        newPhotos.push("photo_placeholder_" + Date.now());
+            fileArray.forEach(file => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    newPhotos.push(reader.result as string);
+                    loadedFiles++;
+                    setUploadProgress(Math.floor((loadedFiles / totalFiles) * 100));
 
+                    if (loadedFiles === totalFiles) {
                         setNewAlbum(prev => ({
                             ...prev,
                             photos: [...prev.photos, ...newPhotos]
                         }));
-
                         setIsUploading(false);
-                        toast.success(`${files.length} fotos enviadas com sucesso!`);
-                    }, 500);
-                } else {
-                    setUploadProgress(progress);
-                }
-            }, 200);
+                        toast.success(`${totalFiles} fotos carregadas com sucesso!`);
+                    }
+                };
+                reader.onerror = () => {
+                    console.error("Erro ao ler arquivo");
+                    loadedFiles++;
+                };
+                reader.readAsDataURL(file);
+            });
         }
     };
 
@@ -895,14 +909,12 @@ const AdminDashboard = () => {
             if (newAlbum.id) {
                 await apiFetch(`/albums/${newAlbum.id}`, { method: 'PUT', body: JSON.stringify(newAlbum) });
                 const updatedList = albuns.map((a: any) => a.id === newAlbum.id ? { ...a, ...newAlbum } : a);
-                setAlbuns([...updatedList].sort((a: any, b: any) => (b.id || 0) - (a.id || 0)));
-                localStorage.setItem("conteffa_albuns", JSON.stringify(updatedList));
+                setAlbuns([...updatedList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0)));
                 toast.success("Álbum atualizado!");
             } else {
                 const res = await apiFetch("/albums", { method: 'POST', body: JSON.stringify(newAlbum) });
                 const newList = [{ ...newAlbum, id: res.id, count: newAlbum.photos.length }, ...albuns];
-                setAlbuns([...newList].sort((a: any, b: any) => (b.id || 0) - (a.id || 0)));
-                localStorage.setItem("conteffa_albuns", JSON.stringify(newList));
+                setAlbuns([...newList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0)));
                 toast.success("Álbum criado com sucesso!");
             }
             setIsAddingAlbum(false);
@@ -910,10 +922,10 @@ const AdminDashboard = () => {
         } catch (err: any) {
             const tempAlbum = { ...newAlbum, id: Date.now(), count: newAlbum.photos.length };
             const newList = [tempAlbum, ...albuns];
-            setAlbuns([...newList].sort((a: any, b: any) => (b.id || 0) - (a.id || 0)));
-            localStorage.setItem("conteffa_albuns", JSON.stringify(newList));
+            setAlbuns([...newList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0)));
             toast.success(`Salvo localmente. Motivo: ${err.message || "Servidor offline"}`);
             setIsAddingAlbum(false);
+            setNewAlbum({ title: "", date: "", location: "", cover: null, photos: [], id: null });
         }
     };
 
@@ -922,19 +934,22 @@ const AdminDashboard = () => {
         setIsAddingAlbum(true);
     };
 
-    const handleDeleteAlbum = async (id: number) => {
+    const confirmDeleteAlbum = async () => {
+        if (!albumToDelete) return;
         try {
-            await apiFetch(`/albums/${id}`, { method: 'DELETE' });
-            const updated = albuns.filter((a: any) => a.id !== id);
+            await apiFetch(`/albums/${albumToDelete.id}`, { method: 'DELETE' });
+            const updated = albuns.filter((a: any) => a.id !== albumToDelete.id);
             setAlbuns(updated);
             localStorage.setItem("conteffa_albuns", JSON.stringify(updated));
             toast.success("Álbum removido.");
+            setAlbumToDelete(null);
         } catch (err: any) {
             console.warn("Falha ao remover do Supabase, removendo localmente:", err.message);
-            const updated = albuns.filter((a: any) => a.id !== id);
+            const updated = albuns.filter((a: any) => a.id !== albumToDelete.id);
             setAlbuns(updated);
             localStorage.setItem("conteffa_albuns", JSON.stringify(updated));
             toast.success("Removido com sucesso (Limpado do navegador)");
+            setAlbumToDelete(null);
         }
     };
 
@@ -1072,13 +1087,11 @@ const AdminDashboard = () => {
                 await apiFetch(`/news/${newNoticia.id}`, { method: 'PUT', body: JSON.stringify(newNoticia) });
                 const updated = noticias.map((n: any) => n.id === newNoticia.id ? { ...n, ...newNoticia } : n);
                 setNoticias(updated);
-                localStorage.setItem("conteffa_noticias", JSON.stringify(updated));
                 toast.success("Matéria atualizada!");
             } else {
                 const res = await apiFetch("/news", { method: 'POST', body: JSON.stringify(newNoticia) });
                 const updated = [{ ...newNoticia, id: res.id, status: "Publicado" }, ...noticias];
                 setNoticias(updated);
-                localStorage.setItem("conteffa_noticias", JSON.stringify(updated));
                 toast.success("Matéria publicada!");
             }
 
@@ -1096,9 +1109,17 @@ const AdminDashboard = () => {
             const tempNoticia = { ...newNoticia, id: Date.now(), status: "Publicado" };
             const updated = [tempNoticia, ...noticias];
             setNoticias(updated);
-            localStorage.setItem("conteffa_noticias", JSON.stringify(updated));
             toast.success(`Salvo localmente. Motivo: ${err.message || "Servidor offline"}`);
             setIsAddingNoticia(false);
+            setNewNoticia({
+                title: "",
+                summary: "",
+                tags: "",
+                date: new Date().toLocaleDateString('pt-BR'),
+                status: "Rascunho",
+                photo: null,
+                id: null
+            });
         }
     };
 
@@ -2662,7 +2683,7 @@ const AdminDashboard = () => {
                                                     <div className="flex gap-2 w-full">
                                                         <Button
                                                             variant="outline"
-                                                            onClick={() => handleDeleteAlbum(album.id)}
+                                                            onClick={() => setAlbumToDelete(album)}
                                                             className="flex-1 rounded-xl border border-red-500/30 bg-red-500/5 text-red-500 hover:bg-red-500/10 hover:border-red-500/50 font-black text-[11px] uppercase tracking-widest h-12 transition-all duration-300"
                                                         >
                                                             Remover
@@ -3379,6 +3400,50 @@ const AdminDashboard = () => {
                                     variant="ghost"
                                     className="rounded-full h-12 text-white/40 hover:text-white hover:bg-white/5 font-black uppercase text-[10px] tracking-widest"
                                     onClick={() => setUserToDelete(null)}
+                                >
+                                    Cancelar
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Modal de Confirmação de Exclusão de Álbum */}
+            <AnimatePresence>
+                {albumToDelete && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setAlbumToDelete(null)}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="bg-[#122442] p-8 md:p-10 rounded-[3rem] border border-white/10 shadow-2xl max-w-sm w-full relative z-10 text-center"
+                        >
+                            <div className="w-20 h-20 bg-red-400/10 rounded-full flex items-center justify-center mx-auto mb-6 text-red-400 border border-red-400/20">
+                                <AlertTriangle className="w-10 h-10" />
+                            </div>
+                            <h3 className="text-2xl font-heading font-black text-white mb-2 uppercase tracking-tighter">Apagar Álbum?</h3>
+                            <p className="text-white/40 mb-8 text-sm font-medium">
+                                Você está prestes a excluir o álbum <strong className="text-white">{albumToDelete.title}</strong>.<br />Todas as fotos vinculadas serão removidas do site.
+                            </p>
+                            <div className="flex flex-col gap-3">
+                                <Button
+                                    className="rounded-full h-12 bg-red-500 hover:bg-red-600 font-black uppercase text-xs tracking-widest shadow-lg shadow-red-500/20"
+                                    onClick={confirmDeleteAlbum}
+                                >
+                                    Confirmar Exclusão
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    className="rounded-full h-12 text-white/40 hover:text-white hover:bg-white/5 font-black uppercase text-[10px] tracking-widest"
+                                    onClick={() => setAlbumToDelete(null)}
                                 >
                                     Cancelar
                                 </Button>
