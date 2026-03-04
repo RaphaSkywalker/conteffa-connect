@@ -36,7 +36,10 @@ import {
     BarChart3,
     MousePointer2,
     Share2,
-    Heart
+    Heart,
+    Eye,
+    Pencil,
+    Trash2
 } from "lucide-react";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -384,22 +387,60 @@ const AdminDashboard = () => {
     const [selectedInscricao, setSelectedInscricao] = useState<any>(null);
     const [isViewingInscricao, setIsViewingInscricao] = useState(false);
 
-    const handleSaveEditedInscricao = () => {
-        const updatedInscricoes = inscricoes.map(insc =>
-            insc.id === selectedInscricao.id ? selectedInscricao : insc
-        );
-        setInscricoes(updatedInscricoes);
-        localStorage.setItem("conteffa_inscricoes", JSON.stringify(updatedInscricoes));
-        setIsViewingInscricao(false);
-        toast.success("Inscrição atualizada com sucesso!");
+    const handleSaveEditedInscricao = async () => {
+        try {
+            // 1. Save to Supabase via apiFetch
+            await apiFetch(`/registrations/${selectedInscricao.id}`, {
+                method: 'PUT',
+                body: JSON.stringify(selectedInscricao)
+            });
+
+            // 2. Save to Local Express Server
+            try {
+                await fetch(`http://localhost:3001/api/registrations/${selectedInscricao.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(selectedInscricao)
+                });
+            } catch (localErr) {
+                console.warn("Local server not available for registration update sync");
+            }
+
+            // 3. Update local state and localStorage
+            const updatedInscricoes = inscricoes.map(insc =>
+                insc.id === selectedInscricao.id ? selectedInscricao : insc
+            );
+            setInscricoes(updatedInscricoes);
+            localStorage.setItem("conteffa_inscricoes", JSON.stringify(updatedInscricoes));
+
+            setIsViewingInscricao(false);
+            toast.success("Inscrição atualizada com sucesso!");
+        } catch (err: any) {
+            console.error("Erro ao salvar edição:", err);
+            toast.error("Erro ao salvar alterações no banco de dados.");
+
+            // Fallback for local persistence even on network error
+            const updatedInscricoes = inscricoes.map(insc =>
+                insc.id === selectedInscricao.id ? selectedInscricao : insc
+            );
+            setInscricoes(updatedInscricoes);
+            localStorage.setItem("conteffa_inscricoes", JSON.stringify(updatedInscricoes));
+            setIsViewingInscricao(false);
+        }
     };
 
     const [userToDelete, setUserToDelete] = useState<any>(null);
     const [albumToDelete, setAlbumToDelete] = useState<any>(null);
+    const [inscricaoToDelete, setInscricaoToDelete] = useState<any>(null);
     const [passwordData, setPasswordData] = useState({
         newPassword: "",
         confirmPassword: ""
     });
+
+    const [adClicks, setAdClicks] = useState(0);
+    const [registrationGoal, setRegistrationGoal] = useState(200);
+    const [isEditingGoal, setIsEditingGoal] = useState(false);
+    const [tempGoal, setTempGoal] = useState(200);
 
     // Export PDF state
     const [isExportingPDF, setIsExportingPDF] = useState(false);
@@ -793,8 +834,23 @@ const AdminDashboard = () => {
                     if (localAd) setAdImage(localAd);
                 }
 
-                // Clear migration flags to avoid repeat
-                // (Optional: keep localStorage for a while just in case)
+                // Carregar Métricas e Metas da Nuvem (Supabase)
+                try {
+                    // 1. Meta de Inscrições
+                    const dbGoal = await apiFetch("/config/registration_goal");
+                    if (dbGoal) {
+                        setRegistrationGoal(Number(dbGoal));
+                        setTempGoal(Number(dbGoal));
+                    }
+
+                    // 2. Cliques de Divulgação
+                    const dbClicks = await apiFetch("/config/ad_clicks");
+                    if (dbClicks) {
+                        setAdClicks(Number(dbClicks));
+                    }
+                } catch (e) {
+                    console.warn("Erro ao carregar métricas da nuvem:", e);
+                }
             } catch (err) {
                 console.error("Failed to load backend data", err);
                 toast.error("Erro ao carregar dados do servidor. Verifique se o backend está rodando.");
@@ -1058,6 +1114,39 @@ const AdminDashboard = () => {
             } catch (err) {
                 toast.error("Erro ao remover usuário.");
             }
+        }
+    };
+
+    const confirmDeleteInscricao = async () => {
+        if (!inscricaoToDelete) return;
+        try {
+            await apiFetch(`/registrations/${inscricaoToDelete.id}`, { method: 'DELETE' });
+            const updated = inscricoes.filter((i: any) => i.id !== inscricaoToDelete.id);
+            setInscricoes(updated);
+            localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
+            toast.success("Inscrição removida com sucesso!");
+            setInscricaoToDelete(null);
+        } catch (err: any) {
+            console.warn("Falha ao remover do servidor, tentando localmente:", err.message);
+            const updated = inscricoes.filter((i: any) => i.id !== inscricaoToDelete.id);
+            setInscricoes(updated);
+            localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
+            toast.success("Inscrição removida localmente.");
+            setInscricaoToDelete(null);
+        }
+    };
+
+    const handleUpdateGoal = async () => {
+        try {
+            await apiFetch(`/config/registration_goal`, {
+                method: 'POST',
+                body: tempGoal
+            });
+            setRegistrationGoal(tempGoal);
+            setIsEditingGoal(false);
+            toast.success("Meta atualizada na nuvem!");
+        } catch (err) {
+            toast.error("Erro ao sincronizar meta.");
         }
     };
 
@@ -1685,12 +1774,13 @@ const AdminDashboard = () => {
                                     </div>
 
                                     {/* Principais Métricas */}
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                                         {[
                                             { label: "Visitas Totais", value: noticias.reduce((acc, n) => acc + (n.views || 0), 0) + 1240, icon: MousePointer2, color: "text-blue-400" },
                                             { label: "Likes no Mural", value: noticias.reduce((acc, n) => acc + (n.likes || 0), 0), icon: Heart, color: "text-red-400" },
                                             { label: "Compartilhamentos", value: Math.floor(noticias.reduce((acc, n) => acc + (n.views || 0), 0) * 0.15), icon: Share2, color: "text-emerald-400" },
-                                            { label: "Inscrições Pagas", value: inscricoes.filter(i => i.status === "Confirmado").length, icon: ShieldCheck, color: "text-amber-400" },
+                                            { label: "Total de Inscritos", value: inscricoes.length, icon: ShieldCheck, color: "text-amber-400" },
+                                            { label: "Cliques Divulgação", value: adClicks, icon: TrendingUp, color: "text-pink-400" },
                                         ].map((m, i) => (
                                             <div key={i} className="bg-white/5 p-6 rounded-2xl border border-white/10 flex items-center justify-between">
                                                 <div>
@@ -1700,6 +1790,90 @@ const AdminDashboard = () => {
                                                 <m.icon className={`w-8 h-8 ${m.color} opacity-80`} />
                                             </div>
                                         ))}
+                                    </div>
+
+                                    {/* Barra de Progresso da Meta */}
+                                    <div className="bg-[#122442] p-8 rounded-3xl border border-white/5 shadow-xl relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -mr-32 -mt-32" />
+
+                                        <div className="relative z-10">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                                        <h4 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Meta de Engajamento</h4>
+                                                    </div>
+                                                    <h3 className="text-2xl font-heading font-black text-white flex items-baseline gap-2">
+                                                        Meta de Inscrições: <span className="text-primary">{registrationGoal}</span>
+                                                    </h3>
+                                                </div>
+
+                                                <div className="flex items-center gap-4">
+                                                    <div className="text-right">
+                                                        <span className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-1">Status Atual</span>
+                                                        <span className="text-xl font-black text-white">{inscricoes.length} / {registrationGoal}</span>
+                                                    </div>
+
+                                                    {!isEditingGoal ? (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => setIsEditingGoal(true)}
+                                                            className="w-10 h-10 rounded-xl hover:bg-white/10 text-white/30 hover:text-white border border-white/5"
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                        </Button>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2 bg-white/5 p-1.5 rounded-2xl border border-white/10">
+                                                            <Input
+                                                                type="number"
+                                                                value={tempGoal}
+                                                                onChange={(e) => setTempGoal(Number(e.target.value))}
+                                                                className="w-24 h-9 bg-black/20 border-white/10 text-white text-xs font-bold rounded-xl"
+                                                            />
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={handleUpdateGoal}
+                                                                className="h-9 px-4 rounded-xl bg-primary text-white font-bold text-xs"
+                                                            >
+                                                                OK
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => setIsEditingGoal(false)}
+                                                                className="w-9 h-9 rounded-xl text-white/40"
+                                                            >
+                                                                <X className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="relative h-6 bg-white/5 rounded-full border border-white/10 p-1 overflow-hidden">
+                                                <motion.div
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${Math.min(100, (inscricoes.length / registrationGoal) * 100)}%` }}
+                                                    transition={{ duration: 1.5, ease: "easeOut" }}
+                                                    className="h-full rounded-full bg-gradient-to-r from-blue-500 via-primary to-emerald-400 relative"
+                                                >
+                                                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                                                </motion.div>
+                                            </div>
+
+                                            <div className="flex justify-between items-center mt-4 px-1">
+                                                <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Início do Projeto</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-black text-primary uppercase tracking-widest">
+                                                        {Math.round((inscricoes.length / registrationGoal) * 100)}% Alcançado
+                                                    </span>
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                                </div>
+                                                <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Meta Final</span>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2962,17 +3136,41 @@ const AdminDashboard = () => {
                                                                     <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">{insc.status}</span>
                                                                 </td>
                                                                 <td className="px-6 py-5">
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        onClick={() => {
-                                                                            setSelectedInscricao(insc);
-                                                                            setIsViewingInscricao(true);
-                                                                        }}
-                                                                        className="rounded-full text-primary border border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all font-bold"
-                                                                    >
-                                                                        Ver Ficha
-                                                                    </Button>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() => {
+                                                                                setSelectedInscricao(insc);
+                                                                                setIsViewingInscricao(true);
+                                                                            }}
+                                                                            className="h-9 w-9 rounded-xl text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 transition-all border border-emerald-500/20"
+                                                                            title="Visualizar Ficha"
+                                                                        >
+                                                                            <Eye className="w-4 h-4" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() => {
+                                                                                setSelectedInscricao(insc);
+                                                                                setIsViewingInscricao(true);
+                                                                            }}
+                                                                            className="h-9 w-9 rounded-xl text-primary hover:bg-primary/10 hover:text-primary transition-all border border-primary/20"
+                                                                            title="Editar Inscrição"
+                                                                        >
+                                                                            <Pencil className="w-4 h-4" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() => setInscricaoToDelete(insc)}
+                                                                            className="h-9 w-9 rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all border border-red-500/20"
+                                                                            title="Excluir Inscrição"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </Button>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         ))
@@ -3618,6 +3816,50 @@ const AdminDashboard = () => {
                                     variant="ghost"
                                     className="rounded-full h-12 text-white/40 hover:text-white hover:bg-white/5 font-black uppercase text-[10px] tracking-widest"
                                     onClick={() => setAlbumToDelete(null)}
+                                >
+                                    Cancelar
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Modal de Confirmação de Exclusão de Inscrição */}
+            <AnimatePresence>
+                {inscricaoToDelete && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setInscricaoToDelete(null)}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="bg-[#122442] p-8 md:p-10 rounded-[3rem] border border-white/10 shadow-2xl max-w-sm w-full relative z-10 text-center"
+                        >
+                            <div className="w-20 h-20 bg-red-400/10 rounded-full flex items-center justify-center mx-auto mb-6 text-red-400 border border-red-400/20">
+                                <Trash2 className="w-10 h-10" />
+                            </div>
+                            <h3 className="text-2xl font-heading font-black text-white mb-2 uppercase tracking-tighter">Excluir Inscrição?</h3>
+                            <p className="text-white/40 mb-8 text-sm font-medium">
+                                Você está prestes a excluir a inscrição de <strong className="text-white">{inscricaoToDelete.nomeCompleto}</strong>.<br />Esta ação é irreversível e removerá todos os dados do participante.
+                            </p>
+                            <div className="flex flex-col gap-3">
+                                <Button
+                                    className="rounded-full h-12 bg-red-500 hover:bg-red-600 font-black uppercase text-xs tracking-widest shadow-lg shadow-red-500/20"
+                                    onClick={confirmDeleteInscricao}
+                                >
+                                    Confirmar Exclusão
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    className="rounded-full h-12 text-white/40 hover:text-white hover:bg-white/5 font-black uppercase text-[10px] tracking-widest"
+                                    onClick={() => setInscricaoToDelete(null)}
                                 >
                                     Cancelar
                                 </Button>

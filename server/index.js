@@ -121,6 +121,47 @@ const initDb = async () => {
         )
     `);
 
+    await dbRun(`
+        CREATE TABLE IF NOT EXISTS registrations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nomeCompleto TEXT,
+            email TEXT,
+            telefone TEXT,
+            celularWhatsapp TEXT,
+            endereco TEXT,
+            bairro TEXT,
+            cidade TEXT,
+            cep TEXT,
+            ateffa TEXT,
+            cargo TEXT,
+            formaDeslocamento TEXT,
+            problemaSaude TEXT,
+            qualSaude TEXT,
+            cuidadosEspeciais TEXT,
+            quaisCuidados TEXT,
+            acompanhantes TEXT,
+            parentesco TEXT,
+            quantosAcompanhantes TEXT,
+            nomeAcompanhante TEXT,
+            foto TEXT,
+            data TEXT,
+            status TEXT
+        )
+    `);
+
+    await dbRun(`
+        CREATE TABLE IF NOT EXISTS metrics (
+            id TEXT PRIMARY KEY,
+            count INTEGER DEFAULT 0
+        )
+    `);
+
+    // Initialize metrics if not exists
+    await dbRun("INSERT OR IGNORE INTO metrics (id, count) VALUES ('ad_clicks', 0)");
+
+    // Initialize default goal
+    await dbRun("INSERT OR IGNORE INTO config (key, value) VALUES ('registration_goal', '200')");
+
     // Initial admin user if not exists
     const admin = await dbGet('SELECT * FROM users WHERE email = ? OR name = ?', ['admin@conteffa.com.br', 'Admin']);
     if (!admin) {
@@ -359,6 +400,30 @@ app.delete('/api/programming/:id', async (req, res) => {
     }
 });
 
+// Config
+app.get('/api/config/:key', async (req, res) => {
+    try {
+        const row = await dbGet('SELECT value FROM config WHERE key = ?', [req.params.key]);
+        res.json(row ? row.value : null);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/config/:key', async (req, res) => {
+    try {
+        const value = typeof req.body === 'object' ? JSON.stringify(req.body) : String(req.body);
+        await dbRun(`
+            INSERT INTO config (key, value) 
+            VALUES (?, ?) 
+            ON CONFLICT(key) DO UPDATE SET value = ?
+        `, [req.params.key, value, value]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Albums
 app.get('/api/albums', async (req, res) => {
     try {
@@ -404,6 +469,70 @@ app.delete('/api/albums/:id', async (req, res) => {
     }
 });
 
+// Registrations
+app.get('/api/registrations', async (req, res) => {
+    try {
+        const rows = await dbAll('SELECT * FROM registrations ORDER BY id DESC');
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/registrations', async (req, res) => {
+    const fields = [
+        'nomeCompleto', 'email', 'telefone', 'celularWhatsapp', 'endereco',
+        'bairro', 'cidade', 'cep', 'ateffa', 'cargo', 'formaDeslocamento',
+        'problemaSaude', 'qualSaude', 'cuidadosEspeciais', 'quaisCuidados',
+        'acompanhantes', 'parentesco', 'quantosAcompanhantes', 'nomeAcompanhante',
+        'foto', 'data', 'status'
+    ];
+
+    const placeholders = fields.map(() => '?').join(', ');
+    const values = fields.map(field => req.body[field]);
+
+    try {
+        const result = await dbRun(`
+            INSERT INTO registrations (${fields.join(', ')})
+            VALUES (${placeholders})
+        `, values);
+        res.json({ id: result.lastID });
+    } catch (e) {
+        console.error('Error saving registration:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/registrations/:id', async (req, res) => {
+    const fields = [
+        'nomeCompleto', 'email', 'telefone', 'celularWhatsapp', 'endereco',
+        'bairro', 'cidade', 'cep', 'ateffa', 'cargo', 'formaDeslocamento',
+        'problemaSaude', 'qualSaude', 'cuidadosEspeciais', 'quaisCuidados',
+        'acompanhantes', 'parentesco', 'quantosAcompanhantes', 'nomeAcompanhante',
+        'foto', 'data', 'status'
+    ];
+
+    const setClause = fields.map(field => `${field} = ?`).join(', ');
+    const values = fields.map(field => req.body[field]);
+    values.push(req.params.id);
+
+    try {
+        await dbRun(`UPDATE registrations SET ${setClause} WHERE id = ?`, values);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/registrations/:id', async (req, res) => {
+    try {
+        await dbRun('DELETE FROM registrations WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Config
 app.get('/api/config/:key', async (req, res) => {
     try {
@@ -419,6 +548,29 @@ app.post('/api/config/:key', async (req, res) => {
         const { key } = req.params;
         const value = JSON.stringify(req.body);
         await dbRun('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', [key, value]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Metrics
+app.get('/api/metrics/:id', async (req, res) => {
+    try {
+        const row = await dbGet('SELECT count FROM metrics WHERE id = ?', [req.params.id]);
+        res.json(row || { count: 0 });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/metrics/increment/:id', async (req, res) => {
+    try {
+        await dbRun(`
+            INSERT INTO metrics (id, count) 
+            VALUES (?, 1) 
+            ON CONFLICT(id) DO UPDATE SET count = count + 1
+        `, [req.params.id]);
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });

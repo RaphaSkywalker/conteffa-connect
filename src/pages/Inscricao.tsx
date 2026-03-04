@@ -102,6 +102,17 @@ const Inscricao = () => {
       const updated = [...current, { ...newInscricao, id: dbData?.[0]?.id || Date.now() }];
       localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
 
+      // 3. Save to local server (Express)
+      try {
+        await fetch("http://localhost:3001/api/registrations", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newInscricao)
+        });
+      } catch (localErr) {
+        console.warn("Local server not available for registration sync");
+      }
+
       // Trigger Success Modal
       setSubmitted(true);
       toast.success("Inscrição realizada com sucesso!");

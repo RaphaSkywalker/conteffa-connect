@@ -109,10 +109,34 @@ const Index = () => {
           setNoticias(newsData);
         }
 
-        if (regs) {
-          // Use Math.max to avoid overwriting local data with 0 from cloud if local exists
-          setInscritosCount(prev => Math.max(prev, regCount));
+        let finalCount = regCount;
+
+        // 4. Buscar do servidor local
+        try {
+          const localResponse = await fetch("http://localhost:3001/api/registrations");
+          if (localResponse.ok) {
+            const localRegs = await localResponse.json();
+            if (localRegs && localRegs.length > 0) {
+              finalCount = Math.max(finalCount, localRegs.length);
+            }
+          }
+        } catch (localErr) {
+          console.warn("Servidor local não acessível para contagem de inscritos");
         }
+
+        // 5. Buscar do localStorage
+        const savedInscricoes = localStorage.getItem("conteffa_inscricoes");
+        if (savedInscricoes) {
+          try {
+            const parsed = JSON.parse(savedInscricoes);
+            finalCount = Math.max(finalCount, parsed.length);
+          } catch (e) {
+            console.error("Erro ao ler localStorage de inscritos", e);
+          }
+        }
+
+        setInscritosCount(finalCount);
+
       } catch (err) {
         console.error("Failed to fetch home data", err);
       }
@@ -162,7 +186,6 @@ const Index = () => {
     };
 
     fetchAllData();
-    loadInscritosCount();
 
     // -- REALTIME SUBSCRIPTIONS --
     const channel = supabase

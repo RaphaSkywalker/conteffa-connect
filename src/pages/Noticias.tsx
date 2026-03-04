@@ -146,6 +146,24 @@ const Noticias = () => {
     }
   };
 
+  const handleSaibaMaisClick = async () => {
+    try {
+      // Sincronização Global via Supabase Config
+      const { data: currentClicks } = await supabase.from('config').select('value').eq('key', 'ad_clicks').maybeSingle();
+      const nextValue = currentClicks ? Number(JSON.parse(currentClicks.value)) + 1 : 1;
+
+      await supabase.from('config').upsert({
+        key: 'ad_clicks',
+        value: JSON.stringify(nextValue)
+      });
+
+      // Sincronização Local (Opcional/Fallback)
+      fetch("http://localhost:3001/api/metrics/increment/ad_clicks", { method: "POST" }).catch(() => { });
+    } catch (err) {
+      console.error("Erro ao registrar clique na nuvem:", err);
+    }
+  };
+
   const mesesFull = [
     { name: "Janeiro", index: 0 }, { name: "Fevereiro", index: 1 }, { name: "Março", index: 2 },
     { name: "Abril", index: 3 }, { name: "Maio", index: 4 }, { name: "Junho", index: 5 },
@@ -333,7 +351,12 @@ const Noticias = () => {
                     )}
                   </div>
                   {!adImage && <p className="text-white/60 text-sm font-body leading-relaxed mb-6">Seja um patrocinador do IX CONTEFFA e dê visibilidade à sua marca.</p>}
-                  <Button className="w-full bg-white text-[#0B1B32] hover:bg-slate-200 rounded-xl font-bold">SAIBA MAIS</Button>
+                  <Button
+                    onClick={handleSaibaMaisClick}
+                    className="w-full bg-white text-[#0B1B32] hover:bg-slate-200 rounded-xl font-bold"
+                  >
+                    SAIBA MAIS
+                  </Button>
                 </div>
               </div>
 
