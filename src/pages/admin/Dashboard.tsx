@@ -39,11 +39,12 @@ import {
     Heart,
     Eye,
     Pencil,
-    Trash2
+    Trash2,
+    Bell
 } from "lucide-react";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-    AreaChart, Area
+    AreaChart, Area, PieChart, Pie
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,7 +77,8 @@ const apiFetch = async (endpoint: string, options: any = {}) => {
         '/guests': 'guests',
         '/timeline_events': 'timeline_events',
         '/site_settings': 'site_settings',
-        '/config/instagram': 'config'
+        '/config/instagram': 'config',
+        '/messages': 'messages'
     };
 
     const tableName = tableMap[endpoint] || endpoint.replace('/', '').split('/')[0];
@@ -143,6 +145,7 @@ const apiFetch = async (endpoint: string, options: any = {}) => {
             if ('id' in cleanBody) delete cleanBody.id;
             // Álbuns não possuem coluna 'items'
             if (tableName === 'albums' && 'items' in cleanBody) delete cleanBody.items;
+            if (tableName === 'programming' && 'photos' in cleanBody) delete cleanBody.photos;
 
             // Formatar data para o banco (DD/MM/YYYY -> YYYY-MM-DD)
             if (cleanBody.date && typeof cleanBody.date === 'string' && cleanBody.date.includes('/')) {
@@ -241,6 +244,63 @@ const AdminDashboard = () => {
     });
 
     const [activeTab, setActiveTab] = useState("painel");
+
+    const [unreadNotifications, setUnreadNotifications] = useState(0);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [messages, setMessages] = useState<any[]>([]);
+    const notificationRef = useRef<HTMLDivElement>(null);
+
+    const fetchMessages = async () => {
+        try {
+            const data = await apiFetch("/messages");
+            if (data && Array.isArray(data)) {
+                setMessages(data.sort((a, b) => b.id - a.id));
+                const unread = data.filter((m: any) => !m.is_read).length;
+                setUnreadNotifications(unread);
+            }
+        } catch (err) {
+            console.error("Error fetching messages:", err);
+        }
+    };
+
+    const markAllAsRead = async () => {
+        try {
+            const unreadIds = messages.filter(m => !m.is_read).map(m => m.id);
+            if (unreadIds.length === 0) return;
+
+            // Update local state first for instant feedback
+            setMessages(prev => prev.map(m => ({ ...m, is_read: true })));
+            setUnreadNotifications(0);
+
+            // Update Supabase
+            const { error } = await supabase
+                .from('messages')
+                .update({ is_read: true })
+                .in('id', unreadIds);
+
+            if (error) throw error;
+            toast.success("Todas as notificações marcadas como lidas!");
+        } catch (err) {
+            console.error("Error marking messages as read:", err);
+            toast.error("Erro ao atualizar notificações");
+        }
+    };
+
+    // Close notifications when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+                setShowNotifications(false);
+            }
+        };
+
+        if (showNotifications) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [showNotifications]);
     // Form state for new user
     const [newUser, setNewUser] = useState({
         name: "",
@@ -733,15 +793,21 @@ const AdminDashboard = () => {
         const loadData = async () => {
             try {
                 // Fetch all data from backend
-                const [dbUsers, dbNews, dbSpeakers, dbProg, dbAlbums, dbGuests, dbInscricoes] = await Promise.all([
+                const [dbUsers, dbNews, dbSpeakers, dbProg, dbAlbums, dbGuests, dbInscricoes, dbMessages] = await Promise.all([
                     apiFetch("/users").catch(() => []),
                     apiFetch("/news").catch(() => []),
                     apiFetch("/speakers").catch(() => []),
                     apiFetch("/programming").catch(() => []),
                     apiFetch("/albums").catch(() => []),
                     apiFetch("/guests").catch(() => []),
-                    apiFetch("/registrations").catch(() => [])
+                    apiFetch("/registrations").catch(() => []),
+                    apiFetch("/messages").catch(() => [])
                 ]);
+
+                if (dbMessages && Array.isArray(dbMessages)) {
+                    setMessages(dbMessages.sort((a: any, b: any) => b.id - a.id));
+                    setUnreadNotifications(dbMessages.filter((m: any) => !m.is_read).length);
+                }
 
                 if (dbUsers && dbUsers.length > 0) setActiveUsers(dbUsers);
 
@@ -888,13 +954,41 @@ const AdminDashboard = () => {
     const convidadoFileInputRef = useRef<HTMLInputElement>(null);
     const albumCoverInputRef = useRef<HTMLInputElement>(null);
     const albumPhotosInputRef = useRef<HTMLInputElement>(null);
+    const compressImage = (base64Str: string, maxWidth = 1200, quality = 0.8): Promise<string> => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.src = base64Str;
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                if (width > maxWidth) {
+                    const ratio = maxWidth / width;
+                    width = maxWidth;
+                    height = height * ratio;
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = () => resolve(base64Str);
+        });
+    };
 
     const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'user' | 'profile' | 'noticia' | 'palestrante' | 'convidado' | 'albumCover' | 'albumPhotos' | 'instagramPhotos' | 'ad' = 'user') => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64String = reader.result as string;
+            reader.onloadend = async () => {
+                let base64String = reader.result as string;
+
+                // Compress if it's an image
+                if (base64String.startsWith('data:image/')) {
+                    base64String = await compressImage(base64String);
+                }
+
                 if (type === 'profile') {
                     const updatedProfile = { ...user, photo: base64String };
                     setUser(updatedProfile);
@@ -946,8 +1040,13 @@ const AdminDashboard = () => {
 
             fileArray.forEach(file => {
                 const reader = new FileReader();
-                reader.onloadend = () => {
-                    newPhotos.push(reader.result as string);
+                reader.onloadend = async () => {
+                    let base64String = reader.result as string;
+
+                    // Auto-compress gallery photos
+                    base64String = await compressImage(base64String, 1200, 0.7);
+
+                    newPhotos.push(base64String);
                     loadedFiles++;
                     setUploadProgress(Math.floor((loadedFiles / totalFiles) * 100));
 
@@ -957,7 +1056,7 @@ const AdminDashboard = () => {
                             photos: [...prev.photos, ...newPhotos]
                         }));
                         setIsUploading(false);
-                        toast.success(`${totalFiles} fotos carregadas com sucesso!`);
+                        toast.success(`${totalFiles} fotos otimizadas e carregadas!`);
                     }
                 };
                 reader.onerror = () => {
@@ -976,15 +1075,19 @@ const AdminDashboard = () => {
         }
 
         try {
-            if (newAlbum.id) {
+            if (newAlbum.id && newAlbum.id > 0) {
                 await apiFetch(`/albums/${newAlbum.id}`, { method: 'PUT', body: JSON.stringify(newAlbum) });
                 const updatedList = albuns.map((a: any) => a.id === newAlbum.id ? { ...a, ...newAlbum } : a);
-                setAlbuns([...updatedList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0)));
+                const sorted = [...updatedList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0));
+                setAlbuns(sorted);
+                localStorage.setItem("conteffa_albuns", JSON.stringify(sorted));
                 toast.success("Álbum atualizado!");
             } else {
                 const res = await apiFetch("/albums", { method: 'POST', body: JSON.stringify(newAlbum) });
-                const newList = [{ ...newAlbum, id: res.id, count: newAlbum.photos.length }, ...albuns];
-                setAlbuns([...newList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0)));
+                const newList = [{ ...newAlbum, id: res.id, count: newAlbum.photos.length }, ...albuns.filter(a => a.id !== newAlbum.id)];
+                const sorted = [...newList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0));
+                setAlbuns(sorted);
+                localStorage.setItem("conteffa_albuns", JSON.stringify(sorted));
                 toast.success("Álbum criado com sucesso!");
             }
             setIsAddingAlbum(false);
@@ -1387,12 +1490,18 @@ const AdminDashboard = () => {
             setIsAddingProgramacao(false);
             setNewProgramacao({ date: "", label: "", items: [], id: null });
         } catch (err: any) {
-            const tempDay = { ...newProgramacao, id: Date.now() };
-            const updated = [...programacao, tempDay];
+            let updated;
+            if (newProgramacao.id) {
+                updated = programacao.map((p: any) => p.id === newProgramacao.id ? { ...p, ...newProgramacao } : p);
+            } else {
+                const tempDay = { ...newProgramacao, id: Date.now() };
+                updated = [...programacao, tempDay];
+            }
             setProgramacao(updated);
             localStorage.setItem("conteffa_programacao", JSON.stringify(updated));
-            toast.success(`Salvo localmente. Motivo: ${err.message || "Servidor offline"}`);
+            toast.success(`Salvo localmente. ${err.message ? `Motivo: ${err.message}` : "Servidor offline"}`);
             setIsAddingProgramacao(false);
+            setNewProgramacao({ date: "", label: "", items: [], id: null });
         }
     };
 
@@ -1548,7 +1657,7 @@ const AdminDashboard = () => {
             {/* Main Content */}
             <main className="flex-1 bg-[#0C1A32] relative overflow-hidden flex flex-col h-screen text-slate-100">
                 {/* Top Header */}
-                <header className="bg-[#122442]/80 backdrop-blur-md px-8 py-6 border-b border-white/5 flex items-center justify-between sticky top-0 z-10 shadow-lg">
+                <header className="bg-[#122442]/95 backdrop-blur-md px-8 py-6 border-b border-white/5 flex items-center justify-between sticky top-0 z-30 shadow-lg">
                     <h1 className="text-2xl font-heading font-black text-white">
                         {tabs.find(t => t.id === activeTab)?.label}
                     </h1>
@@ -1560,6 +1669,69 @@ const AdminDashboard = () => {
                                 className="pl-10 w-64 bg-white/5 border-white/10 text-white placeholder:text-white/20 rounded-full focus:ring-primary/50 focus:border-primary/50"
                                 placeholder="Buscar no sistema..."
                             />
+                        </div>
+
+                        {/* Notification Bell */}
+                        <div className="relative" ref={notificationRef}>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setShowNotifications(!showNotifications)}
+                                className="w-10 h-10 rounded-full hover:bg-white/5 text-white relative"
+                            >
+                                <Bell className="w-5 h-5" />
+                                {unreadNotifications > 0 && (
+                                    <span className="absolute top-2 right-2 w-4 h-4 bg-red-500 text-white border-2 border-[#122442] rounded-full text-[8px] font-black flex items-center justify-center animate-pulse">
+                                        {unreadNotifications}
+                                    </span>
+                                )}
+                            </Button>
+
+                            {showNotifications && (
+                                <div className="absolute right-0 mt-4 w-80 bg-[#122442] border border-white/10 rounded-3xl shadow-2xl p-4 z-50 overflow-hidden ring-1 ring-white/5">
+                                    <div className="flex items-center justify-between mb-4 px-2">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40">Notificações</h4>
+                                        <button
+                                            onClick={markAllAsRead}
+                                            className="text-[9px] font-bold text-primary hover:underline"
+                                        >
+                                            Marcar todas como lidas
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2 max-h-[400px] overflow-auto pr-2 custom-scrollbar">
+                                        {messages.length > 0 ? messages.map((n, i) => (
+                                            <div key={i} className={`p-4 rounded-2xl border transition-all cursor-pointer group ${n.is_read ? 'bg-white/[0.02] border-white/5 opacity-60' : 'bg-white/5 border-primary/20 shadow-lg shadow-primary/5'}`}>
+                                                <div className="flex items-start gap-4">
+                                                    <div className={`w-2 h-2 rounded-full mt-1.5 ${n.type === 'success' ? 'bg-emerald-400' : n.type === 'warning' ? 'bg-amber-400' : 'bg-blue-400'}`} />
+                                                    <div>
+                                                        <h5 className="text-[11px] font-black text-white group-hover:text-primary transition-colors">{n.title}</h5>
+                                                        <p className="text-[10px] text-white/40 leading-relaxed mb-1">{n.content}</p>
+                                                        <span className="text-[9px] font-bold text-white/20 uppercase">
+                                                            {new Date(n.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} •
+                                                            {new Date(n.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )) : (
+                                            <div className="py-10 text-center">
+                                                <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Nenhuma notificação</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="mt-4 pt-4 border-t border-white/5 text-center">
+                                        <button
+                                            onClick={() => {
+                                                setShowNotifications(false);
+                                                toast.info("Em breve: Central Completa de Notificações");
+                                            }}
+                                            className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                                        >
+                                            Ver tudo
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </header>
@@ -1581,8 +1753,8 @@ const AdminDashboard = () => {
                                 <div className="space-y-6 pb-10">
                                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#122442] p-4 rounded-xl shadow-xl border border-white/10">
                                         <div>
-                                            <h3 className="font-heading font-black text-lg text-white">Dashboard Geral</h3>
-                                            <p className="text-white/40 text-[12px] font-medium">Bem-vindo, {user.name}.</p>
+                                            <h3 className="font-heading font-black text-[20px] text-white">Dashboard Geral</h3>
+                                            <p className="text-white/40 text-[13px] font-medium">Bem-vindo, {user.name}.</p>
                                         </div>
                                         <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-xl border border-white/5 shadow-2xl">
                                             <div className="text-right">
@@ -1637,26 +1809,26 @@ const AdminDashboard = () => {
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                         {/* Progresso Radial */}
                                         <div className="lg:col-span-1 bg-white/5 p-6 rounded-2xl border border-white/10 shadow-xl flex flex-col items-center justify-center text-center relative overflow-hidden group h-[400px]">
-                                            <h4 className="font-black text-white/30 text-[10px] uppercase tracking-[0.2em] mb-4">Status Geral</h4>
+                                            <h4 className="font-bold text-white text-[13px] uppercase tracking-wider mb-4">Status Geral</h4>
 
-                                            <div className="relative w-44 h-44 mb-6 flex items-center justify-center">
+                                            <div className="relative w-64 h-64 mb-6 flex items-center justify-center">
                                                 <svg className="w-full h-full -rotate-90" viewBox="0 0 256 256">
-                                                    <circle cx="128" cy="128" r="114" className="stroke-white/5" strokeWidth="16" fill="none" />
+                                                    <circle cx="128" cy="128" r="110" className="stroke-white/5" strokeWidth="12" fill="none" />
                                                     <motion.circle
-                                                        cx="128" cy="128" r="114" className="stroke-primary" strokeWidth="16" fill="none"
-                                                        strokeDasharray="716"
-                                                        initial={{ strokeDashoffset: 716 }}
-                                                        animate={{ strokeDashoffset: 716 * (1 - 0.65) }}
+                                                        cx="128" cy="128" r="110" className="stroke-primary" strokeWidth="12" fill="none"
+                                                        strokeDasharray="691"
+                                                        initial={{ strokeDashoffset: 691 }}
+                                                        animate={{ strokeDashoffset: 691 * (1 - 0.65) }}
                                                         transition={{ duration: 1.5, ease: "easeOut" }}
                                                         strokeLinecap="round"
                                                     />
                                                 </svg>
                                                 <div className="absolute flex flex-col items-center">
-                                                    <span className="text-4xl font-black text-white">65%</span>
+                                                    <span className="text-5xl font-black text-white">65%</span>
                                                 </div>
                                             </div>
 
-                                            <p className="text-xs text-white/50 font-medium px-4">
+                                            <p className="text-[13px] text-white/50 font-medium px-4">
                                                 Faltam <span className="text-primary font-black">2 atividades</span> pendentes.
                                             </p>
                                         </div>
@@ -1762,41 +1934,43 @@ const AdminDashboard = () => {
                                     {/* Principais Métricas */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                                         {[
-                                            { label: "Visitas Totais", value: noticias.reduce((acc, n) => acc + (n.views || 0), 0), icon: MousePointer2, color: "text-blue-400" },
-                                            { label: "Likes no Mural", value: noticias.reduce((acc, n) => acc + (n.likes || 0), 0), icon: Heart, color: "text-red-400" },
-                                            { label: "Compartilhamentos", value: noticias.reduce((acc, n) => acc + (n.shares || 0), 0), icon: Share2, color: "text-emerald-400" },
-                                            { label: "Total de Inscritos", value: inscricoes.length, icon: ShieldCheck, color: "text-amber-400" },
-                                            { label: "Cliques Divulgação", value: adClicks, icon: TrendingUp, color: "text-pink-400" },
+                                            { label: "Visitas Totais", value: noticias.reduce((acc, n) => acc + (n.views || 0), 0) + albuns.reduce((acc, a) => acc + (a.views || 0), 0), icon: MousePointer2, color: "text-blue-400", bg: "bg-blue-400/10" },
+                                            { label: "Curtidas Mural", value: noticias.reduce((acc, n) => acc + (n.likes || 0), 0), icon: Heart, color: "text-red-400", bg: "bg-red-400/10" },
+                                            { label: "Curtidas Galeria", value: albuns.reduce((acc, a) => acc + (a.likes || 0), 0), icon: Heart, color: "text-pink-400", bg: "bg-pink-400/10" },
+                                            { label: "Compartilhados", value: noticias.reduce((acc, n) => acc + (n.shares || 0), 0) + albuns.reduce((acc, a) => acc + (a.shares || 0), 0), icon: Share2, color: "text-emerald-400", bg: "bg-emerald-400/10" },
+                                            { label: "Cliques Divulgação", value: adClicks, icon: TrendingUp, color: "text-amber-400", bg: "bg-amber-400/10" },
                                         ].map((m, i) => (
                                             <div key={i} className="bg-white/5 p-6 rounded-2xl border border-white/10 flex items-center justify-between">
-                                                <div>
-                                                    <span className="text-[10px] font-black text-white/30 uppercase tracking-widest block mb-1">{m.label}</span>
-                                                    <span className="text-3xl font-black text-white">{m.value}</span>
+                                                <div className="flex-1">
+                                                    <span className="text-3xl font-black text-white block mb-0.5">{m.value}</span>
+                                                    <span className="text-[10px] font-black text-white/30 uppercase tracking-widest block">{m.label}</span>
                                                 </div>
-                                                <m.icon className={`w-8 h-8 ${m.color} opacity-80`} />
+                                                <div className={`w-12 h-12 rounded-full ${m.bg} flex items-center justify-center shrink-0`}>
+                                                    <m.icon className={`w-6 h-6 ${m.color}`} />
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
 
                                     {/* Barra de Progresso da Meta */}
-                                    <div className="bg-[#122442] p-8 rounded-3xl border border-white/5 shadow-xl relative overflow-hidden group">
+                                    <div className="bg-[#122442] p-6 rounded-3xl border border-white/5 shadow-xl relative overflow-hidden group">
                                         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -mr-32 -mt-32" />
 
                                         <div className="relative z-10">
-                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                                                        <h4 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Meta de Engajamento</h4>
+                                                        <h4 className="text-[13px] font-black text-white/40 mb-1">Meta de Engajamento</h4>
                                                     </div>
-                                                    <h3 className="text-2xl font-heading font-black text-white flex items-baseline gap-2">
+                                                    <h3 className="text-[20px] font-heading font-black text-white flex items-baseline gap-2">
                                                         Meta de Inscrições: <span className="text-primary">{registrationGoal}</span>
                                                     </h3>
                                                 </div>
 
                                                 <div className="flex items-center gap-4">
                                                     <div className="text-right">
-                                                        <span className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-1">Status Atual</span>
+                                                        <span className="block text-[13px] font-black text-white/20 uppercase tracking-widest mb-1">Status Atual</span>
                                                         <span className="text-xl font-black text-white">{inscricoes.length} / {registrationGoal}</span>
                                                     </div>
 
@@ -1837,7 +2011,7 @@ const AdminDashboard = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="relative h-6 bg-white/5 rounded-full border border-white/10 p-1 overflow-hidden">
+                                            <div className="relative h-4 bg-white/5 rounded-full border border-white/10 p-0.5 overflow-hidden">
                                                 <motion.div
                                                     initial={{ width: 0 }}
                                                     animate={{ width: `${Math.min(100, (inscricoes.length / registrationGoal) * 100)}%` }}
@@ -1849,15 +2023,15 @@ const AdminDashboard = () => {
                                                 </motion.div>
                                             </div>
 
-                                            <div className="flex justify-between items-center mt-4 px-1">
-                                                <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Início do Projeto</span>
+                                            <div className="flex justify-between items-center mt-3 px-1">
+                                                <span className="text-[13px] font-black text-white/30 uppercase tracking-widest">Início do Projeto</span>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-black text-primary uppercase tracking-widest">
+                                                    <span className="text-[13px] font-black text-primary uppercase tracking-widest">
                                                         {Math.round((inscricoes.length / registrationGoal) * 100)}% Alcançado
                                                     </span>
                                                     <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                                                 </div>
-                                                <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Meta Final</span>
+                                                <span className="text-[13px] font-black text-white/30 uppercase tracking-widest">Meta Final</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1865,25 +2039,29 @@ const AdminDashboard = () => {
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                         {/* Gráfico de Popularidade de Notícias */}
                                         <div className="bg-[#122442] p-6 rounded-3xl border border-white/5 shadow-xl">
-                                            <h4 className="text-sm font-black text-white uppercase tracking-widest mb-6">Popularidade de Notícias (Views)</h4>
+                                            <h4 className="text-[20px] font-heading font-black text-white mb-6">Popularidade de Notícias (Views)</h4>
                                             <div className="h-[300px] w-full">
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={noticias.slice(0, 5).map(n => ({ name: n.title.substring(0, 20) + '...', views: n.views || 0 }))}>
+                                                    <BarChart
+                                                        data={noticias.slice(0, 5).map(n => ({ name: n.title.substring(0, 20) + '...', views: n.views || 0 }))}
+                                                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                                                    >
                                                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                                         <XAxis
                                                             dataKey="name"
                                                             axisLine={false}
                                                             tickLine={false}
-                                                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 'bold' }}
+                                                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: 500 }}
                                                         />
                                                         <YAxis
                                                             axisLine={false}
                                                             tickLine={false}
-                                                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 'bold' }}
+                                                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: 500 }}
                                                         />
                                                         <Tooltip
                                                             contentStyle={{ backgroundColor: '#091426', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
                                                             itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                                                            cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                                                         />
                                                         <Bar dataKey="views" radius={[6, 6, 0, 0]}>
                                                             {noticias.slice(0, 5).map((_, index) => (
@@ -1897,16 +2075,19 @@ const AdminDashboard = () => {
 
                                         {/* Gráfico de Engajamento */}
                                         <div className="bg-[#122442] p-6 rounded-3xl border border-white/5 shadow-xl">
-                                            <h4 className="text-sm font-black text-white uppercase tracking-widest mb-6">Engajamento Mensal (Likes)</h4>
+                                            <h4 className="text-[20px] font-heading font-black text-white mb-6">Engajamento Mensal (Likes)</h4>
                                             <div className="h-[300px] w-full">
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <AreaChart data={[
-                                                        { name: 'Jan', likes: 120 },
-                                                        { name: 'Fev', likes: 210 },
-                                                        { name: 'Mar', likes: noticias.reduce((acc, n) => acc + (n.likes || 0), 0) + 50 },
-                                                        { name: 'Abr', likes: 0 },
-                                                        { name: 'Mai', likes: 0 },
-                                                    ]}>
+                                                    <AreaChart
+                                                        data={[
+                                                            { name: 'Jan', likes: 120 },
+                                                            { name: 'Fev', likes: 210 },
+                                                            { name: 'Mar', likes: noticias.reduce((acc, n) => acc + (n.likes || 0), 0) + 50 },
+                                                            { name: 'Abr', likes: 0 },
+                                                            { name: 'Mai', likes: 0 },
+                                                        ]}
+                                                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                                                    >
                                                         <defs>
                                                             <linearGradient id="colorLikes" x1="0" y1="0" x2="0" y2="1">
                                                                 <stop offset="5%" stopColor="#EC4899" stopOpacity={0.3} />
@@ -1918,16 +2099,17 @@ const AdminDashboard = () => {
                                                             dataKey="name"
                                                             axisLine={false}
                                                             tickLine={false}
-                                                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 'bold' }}
+                                                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: 500 }}
                                                         />
                                                         <YAxis
                                                             axisLine={false}
                                                             tickLine={false}
-                                                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 'bold' }}
+                                                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: 500 }}
                                                         />
                                                         <Tooltip
                                                             contentStyle={{ backgroundColor: '#091426', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
                                                             itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                                                            cursor={{ stroke: 'rgba(255, 255, 255, 0.1)', strokeWidth: 1 }}
                                                         />
                                                         <Area type="monotone" dataKey="likes" stroke="#EC4899" fillOpacity={1} fill="url(#colorLikes)" strokeWidth={3} />
                                                     </AreaChart>
@@ -1936,28 +2118,91 @@ const AdminDashboard = () => {
                                         </div>
                                     </div>
 
-                                    {/* Tabela de Top Conteúdo */}
-                                    <div className="bg-[#122442] p-6 rounded-3xl border border-white/5 shadow-xl">
-                                        <h4 className="text-sm font-black text-white uppercase tracking-widest mb-6">Ranking de Engajamento por Notícia</h4>
-                                        <div className="space-y-3">
-                                            {[...noticias].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5).map((n, i) => (
-                                                <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-primary/30 transition-all">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-xs">#{i + 1}</div>
-                                                        <div>
-                                                            <h5 className="text-sm font-bold text-white leading-tight mb-1">{n.title}</h5>
-                                                            <div className="flex gap-3">
-                                                                <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">👁️ {n.views || 0}</span>
-                                                                <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">❤️ {n.likes || 0}</span>
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        {/* Tabela de Top Conteúdo (Notícias) */}
+                                        <div className="bg-[#122442] p-6 rounded-3xl border border-white/5 shadow-xl">
+                                            <h4 className="text-[20px] font-heading font-black text-white mb-6">Ranking de Notícias</h4>
+                                            <div className="space-y-3">
+                                                {[...noticias].sort((a, b) => ((b.views || 0) + (b.likes || 0)) - ((a.views || 0) + (a.likes || 0))).slice(0, 5).map((n, i) => (
+                                                    <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-primary/30 transition-all">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-[10px]">#{i + 1}</div>
+                                                            <div>
+                                                                <h5 className="text-[13px] font-black text-white line-clamp-1">{n.title}</h5>
+                                                                <div className="flex items-center gap-3 mt-1">
+                                                                    <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest flex items-center gap-1">👁️ {n.views || 0}</span>
+                                                                    <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest flex items-center gap-1">❤️ {n.likes || 0}</span>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Média de Relevância</div>
-                                                        <div className="text-lg font-black text-white">{Math.floor(((n.views || 1) * 0.4 + (n.likes || 0) * 0.6) / 2)}%</div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Tabela de Top Conteúdo (Galeria) */}
+                                        <div className="bg-[#122442] p-6 rounded-3xl border border-white/5 shadow-xl">
+                                            <h4 className="text-[20px] font-heading font-black text-white mb-6">Ranking de Galeria</h4>
+
+                                            <div className="flex flex-col items-center">
+                                                <div className="h-[350px] w-full relative flex items-center justify-center">
+                                                    {/* Contador Centralizado */}
+                                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
+                                                        <span className="text-[36px] font-black text-white leading-none">
+                                                            {[...albuns]
+                                                                .sort((a, b) => ((b.views || 0) + (b.likes || 0)) - ((a.views || 0) + (a.likes || 0)))
+                                                                .slice(0, 3)
+                                                                .reduce((acc, a) => acc + (a.views || 0) + (a.likes || 0), 0)}
+                                                        </span>
+                                                        <span className="text-[10px] font-bold text-primary uppercase tracking-widest mt-1">TOP 3 CURTIDAS</span>
                                                     </div>
+
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <PieChart>
+                                                            <Pie
+                                                                data={[...albuns]
+                                                                    .sort((a, b) => ((b.views || 0) + (b.likes || 0)) - ((a.views || 0) + (a.likes || 0)))
+                                                                    .slice(0, 3)
+                                                                    .map(a => ({ name: a.title, value: (a.views || 0) + (a.likes || 0) }))
+                                                                }
+                                                                cx="50%"
+                                                                cy="50%"
+                                                                innerRadius={100}
+                                                                outerRadius={140}
+                                                                paddingAngle={10}
+                                                                dataKey="value"
+                                                                stroke="none"
+                                                            >
+                                                                {['#EC4899', '#A855F7', '#3B82F6'].map((color, index) => (
+                                                                    <Cell key={`cell-${index}`} fill={color} />
+                                                                ))}
+                                                            </Pie>
+                                                            <Tooltip
+                                                                contentStyle={{ backgroundColor: '#091426', border: 'none', borderRadius: '12px' }}
+                                                                itemStyle={{ color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                                                            />
+                                                        </PieChart>
+                                                    </ResponsiveContainer>
                                                 </div>
-                                            ))}
+
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 w-full px-4">
+                                                    {[...albuns]
+                                                        .sort((a, b) => ((b.views || 0) + (b.likes || 0)) - ((a.views || 0) + (a.likes || 0)))
+                                                        .slice(0, 3)
+                                                        .map((a, i) => (
+                                                            <div key={i} className="flex flex-col items-center text-center">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: ['#EC4899', '#A855F7', '#3B82F6'][i] }} />
+                                                                    <p className="text-[13px] font-black text-white truncate max-w-[150px]">{a.title}</p>
+                                                                </div>
+                                                                <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">
+                                                                    {(a.views || 0) + (a.likes || 0)} Pontos
+                                                                </p>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                                {albuns.length === 0 && <p className="text-center text-white/20 py-10 text-[9px] font-bold uppercase tracking-widest">Nenhum álbum registrado</p>}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

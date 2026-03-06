@@ -4,13 +4,20 @@ import PageLayout from "@/components/PageLayout";
 import PageBanner from "@/components/PageBanner";
 import SectionTitle from "@/components/SectionTitle";
 import { motion, AnimatePresence } from "framer-motion";
-import { Image as ImageIcon, Calendar, MapPin, ArrowLeft, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Image as ImageIcon, Calendar, MapPin, ArrowLeft, X, ChevronLeft, ChevronRight, Heart, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const Galeria = () => {
   const [albuns, setAlbuns] = useState<any[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
   const [photoIndex, setPhotoIndex] = useState<number | null>(null);
+  const [likedAlbums, setLikedAlbums] = useState<number[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('albums_liked_status');
+    if (saved) setLikedAlbums(JSON.parse(saved));
+  }, []);
 
   useEffect(() => {
     const fetchAlbuns = async () => {
@@ -18,14 +25,20 @@ const Galeria = () => {
         const { data, error } = await supabase.from('albums').select('*').order('id', { ascending: false });
         if (data && data.length > 0) {
           const formatted = data.map(album => {
+            let enriched = { ...album };
             if (album.date && typeof album.date === 'string' && album.date.includes('-') && !album.date.includes('/')) {
               const parts = album.date.split('-');
               if (parts.length === 3) {
                 const [y, m, d] = parts;
-                return { ...album, date: `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}` };
+                enriched.date = `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
               }
             }
-            return album;
+            return {
+              ...enriched,
+              likes: album.likes || 0,
+              views: album.views || 0,
+              shares: album.shares || 0
+            };
           });
           setAlbuns(formatted);
         } else {
@@ -47,6 +60,58 @@ const Galeria = () => {
 
     fetchAlbuns();
   }, []);
+
+  const handleLike = async (e: React.MouseEvent, album: any) => {
+    e.stopPropagation();
+    if (likedAlbums.includes(album.id)) {
+      toast.info("Você já curtiu este álbum!");
+      return;
+    }
+
+    try {
+      // Feedback visual imediato
+      setAlbuns(prev => prev.map(a => a.id === album.id ? { ...a, likes: (a.likes || 0) + 1 } : a));
+      if (selectedAlbum?.id === album.id) {
+        setSelectedAlbum({ ...selectedAlbum, likes: (selectedAlbum.likes || 0) + 1 });
+      }
+
+      const newLikedStatus = [...likedAlbums, album.id];
+      setLikedAlbums(newLikedStatus);
+      localStorage.setItem('albums_liked_status', JSON.stringify(newLikedStatus));
+
+      toast.success("Álbum curtido!", { icon: "❤️" });
+
+      // Atualizar Supabase
+      await supabase.from('albums').update({ likes: (album.likes || 0) + 1 }).eq('id', album.id);
+    } catch (err) {
+      console.error("Erro ao curtir álbum:", err);
+    }
+  };
+
+  const handleShare = async (e: React.MouseEvent, album: any) => {
+    e.stopPropagation();
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: album.title,
+          url: window.location.href
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success("Link do álbum copiado!");
+      }
+
+      // Incrementar compartilhamentos no banco
+      await supabase.from('albums').update({ shares: (album.shares || 0) + 1 }).eq('id', album.id);
+
+      setAlbuns(prev => prev.map(a => a.id === album.id ? { ...a, shares: (a.shares || 0) + 1 } : a));
+      if (selectedAlbum?.id === album.id) {
+        setSelectedAlbum({ ...selectedAlbum, shares: (selectedAlbum.shares || 0) + 1 });
+      }
+    } catch (err) {
+      console.error("Erro ao compartilhar:", err);
+    }
+  };
 
   const photosToDisplay = selectedAlbum?.photos?.length > 0
     ? selectedAlbum.photos
@@ -124,19 +189,37 @@ const Galeria = () => {
                             </span>
                           </div>
                         </div>
-                        <div className="p-8">
-                          <h4 className="font-heading font-black text-2xl text-[#0B1B32] mb-4 leading-tight group-hover:text-primary transition-colors">
+                        <div className="p-5">
+                          <h4 className="font-heading font-black text-xl text-[#0B1B32] mb-3 leading-tight group-hover:text-primary transition-colors truncate">
                             {album.title}
                           </h4>
-                          <div className="space-y-2">
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                              <Calendar className="w-4 h-4 text-primary" /> {album.date}
-                            </p>
-                            {album.location && (
-                              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                                <MapPin className="w-4 h-4 text-primary" /> {album.location}
+                          <div className="flex items-end justify-between">
+                            <div className="space-y-1.5">
+                              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                                <Calendar className="w-3.5 h-3.5 text-primary" /> {album.date}
                               </p>
-                            )}
+                              {album.location && (
+                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                                  <MapPin className="w-3.5 h-3.5 text-primary" /> {album.location}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-4 pb-0.5">
+                              <button
+                                onClick={(e) => handleLike(e, album)}
+                                className="flex items-center gap-1.5 text-slate-400 hover:text-red-500 transition-all group/heart"
+                              >
+                                <Heart className={`w-4 h-4 ${likedAlbums.includes(album.id) ? 'fill-red-500 text-red-500' : ''}`} />
+                                <span className="text-[10px] font-bold uppercase">{album.likes || 0}</span>
+                              </button>
+                              <button
+                                onClick={(e) => handleShare(e, album)}
+                                className="flex items-center gap-1.5 text-slate-400 hover:text-primary transition-all"
+                              >
+                                <Share2 className="w-4 h-4" />
+                                <span className="text-[10px] font-bold uppercase">{album.shares || 0}</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </motion.div>
@@ -169,10 +252,32 @@ const Galeria = () => {
                     </Button>
                     <div>
                       <h2 className="text-3xl md:text-4xl font-heading font-black text-[#0B1B32] mb-2">{selectedAlbum.title}</h2>
-                      <p className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-4">
-                        <span className="flex items-center gap-2"><Calendar className="w-4 h-4" /> {selectedAlbum.date}</span>
-                        {selectedAlbum.location && <span className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {selectedAlbum.location}</span>}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                          <Calendar className="w-4 h-4" /> {selectedAlbum.date}
+                        </p>
+                        {selectedAlbum.location && (
+                          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                            <MapPin className="w-4 h-4" /> {selectedAlbum.location}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-4 pl-4 border-l border-slate-200">
+                          <button
+                            onClick={(e) => handleLike(e, selectedAlbum)}
+                            className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors"
+                          >
+                            <Heart className={`w-5 h-5 ${likedAlbums.includes(selectedAlbum.id) ? 'fill-red-500 text-red-500' : ''}`} />
+                            <span className="text-xs font-bold">{selectedAlbum.likes || 0}</span>
+                          </button>
+                          <button
+                            onClick={(e) => handleShare(e, selectedAlbum)}
+                            className="flex items-center gap-2 text-slate-400 hover:text-primary transition-colors"
+                          >
+                            <Share2 className="w-5 h-5" />
+                            <span className="text-xs font-bold">{selectedAlbum.shares || 0}</span>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
