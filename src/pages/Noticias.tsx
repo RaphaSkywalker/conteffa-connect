@@ -27,8 +27,9 @@ const Noticias = () => {
 
           const enrichedNews = newsData.map((n: any) => ({
             ...n,
-            likes: n.likes || localStats[n.id]?.likes || 0,
-            views: n.views || localStats[n.id]?.views || 0
+            likes: n.likes || 0,
+            views: n.views || 0,
+            shares: n.shares || 0
           }));
 
           setNoticias(enrichedNews);
@@ -134,15 +135,29 @@ const Noticias = () => {
     }
   };
 
-  const handleShare = (title: string) => {
-    if (navigator.share) {
-      navigator.share({
-        title: title,
-        url: window.location.href
-      }).catch(console.error);
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      toast.success("Link da notícia copiado!");
+  const handleShare = async (newsItem: any) => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: newsItem.title,
+          url: window.location.href
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success("Link da notícia copiado!");
+      }
+
+      // Incrementa o contador de compartilhamentos no Supabase
+      const { error } = await supabase
+        .from('news')
+        .update({ shares: (newsItem.shares || 0) + 1 })
+        .eq('id', newsItem.id);
+
+      if (error) console.error("Erro ao atualizar shares no Supabase:", error);
+
+      // Atualiza o estado local para feedback imediato (opcional, já que o dashboard é quem mais consome isso)
+    } catch (err) {
+      console.error("Erro ao compartilhar:", err);
     }
   };
 
@@ -156,9 +171,6 @@ const Noticias = () => {
         key: 'ad_clicks',
         value: JSON.stringify(nextValue)
       });
-
-      // Sincronização Local (Opcional/Fallback)
-      fetch("http://localhost:3001/api/metrics/increment/ad_clicks", { method: "POST" }).catch(() => { });
     } catch (err) {
       console.error("Erro ao registrar clique na nuvem:", err);
     }
@@ -256,7 +268,7 @@ const Noticias = () => {
                           </button>
 
                           <button
-                            onClick={() => handleShare(n.title)}
+                            onClick={() => handleShare(n)}
                             className="flex items-center gap-2 group/share cursor-pointer transition-all active:scale-95"
                           >
                             <Share2 className="w-5 h-5 text-slate-400 group-hover/share:text-primary transition-colors" />

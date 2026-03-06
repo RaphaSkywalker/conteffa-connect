@@ -5,6 +5,7 @@ import { ShieldCheck, Lock, User, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 import heroBg from "@/assets/hero-congress.jpg";
 
 const AdminLogin = () => {
@@ -18,24 +19,30 @@ const AdminLogin = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch("http://localhost:3001/api/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, password })
-            });
+            // Consulta o Supabase para verificar o usuário
+            // username pode ser o e-mail ou o nome (Admin)
+            const { data: user, error } = await supabase
+                .from('users')
+                .select('*')
+                .or(`email.eq.${username},name.eq.${username}`)
+                .maybeSingle();
 
-            const data = await response.json();
+            if (error) throw error;
 
-            if (data.success) {
-                // Save user session
-                localStorage.setItem("admin_user", JSON.stringify(data.user));
+            if (user && user.password === password) {
+                // Remove a senha antes de salvar no localStorage
+                const { password: _, ...userWithoutPassword } = user;
+
+                // Salva a sessão do usuário
+                localStorage.setItem("admin_user", JSON.stringify(userWithoutPassword));
                 toast.success("Login realizado com sucesso! Bem-vindo ao painel.");
                 navigate("/admin/dashboard");
             } else {
-                toast.error(data.message || "Usuário ou senha incorretos.");
+                toast.error("Usuário ou senha incorretos.");
             }
-        } catch (err) {
-            toast.error("Erro ao conectar com o servidor.");
+        } catch (err: any) {
+            console.error("Erro no login:", err);
+            toast.error("Erro ao conectar com o banco de dados.");
         } finally {
             setIsLoading(false);
         }

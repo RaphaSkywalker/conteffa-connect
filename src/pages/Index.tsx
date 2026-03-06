@@ -111,19 +111,6 @@ const Index = () => {
 
         let finalCount = regCount;
 
-        // 4. Buscar do servidor local
-        try {
-          const localResponse = await fetch("http://localhost:3001/api/registrations");
-          if (localResponse.ok) {
-            const localRegs = await localResponse.json();
-            if (localRegs && localRegs.length > 0) {
-              finalCount = Math.max(finalCount, localRegs.length);
-            }
-          }
-        } catch (localErr) {
-          console.warn("Servidor local não acessível para contagem de inscritos");
-        }
-
         // 5. Buscar do localStorage
         const savedInscricoes = localStorage.getItem("conteffa_inscricoes");
         if (savedInscricoes) {

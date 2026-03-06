@@ -137,6 +137,8 @@ const apiFetch = async (endpoint: string, options: any = {}) => {
 
         // Remove ID from body for insert/update to avoid conflicts with auto-generated IDs
         const cleanBody = body ? { ...body } : null;
+        const updateId = body?.id || endpoint.split('/').pop();
+
         if (cleanBody) {
             if ('id' in cleanBody) delete cleanBody.id;
             // Álbuns não possuem coluna 'items'
@@ -160,7 +162,6 @@ const apiFetch = async (endpoint: string, options: any = {}) => {
         }
 
         if (method === 'PUT' || method === 'PATCH') {
-            const updateId = body.id || endpoint.split('/').pop();
             const { data, error } = await supabase.from(tableName).update(cleanBody).eq('id', updateId).select();
             if (error) throw error;
             return data;
@@ -395,18 +396,7 @@ const AdminDashboard = () => {
                 body: JSON.stringify(selectedInscricao)
             });
 
-            // 2. Save to Local Express Server
-            try {
-                await fetch(`http://localhost:3001/api/registrations/${selectedInscricao.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(selectedInscricao)
-                });
-            } catch (localErr) {
-                console.warn("Local server not available for registration update sync");
-            }
-
-            // 3. Update local state and localStorage
+            // 2. Update local state and localStorage
             const updatedInscricoes = inscricoes.map(insc =>
                 insc.id === selectedInscricao.id ? selectedInscricao : insc
             );
@@ -756,16 +746,12 @@ const AdminDashboard = () => {
                 if (dbUsers && dbUsers.length > 0) setActiveUsers(dbUsers);
 
                 if (dbNews && dbNews.length > 0) {
-                    setNoticias(prev => {
-                        const current = Array.isArray(prev) ? prev : [];
-                        const dbIds = new Set(dbNews.map((n: any) => n.id));
-                        const merged = [...dbNews, ...current.filter(p => p && p.id && !dbIds.has(p.id))];
-                        return merged.sort((a: any, b: any) => {
-                            const valA = String(a.created_at || a.id || 0);
-                            const valB = String(b.created_at || b.id || 0);
-                            return valB.localeCompare(valA);
-                        });
-                    });
+                    // Prioritiza dados do Supabase
+                    setNoticias(dbNews.sort((a: any, b: any) => {
+                        const valA = String(a.created_at || a.id || 0);
+                        const valB = String(b.created_at || b.id || 0);
+                        return valB.localeCompare(valA);
+                    }));
                 }
 
                 if (dbSpeakers && dbSpeakers.length > 0) {
@@ -1776,9 +1762,9 @@ const AdminDashboard = () => {
                                     {/* Principais Métricas */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                                         {[
-                                            { label: "Visitas Totais", value: noticias.reduce((acc, n) => acc + (n.views || 0), 0) + 1240, icon: MousePointer2, color: "text-blue-400" },
+                                            { label: "Visitas Totais", value: noticias.reduce((acc, n) => acc + (n.views || 0), 0), icon: MousePointer2, color: "text-blue-400" },
                                             { label: "Likes no Mural", value: noticias.reduce((acc, n) => acc + (n.likes || 0), 0), icon: Heart, color: "text-red-400" },
-                                            { label: "Compartilhamentos", value: Math.floor(noticias.reduce((acc, n) => acc + (n.views || 0), 0) * 0.15), icon: Share2, color: "text-emerald-400" },
+                                            { label: "Compartilhamentos", value: noticias.reduce((acc, n) => acc + (n.shares || 0), 0), icon: Share2, color: "text-emerald-400" },
                                             { label: "Total de Inscritos", value: inscricoes.length, icon: ShieldCheck, color: "text-amber-400" },
                                             { label: "Cliques Divulgação", value: adClicks, icon: TrendingUp, color: "text-pink-400" },
                                         ].map((m, i) => (
