@@ -54,6 +54,7 @@ const Inscricao = () => {
     if (file) {
       toast.loading("Enviando sua foto...", { id: "upload" });
       try {
+        // 1. Upload to Supabase (original)
         const fileExt = file.name.split('.').pop();
         const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
         const filePath = `registrations/${fileName}`;
@@ -68,7 +69,21 @@ const Inscricao = () => {
           .from('media')
           .getPublicUrl(filePath);
 
-        setForm({ ...form, foto: publicUrl });
+        // 2. Upload to Local Server
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        const response = await fetch('http://localhost:3001/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const localData = await response.json();
+
+        // Use local URL if successful, otherwise fallback to Supabase
+        const finalUrl = localData.success ? localData.url : publicUrl;
+
+        setForm({ ...form, foto: finalUrl });
         toast.success("Foto carregada com sucesso!", { id: "upload" });
       } catch (err) {
         console.error("Erro no upload:", err);

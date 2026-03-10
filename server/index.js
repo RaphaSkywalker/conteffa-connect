@@ -3,6 +3,7 @@ const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 
 const app = express();
 const port = 3001;
@@ -23,6 +24,19 @@ const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
+
+// Multer storage config
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadDir)
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+        cb(null, 'photo-' + uniqueSuffix + path.extname(file.originalname))
+    }
+});
+
+const upload = multer({ storage: storage });
 
 // Database setup
 const db = new sqlite3.Database('database.sqlite');
@@ -150,6 +164,17 @@ const initDb = async () => {
     `);
 
     await dbRun(`
+        CREATE TABLE IF NOT EXISTS guests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            cargo TEXT,
+            category TEXT,
+            bio TEXT,
+            photo TEXT
+        )
+    `);
+
+    await dbRun(`
         CREATE TABLE IF NOT EXISTS metrics (
             id TEXT PRIMARY KEY,
             count INTEGER DEFAULT 0
@@ -209,6 +234,15 @@ app.post('/api/login', async (req, res) => {
         console.error(`Login error: ${e.message}`);
         res.status(500).json({ error: e.message });
     }
+});
+
+// Photo upload endpoint
+app.post('/api/upload', upload.single('photo'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    }
+    const photoUrl = `http://localhost:3001/uploads/${req.file.filename}`;
+    res.json({ success: true, url: photoUrl });
 });
 
 // Users
@@ -463,6 +497,51 @@ app.put('/api/albums/:id', async (req, res) => {
 app.delete('/api/albums/:id', async (req, res) => {
     try {
         await dbRun('DELETE FROM albums WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Guests
+app.get('/api/guests', async (req, res) => {
+    try {
+        const rows = await dbAll('SELECT * FROM guests');
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/guests', async (req, res) => {
+    const { name, cargo, category, bio, photo } = req.body;
+    try {
+        const result = await dbRun(`
+            INSERT INTO guests (name, cargo, category, bio, photo)
+            VALUES (?, ?, ?, ?, ?)
+        `, [name, cargo, category, bio, photo]);
+        res.json({ id: result.lastID });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/guests/:id', async (req, res) => {
+    const { name, cargo, category, bio, photo } = req.body;
+    try {
+        await dbRun(`
+            UPDATE guests SET name=?, cargo=?, category=?, bio=?, photo=?
+            WHERE id=?
+        `, [name, cargo, category, bio, photo, req.params.id]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/guests/:id', async (req, res) => {
+    try {
+        await dbRun('DELETE FROM guests WHERE id = ?', [req.params.id]);
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });

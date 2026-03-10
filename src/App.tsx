@@ -14,6 +14,7 @@ import { CadernoTeses, RegulamentoTeses, VisualizarTeses } from "./pages/Teses";
 import Indicativos from "./pages/Indicativos";
 import Galeria from "./pages/Galeria";
 import Contato from "./pages/Contato";
+import Comissao from "./pages/Comissao";
 
 // Admin Pages
 import AdminLogin from "./pages/admin/Login";
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/apresentacao/evento" element={<Evento />} />
           <Route path="/apresentacao/regimento" element={<Regimento />} />
           <Route path="/programacao" element={<Programacao />} />
+          <Route path="/comissao" element={<Comissao />} />
           <Route path="/inscricao" element={<Inscricao />} />
           <Route path="/noticias" element={<Noticias />} />
           <Route path="/local" element={<LocalPage />} />

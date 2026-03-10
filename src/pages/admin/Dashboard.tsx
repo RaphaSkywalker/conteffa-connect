@@ -190,6 +190,7 @@ const AdminDashboard = () => {
     const [user, setUser] = useState(() => {
         const savedUser = localStorage.getItem("admin_user");
         return savedUser ? JSON.parse(savedUser) : {
+            id: 1,
             name: "Raphael Skywalker",
             email: "admin@conteffa.com.br",
             role: "admin",
@@ -413,7 +414,7 @@ const AdminDashboard = () => {
     const [newConvidado, setNewConvidado] = useState({
         name: "",
         cargo: "",
-        category: "Convidado" as "Presidente" | "Diretoria" | "Convidado",
+        category: "Convidado" as "Presidente" | "Diretoria" | "Convidado" | "Comissão",
         bio: "",
         photo: null as string | null,
         id: null as number | null
@@ -661,11 +662,15 @@ const AdminDashboard = () => {
                 doc.line(14, 45, 196, 45);
 
                 // Foto do Inscrito
-                if (insc.foto && typeof insc.foto === 'string' && insc.foto.startsWith('data:image')) {
+                if (insc.foto && typeof insc.foto === 'string') {
                     try {
                         let format = 'JPEG';
-                        if (insc.foto.includes('image/png')) format = 'PNG';
-                        if (insc.foto.includes('image/webp')) format = 'WEBP';
+                        if (insc.foto.includes('.png') || insc.foto.includes('image/png')) format = 'PNG';
+                        if (insc.foto.includes('.webp') || insc.foto.includes('image/webp')) format = 'WEBP';
+
+                        // Para URLs que não são base64, o jsPDF pode ter dificuldade se não forem carregadas antes.
+                        // Mas como o addImage no jsPDF suporta URL (se o CORS permitir), vamos tentar diretamente.
+                        // No nosso caso as fotos locais no 3001 possuem CORS liberado no server.
                         doc.addImage(insc.foto, format, 14, 55, 40, 40, undefined, 'FAST');
                         doc.setDrawColor(11, 27, 50);
                         doc.rect(14, 55, 40, 40);
@@ -809,7 +814,14 @@ const AdminDashboard = () => {
                     setUnreadNotifications(dbMessages.filter((m: any) => !m.is_read).length);
                 }
 
-                if (dbUsers && dbUsers.length > 0) setActiveUsers(dbUsers);
+                if (dbUsers && dbUsers.length > 0) {
+                    setActiveUsers(dbUsers);
+                    // Sincroniza o perfil do usuário logado com os dados vindos do banco
+                    const currentUser = dbUsers.find((u: any) => u.email === user.email || u.id === (user.id || 1));
+                    if (currentUser) {
+                        setUser(prev => ({ ...prev, ...currentUser }));
+                    }
+                }
 
                 if (dbNews && dbNews.length > 0) {
                     // Prioritiza dados do Supabase
@@ -977,53 +989,77 @@ const AdminDashboard = () => {
         });
     };
 
-    const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'user' | 'profile' | 'noticia' | 'palestrante' | 'convidado' | 'albumCover' | 'albumPhotos' | 'instagramPhotos' | 'ad' = 'user') => {
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'user' | 'profile' | 'noticia' | 'palestrante' | 'convidado' | 'albumCover' | 'albumPhotos' | 'instagramPhotos' | 'ad' = 'user') => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                let base64String = reader.result as string;
+            toast.loading("Enviando foto...", { id: "upload" });
+            try {
+                // 1. Upload para o Supabase Storage (para nuvem)
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+                const filePath = `admin/${type}/${fileName}`;
 
-                // Compress if it's an image
-                if (base64String.startsWith('data:image/')) {
-                    base64String = await compressImage(base64String);
+                const { error: uploadError } = await supabase.storage
+                    .from('media')
+                    .upload(filePath, file);
+
+                let publicUrl = "";
+                if (!uploadError) {
+                    const { data } = supabase.storage.from('media').getPublicUrl(filePath);
+                    publicUrl = data.publicUrl;
                 }
 
+                // 2. Upload para o Servidor Local (para persistência local e PDFs)
+                const formData = new FormData();
+                formData.append('photo', file);
+
+                const response = await fetch('http://localhost:3001/api/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const localData = await response.json();
+                const finalUrl = localData.success ? localData.url : publicUrl;
+
+                if (!finalUrl) throw new Error("Falha no upload");
+
+                // 3. Atualizar o estado correspondente
                 if (type === 'profile') {
-                    const updatedProfile = { ...user, photo: base64String };
+                    const updatedProfile = { ...user, photo: finalUrl };
                     setUser(updatedProfile);
 
                     const updatedUsers = activeUsers.map((u: any) =>
-                        (u.email === user.email || u.id === 1) ? { ...u, photo: base64String } : u
+                        (u.email === user.email || u.id === (user.id || 1)) ? { ...u, photo: finalUrl } : u
                     );
                     setActiveUsers(updatedUsers);
-                    toast.success("Foto de perfil atualizada!");
+                    toast.success("Foto de perfil atualizada!", { id: "upload" });
                 } else if (type === 'noticia') {
-                    setNewNoticia({ ...newNoticia, photo: base64String });
+                    setNewNoticia({ ...newNoticia, photo: finalUrl });
+                    toast.success("Foto da notícia carregada!", { id: "upload" });
                 } else if (type === 'palestrante') {
-                    setNewPalestrante({ ...newPalestrante, photo: base64String });
+                    setNewPalestrante({ ...newPalestrante, photo: finalUrl });
+                    toast.success("Foto do palestrante carregada!", { id: "upload" });
                 } else if (type === 'convidado') {
-                    setNewConvidado({ ...newConvidado, photo: base64String });
+                    setNewConvidado({ ...newConvidado, photo: finalUrl });
+                    toast.success("Foto do convidado carregada!", { id: "upload" });
                 } else if (type === 'albumCover') {
-                    setNewAlbum({ ...newAlbum, cover: base64String });
-                    toast.success("Capa do álbum definida!");
-                } else if (type === 'albumPhotos') {
-                    setNewAlbum({ ...newAlbum, photos: [...newAlbum.photos, base64String] });
-                } else if (type === 'instagramPhotos') {
-                    if (instagramConfig.photos.length >= 6) {
-                        toast.error("Máximo de 6 fotos atingido.");
-                        return;
-                    }
-                    setInstagramConfig({ ...instagramConfig, photos: [...instagramConfig.photos, base64String] });
+                    setNewAlbum({ ...newAlbum, cover: finalUrl });
+                    toast.success("Capa do álbum definida!", { id: "upload" });
                 } else if (type === 'ad') {
-                    setAdImage(base64String);
-                    localStorage.setItem("conteffa_ad_image", base64String);
-                    toast.success("Imagem de divulgação atualizada!");
+                    setAdImage(finalUrl);
+                    localStorage.setItem("conteffa_ad_image", finalUrl);
+                    toast.success("Imagem de divulgação atualizada!", { id: "upload" });
+                } else if (type === 'albumPhotos') {
+                    setNewAlbum({ ...newAlbum, photos: [...newAlbum.photos, finalUrl] });
+                    toast.success("Foto adicionada ao álbum!", { id: "upload" });
                 } else {
-                    setNewUser({ ...newUser, photo: base64String });
+                    setNewUser({ ...newUser, photo: finalUrl });
+                    toast.success("Foto do usuário carregada!", { id: "upload" });
                 }
-            };
-            reader.readAsDataURL(file);
+            } catch (err) {
+                console.error("Erro no upload:", err);
+                toast.error("Erro ao carregar foto.", { id: "upload" });
+            }
         }
     };
 
@@ -2765,6 +2801,7 @@ const AdminDashboard = () => {
                                                                     <SelectContent className="bg-[#122442] border-white/10 text-white">
                                                                         <SelectItem value="Presidente">Presidente</SelectItem>
                                                                         <SelectItem value="Diretoria">Diretoria</SelectItem>
+                                                                        <SelectItem value="Comissão">Comissão</SelectItem>
                                                                         <SelectItem value="Convidado">Convidado</SelectItem>
                                                                     </SelectContent>
                                                                 </Select>
@@ -2855,7 +2892,8 @@ const AdminDashboard = () => {
                                                 <div className="mb-4">
                                                     <span className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${c.category === 'Presidente' ? 'bg-amber-500/20 text-amber-500' :
                                                         c.category === 'Diretoria' ? 'bg-blue-500/20 text-blue-500' :
-                                                            'bg-white/10 text-white/40'
+                                                            c.category === 'Comissão' ? 'bg-emerald-500/20 text-emerald-500' :
+                                                                'bg-white/10 text-white/40'
                                                         }`}>
                                                         {c.category}
                                                     </span>
