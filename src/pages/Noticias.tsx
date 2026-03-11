@@ -337,8 +337,8 @@ const Noticias = () => {
                     ))
                   ) : (
                     Array(6).fill(0).map((_, i) => (
-                      <div key={i} className="aspect-square bg-slate-100 relative group cursor-pointer overflow-hidden">
-                        <img src={`https://images.unsplash.com/photo-${i}?w=200&h=200&auto=format&fit=crop`} alt="" className="w-full h-full object-cover opacity-80" />
+                      <div key={i} className="aspect-square bg-slate-200/50 relative group cursor-pointer overflow-hidden flex items-center justify-center">
+                        <Instagram className="w-5 h-5 text-slate-300" />
                       </div>
                     ))
                   )}

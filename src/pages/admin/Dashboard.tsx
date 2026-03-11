@@ -842,6 +842,8 @@ const AdminDashboard = () => {
         photos: [] as string[]
     });
 
+    const [editingInstaIdx, setEditingInstaIdx] = useState<number | null>(null);
+
     const [adImage, setAdImage] = useState<string | null>(null);
 
     const instagramPhotosInputRef = useRef<HTMLInputElement>(null);
@@ -1110,6 +1112,16 @@ const AdminDashboard = () => {
                 } else if (type === 'albumPhotos') {
                     setNewAlbum({ ...newAlbum, photos: [...newAlbum.photos, finalUrl] });
                     toast.success("Foto adicionada ao álbum!", { id: "upload" });
+                } else if (type === 'instagramPhotos') {
+                    const newPhotos = [...(instagramConfig.photos || [])];
+                    if (editingInstaIdx !== null) {
+                        newPhotos[editingInstaIdx] = finalUrl;
+                    } else if (newPhotos.length < 6) {
+                        newPhotos.push(finalUrl);
+                    }
+                    setInstagramConfig({ ...instagramConfig, photos: newPhotos });
+                    setEditingInstaIdx(null);
+                    toast.success("Foto do Instagram atualizada!", { id: "upload" });
                 } else {
                     setNewUser({ ...newUser, photo: finalUrl });
                     toast.success("Foto do usuário carregada!", { id: "upload" });
@@ -2531,7 +2543,7 @@ const AdminDashboard = () => {
                                                                         <img src={photo} alt="" className="w-full h-full object-cover" />
                                                                         <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-1">
                                                                             <button
-                                                                                onClick={() => instagramPhotosInputRef.current?.click()}
+                                                                                onClick={() => { setEditingInstaIdx(idx); instagramPhotosInputRef.current?.click(); }}
                                                                                 className="p-1.5 bg-primary rounded-full hover:scale-110 transition-transform"
                                                                                 title="Trocar Foto"
                                                                             >
@@ -2548,7 +2560,7 @@ const AdminDashboard = () => {
                                                                     </>
                                                                 ) : (
                                                                     <button
-                                                                        onClick={() => instagramPhotosInputRef.current?.click()}
+                                                                        onClick={() => { setEditingInstaIdx(idx); instagramPhotosInputRef.current?.click(); }}
                                                                         className="w-full h-full flex items-center justify-center hover:bg-white/5 transition-colors"
                                                                     >
                                                                         <Plus className="w-4 h-4 text-white/20" />
