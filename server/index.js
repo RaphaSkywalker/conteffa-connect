@@ -159,9 +159,30 @@ const initDb = async () => {
             nomeAcompanhante TEXT,
             foto TEXT,
             data TEXT,
-            status TEXT
+            status TEXT,
+            cpf TEXT,
+            dataNascimento TEXT,
+            tamanhoCamiseta TEXT,
+            hotel TEXT
         )
     `);
+
+    // Migration for new fields
+    const columns = [
+        { name: 'cpf', type: 'TEXT' },
+        { name: 'dataNascimento', type: 'TEXT' },
+        { name: 'tamanhoCamiseta', type: 'TEXT' },
+        { name: 'hotel', type: 'TEXT' }
+    ];
+
+    for (const col of columns) {
+        try {
+            await dbRun(`ALTER TABLE registrations ADD COLUMN ${col.name} ${col.type}`);
+            console.log(`Column ${col.name} added to registrations table`);
+        } catch (err) {
+            // Column probably already exists
+        }
+    }
 
     await dbRun(`
         CREATE TABLE IF NOT EXISTS guests (
@@ -178,6 +199,17 @@ const initDb = async () => {
         CREATE TABLE IF NOT EXISTS metrics (
             id TEXT PRIMARY KEY,
             count INTEGER DEFAULT 0
+        )
+    `);
+
+    await dbRun(`
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT,
+            content TEXT,
+            type TEXT DEFAULT 'info',
+            is_read INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
 
@@ -438,7 +470,27 @@ app.delete('/api/programming/:id', async (req, res) => {
 app.get('/api/config/:key', async (req, res) => {
     try {
         const row = await dbGet('SELECT value FROM config WHERE key = ?', [req.params.key]);
-        res.json(row ? row.value : null);
+        if (row && row.value) {
+            let val = row.value;
+
+            // Auto-correção para o formato de "mapa de caracteres" corrompido
+            if (typeof val === 'string' && val.startsWith('{"0":')) {
+                try {
+                    const data = JSON.parse(val);
+                    if (data && typeof data === 'object' && '0' in data) {
+                        val = Object.values(data).join('');
+                    }
+                } catch (e) { console.error("Falha ao reconstruir config:", e); }
+            }
+
+            try {
+                res.json(JSON.parse(val));
+            } catch (e) {
+                res.json(val);
+            }
+        } else {
+            res.json(null);
+        }
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -452,6 +504,25 @@ app.post('/api/config/:key', async (req, res) => {
             VALUES (?, ?) 
             ON CONFLICT(key) DO UPDATE SET value = ?
         `, [req.params.key, value, value]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Messages
+app.get('/api/messages', async (req, res) => {
+    try {
+        const rows = await dbAll('SELECT * FROM messages ORDER BY created_at DESC');
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/messages/read-all', async (req, res) => {
+    try {
+        await dbRun('UPDATE messages SET is_read = 1');
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });

@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle, Camera, User, Mail, Phone, MapPin, Info, AlertCircle, Check } from "lucide-react";
+import { CheckCircle, Camera, User, Mail, Phone, MapPin, Info, AlertCircle, Check, Hotel } from "lucide-react";
 import { toast } from "sonner";
 
 const Inscricao = () => {
@@ -47,7 +47,29 @@ const Inscricao = () => {
     parentesco: "",
     quantosAcompanhantes: "",
     nomeAcompanhante: "",
+    cpf: "",
+    dataNascimento: "",
+    tamanhoCamiseta: "",
+    hotel: "MarHotel",
+    qualHotel: "",
   });
+
+  const maskCPF = (value: string) => {
+    return value
+      .replace(/\D/g, "")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})/, "$1-$2")
+      .replace(/(-\d{2})\d+?$/, "$1");
+  };
+
+  const maskDate = (value: string) => {
+    return value
+      .replace(/\D/g, "")
+      .replace(/(\d{2})(\d)/, "$1/$2")
+      .replace(/(\d{2})(\d)/, "$1/$2")
+      .replace(/(\/\d{4})\d+?$/, "$1");
+  };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -94,8 +116,8 @@ const Inscricao = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.nomeCompleto || !form.email) {
-      toast.error("Por favor, preencha pelo menos o Nome e E-mail.");
+    if (!form.nomeCompleto || !form.email || !form.cpf || !form.dataNascimento) {
+      toast.error("Por favor, preencha os campos obrigatórios (Nome, E-mail, CPF e Data de Nascimento).");
       return;
     }
 
@@ -132,8 +154,6 @@ const Inscricao = () => {
       toast.success("Inscrito salvo no navegador.");
     }
   };
-
-  // Success Modal removed from conditional return to use Dialog instead
 
 
   return (
@@ -206,6 +226,28 @@ const Inscricao = () => {
                   </div>
                 </div>
 
+                {/* CPF & Data de Nascimento */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-bold text-white ml-1">CPF <span className="text-primary">*</span></Label>
+                  <Input
+                    required
+                    value={form.cpf}
+                    onChange={(e) => setForm({ ...form, cpf: maskCPF(e.target.value) })}
+                    className="h-14 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-primary/50"
+                    placeholder="000.000.000-00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-bold text-white ml-1">Data de Nascimento <span className="text-primary">*</span></Label>
+                  <Input
+                    required
+                    value={form.dataNascimento}
+                    onChange={(e) => setForm({ ...form, dataNascimento: maskDate(e.target.value) })}
+                    className="h-14 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-primary/50"
+                    placeholder="DD/MM/AAAA"
+                  />
+                </div>
+
                 {/* Endereço & Bairro */}
                 <div className="space-y-2">
                   <Label className="text-sm font-bold text-white ml-1">Endereço</Label>
@@ -261,13 +303,12 @@ const Inscricao = () => {
                       <SelectItem value="ATEFFA/SP">ATEFFA/SP</SelectItem>
                       <SelectItem value="ATEFFA/MG">ATEFFA/MG</SelectItem>
                       <SelectItem value="ATEFFA/ES">ATEFFA/ES</SelectItem>
-                      <SelectItem value="ATEFFA/SE">ATEFFA/SE</SelectItem>
                       <SelectItem value="ATEFFA/PI">ATEFFA/PI</SelectItem>
                       <SelectItem value="ATEFFA/RJ">ATEFFA/RJ</SelectItem>
                       <SelectItem value="ATEFFA/MS">ATEFFA/MS</SelectItem>
                       <SelectItem value="ATEFFA/MT">ATEFFA/MT</SelectItem>
                       <SelectItem value="ATEFFA/BA">ATEFFA/BA</SelectItem>
-                      <SelectItem value="ATEFFA/CE">ATEFFA/CE</SelectItem>
+                      <SelectItem value="ANTEFFA">ANTEFFA</SelectItem>
                       <SelectItem value="ATEFFA/Região Norte">ATEFFA/Região Norte</SelectItem>
                       <SelectItem value="ATEFFA/Região Nordeste">ATEFFA/Região Nordeste</SelectItem>
                       <SelectItem value="Diretoria Executiva">Diretoria Executiva</SelectItem>
@@ -353,6 +394,26 @@ const Inscricao = () => {
                   </Select>
                 </div>
 
+                {/* Tamanho Camiseta */}
+                <div className="md:col-span-2 space-y-4">
+                  <Label className="text-sm font-bold text-white ml-1 uppercase tracking-widest text-[10px]">Tamanho da Camiseta</Label>
+                  <div className="flex flex-wrap gap-3">
+                    {["PP", "P", "M", "G", "GG", "XXG"].map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => setForm({ ...form, tamanhoCamiseta: size })}
+                        className={`px-6 py-3 rounded-xl border-2 transition-all font-black text-xs ${form.tamanhoCamiseta === size
+                          ? "bg-primary border-primary text-white shadow-lg shadow-primary/30 scale-105"
+                          : "bg-white/5 border-white/10 text-white/40 hover:border-white/20"
+                          }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Problema de Saúde */}
                 <div className="space-y-2">
                   <Label className="text-sm font-bold text-white ml-1">Possui algum problema de saúde?</Label>
@@ -400,6 +461,43 @@ const Inscricao = () => {
                   <p className="text-[12px] text-white/30 italic mt-1.5 flex items-center gap-1.5">
                     <AlertCircle className="w-3 h-3" /> Inciso XIII do Art. 6º do Regimento do Congresso
                   </p>
+                </div>
+
+                {/* Hospedagem Section */}
+                <div className="md:col-span-2 pt-6 mt-6 border-t border-white/5">
+                  <h5 className="font-heading font-black text-white uppercase tracking-wider text-sm mb-6 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Hotel className="w-4 h-4 text-primary" />
+                    </div>
+                    HOSPEDAGEM
+                  </h5>
+
+                  <div className={`grid gap-8 ${form.hotel === 'Outros...' ? 'md:grid-cols-2' : 'max-w-sm'}`}>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-bold text-white ml-1">Hotel</Label>
+                      <Select value={form.hotel} onValueChange={(v) => setForm({ ...form, hotel: v })}>
+                        <SelectTrigger className="h-14 rounded-2xl bg-white/5 border-white/10 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#122442] border-white/10 text-white shadow-2xl">
+                          <SelectItem value="MarHotel">MarHotel</SelectItem>
+                          <SelectItem value="Outros...">Outros...</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {form.hotel === 'Outros...' && (
+                      <div className="space-y-2 animate-in fade-in slide-in-from-left-4 duration-300">
+                        <Label className="text-sm font-bold text-white ml-1">Qual?</Label>
+                        <Input
+                          value={form.qualHotel}
+                          onChange={(e) => setForm({ ...form, qualHotel: e.target.value })}
+                          placeholder="Nome do hotel/pousada"
+                          className="h-14 rounded-2xl bg-white/5 border-white/10 text-white focus:border-primary/50"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Acompanhante Section */}

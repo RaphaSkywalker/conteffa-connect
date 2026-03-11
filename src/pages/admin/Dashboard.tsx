@@ -40,8 +40,12 @@ import {
     Eye,
     Pencil,
     Trash2,
-    Bell
+    Bell,
+    Hotel,
+    Upload,
+    FileSpreadsheet
 } from "lucide-react";
+import * as XLSX from 'xlsx';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
     AreaChart, Area, PieChart, Pie
@@ -200,6 +204,23 @@ const AdminDashboard = () => {
             phone: "(00) 00000-0000"
         };
     });
+
+    const maskCPF = (value: string) => {
+        return value
+            .replace(/\D/g, "")
+            .replace(/(\d{3})(\d)/, "$1.$2")
+            .replace(/(\d{3})(\d)/, "$1.$2")
+            .replace(/(\d{3})(\d{1,2})/, "$1-$2")
+            .replace(/(-\d{2})\d+?$/, "$1");
+    };
+
+    const maskDate = (value: string) => {
+        return value
+            .replace(/\D/g, "")
+            .replace(/(\d{2})(\d)/, "$1/$2")
+            .replace(/(\d{2})(\d)/, "$1/$2")
+            .replace(/(\/\d{4})\d+?$/, "$1");
+    };
 
     // Load users list from localStorage or use default
     const [activeUsers, setActiveUsers] = useState(() => {
@@ -504,12 +525,11 @@ const AdminDashboard = () => {
             toast.error("Nenhuma inscrição encontrada para exportar.");
             return;
         }
-
         const type = exportSettings.reportType;
         const img = new Image();
         img.src = "/logo-evento.png?t=" + Date.now();
 
-        toast.loading("Preparando relatório...", { id: "pdf-export" });
+        toast.loading("Relatório em PDF solicitado...", { id: "pdf-export" });
 
         img.onload = () => {
             const doc = new jsPDF();
@@ -546,12 +566,13 @@ const AdminDashboard = () => {
             doc.line(14, 48, 196, 48);
 
             if (type === "simples") {
-                const head = [["NOME COMPLETO", "TELEFONE/WHATSAPP", "ATEFFA", "ACOMPANHANTE"]];
+                const head = [["NOME COMPLETO", "CPF", "ATEFFA", "TAMANHO", "HOTEL"]];
                 const body = inscricoes.map(insc => [
                     insc.nomeCompleto,
-                    insc.celularWhatsapp || insc.telefone || "-",
+                    insc.cpf || "-",
                     insc.ateffa,
-                    insc.nomeAcompanhante || "-"
+                    insc.tamanhoCamiseta || "-",
+                    insc.hotel || "MarHotel"
                 ]);
 
                 autoTable(doc, {
@@ -564,11 +585,11 @@ const AdminDashboard = () => {
                     alternateRowStyles: { fillColor: [245, 245, 245] }
                 });
             } else if (type === "medio") {
-                const head = [["DADOS PESSOAIS", "LOCALIZAÇÃO & ADICIONAIS", "ACOMPANHANTE"]];
+                const head = [["DADOS PESSOAIS", "LOCALIZAÇÃO & INSCR.", "LOGÍSTICA & HOTEL"]];
                 const body = inscricoes.map(insc => [
-                    `Nome: ${insc.nomeCompleto}\nEmail: ${insc.email}\nTel: ${insc.celularWhatsapp || insc.telefone}\nCargo: ${insc.cargo}`,
-                    `End: ${insc.endereco}\nCidade: ${insc.cidade}\nAteffa: ${insc.ateffa}\nDeslocamento: ${insc.formaDeslocamento}`,
-                    `Acomp: ${insc.acompanhantes}\nNome: ${insc.nomeAcompanhante || "-"}\nParentesco: ${insc.parentesco || "-"}`
+                    `Nome: ${insc.nomeCompleto}\nCPF: ${insc.cpf || "-"}\nNasc: ${insc.dataNascimento || "-"}\nCargo: ${insc.cargo}`,
+                    `Ateffa: ${insc.ateffa}\nCel: ${insc.celularWhatsapp || "-"}\nEmail: ${insc.email}\nEnd: ${insc.endereco}`,
+                    `Tamanho: ${insc.tamanhoCamiseta || "-"}\nHotel: ${insc.hotel || "MarHotel"}\nAcomp: ${insc.nomeAcompanhante || "-"}`
                 ]);
 
                 autoTable(doc, {
@@ -581,11 +602,11 @@ const AdminDashboard = () => {
                     columnStyles: { 0: { cellWidth: 70 }, 1: { cellWidth: 70 }, 2: { cellWidth: 42 } }
                 });
             } else if (type === "completo") {
-                const head = [["NOME / CARGO", "CONTATO / LOCALIZAÇÃO", "SAÚDE / EXTRAS", "ACOMPANHANTE"]];
+                const head = [["PESSOAL / CONTATO", "ATEFFA / LOGÍSTICA", "HOSPEDAGEM", "ACOMPANHANTE"]];
                 const body = inscricoes.map(insc => [
-                    `${insc.nomeCompleto}\n${insc.cargo}\nATEFFA: ${insc.ateffa}`,
-                    `${insc.email}\n${insc.celularWhatsapp || insc.telefone}\n${insc.cidade} - ${insc.cep}`,
-                    `Saúde: ${insc.problemaSaude}${insc.qualSaude ? ` (${insc.qualSaude})` : ''}\nDeslocamento: ${insc.formaDeslocamento}`,
+                    `${insc.nomeCompleto}\nCPF: ${insc.cpf || "-"}\n${insc.email}\n${insc.celularWhatsapp || "-"}`,
+                    `ATEFFA: ${insc.ateffa}\nCargo: ${insc.cargo || "-"}\nTam: ${insc.tamanhoCamiseta || "-"}\nDesloc: ${insc.formaDeslocamento}`,
+                    `Hotel: ${insc.hotel === 'Outros...' ? (insc.qualHotel || 'Outros') : (insc.hotel || "MarHotel")}\nCidade: ${insc.cidade || "-"}\nCEP: ${insc.cep || "-"}`,
                     `Nome: ${insc.nomeAcompanhante || "-"}\nParentesco: ${insc.parentesco || "-"}`
                 ]);
 
@@ -616,8 +637,62 @@ const AdminDashboard = () => {
         img.onerror = () => {
             setIsExportingPDF(false);
             toast.dismiss("pdf-export");
-            toast.error("Erro ao carregar logomarca. Verifique se o arquivo public/logo-evento.png existe.");
+            toast.error("Erro ao carregar logomarca.");
         };
+    };
+
+    const handleExportExcel = () => {
+        if (inscricoes.length === 0) {
+            toast.error("Nenhuma inscrição encontrada para exportar.");
+            return;
+        }
+
+        toast.loading("Preparando planilha...", { id: "excel-export" });
+
+        try {
+            const dataToExport = inscricoes.map((insc: any) => ({
+                "CPF": insc.cpf,
+                "DATA NASCIMENTO": insc.dataNascimento,
+                "ID": insc.id,
+                "DATA INSCRIÇÃO": insc.data,
+                "STATUS": insc.status || 'PENDENTE',
+                "NOME COMPLETO": insc.nomeCompleto,
+                "E-MAIL": insc.email,
+                "TELEFONE": insc.telefone,
+                "WHATSAPP": insc.celularWhatsapp,
+                "ATEFFA": insc.ateffa,
+                "CARGO": insc.cargo,
+                "TAMANHO CAMISETA": insc.tamanhoCamiseta,
+                "HOTEL": insc.hotel === 'Outros...' ? (insc.qualHotel || 'Outros') : (insc.hotel || "MarHotel"),
+                "ENDEREÇO": insc.endereco,
+                "BAIRRO": insc.bairro,
+                "CIDADE": insc.cidade,
+                "CEP": insc.cep,
+                "DESLOCAMENTO": insc.formaDeslocamento,
+                "PROBLEMA SAÚDE": insc.problemaSaude,
+                "QUAL SAÚDE": insc.qualSaude,
+                "CUIDADOS ESPECIAIS": insc.cuidadosEspeciais,
+                "QUAIS CUIDADOS": insc.quaisCuidados,
+                "HOTEL ESPECIFICO": insc.qualHotel || "",
+                "ACOMPANHANTE": insc.acompanhantes,
+                "NOME ACOMPANHANTE": insc.nomeAcompanhante,
+                "PARENTESCO": insc.parentesco,
+                "QUANTIDADE ACOMPANHANTES": insc.quantosAcompanhantes
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Inscritos");
+
+            XLSX.writeFile(wb, `inscritos_conteffa_${Date.now()}.xlsx`);
+
+            toast.dismiss("excel-export");
+            toast.success("Download Excel iniciado!");
+        } catch (err) {
+            console.error("Erro ao exportar Excel:", err);
+            toast.dismiss("excel-export");
+            toast.error("Erro ao gerar planilha.");
+        }
     };
 
     const handleExportIndividualPDF = (insc: any) => {
@@ -667,10 +742,6 @@ const AdminDashboard = () => {
                         let format = 'JPEG';
                         if (insc.foto.includes('.png') || insc.foto.includes('image/png')) format = 'PNG';
                         if (insc.foto.includes('.webp') || insc.foto.includes('image/webp')) format = 'WEBP';
-
-                        // Para URLs que não são base64, o jsPDF pode ter dificuldade se não forem carregadas antes.
-                        // Mas como o addImage no jsPDF suporta URL (se o CORS permitir), vamos tentar diretamente.
-                        // No nosso caso as fotos locais no 3001 possuem CORS liberado no server.
                         doc.addImage(insc.foto, format, 14, 55, 40, 40, undefined, 'FAST');
                         doc.setDrawColor(11, 27, 50);
                         doc.rect(14, 55, 40, 40);
@@ -678,16 +749,10 @@ const AdminDashboard = () => {
                         console.error("Erro ao adicionar foto ao PDF:", err);
                         doc.setDrawColor(200);
                         doc.rect(14, 55, 40, 40);
-                        doc.setFontSize(8);
-                        doc.setTextColor(150);
-                        doc.text("ERRO NA FOTO", 20, 75);
                     }
                 } else {
                     doc.setDrawColor(200);
                     doc.rect(14, 55, 40, 40);
-                    doc.setFontSize(8);
-                    doc.setTextColor(150);
-                    doc.text("SEM FOTO", 24, 75);
                 }
 
                 // Dados ao lado da foto
@@ -698,83 +763,76 @@ const AdminDashboard = () => {
 
                 doc.setFontSize(10);
                 doc.setTextColor(100);
-                doc.text(`ATEFFA: ${insc.ateffa || "-"}`, 60, 72);
-                doc.text(`CARGO: ${insc.cargo || "-"}`, 60, 77);
+                doc.text(`CPF: ${insc.cpf || "-"}`, 60, 72);
+                doc.text(`NASCIMENTO: ${insc.dataNascimento || "-"}`, 60, 77);
+                doc.text(`ATEFFA: ${insc.ateffa || "-"}`, 60, 82);
+                doc.text(`CARGO: ${insc.cargo || "-"}`, 60, 87);
                 const statusDisplay = (insc.status || "Pendente").toUpperCase();
-                doc.text(`STATUS: ${statusDisplay}`, 60, 82);
-                doc.text(`INSCRITO EM: ${insc.data || "-"}`, 60, 87);
+                doc.text(`STATUS: ${statusDisplay}`, 14, 105);
+                doc.text(`INSCRITO EM: ${insc.data || "-"}`, 14, 110);
+                doc.text(`TAMANHO CAMISETA: ${insc.tamanhoCamiseta || "-"}`, 14, 115);
+                const hotelDisplay = insc.hotel === 'Outros...' ? `Outros (${insc.qualHotel || "?"})` : (insc.hotel || "MarHotel");
+                doc.text(`HOTEL: ${hotelDisplay}`, 14, 120);
 
-                // Tabelas de Dados Detalhados
-                const personalData = [
-                    ["E-MAIL", insc.email || "-"],
-                    ["TELEFONE", insc.telefone || "-"],
-                    ["WHATSAPP", insc.celularWhatsapp || "-"],
-                    ["ENDEREÇO", insc.endereco || "-"],
-                    ["CIDADE", insc.cidade || "-"],
-                    ["CEP", insc.cep || "-"]
-                ];
+                // Seção: Informações de Contato
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(12);
+                doc.setTextColor(11, 27, 50);
+                doc.text("INFORMAÇÕES DE CONTATO", 14, 135);
+                doc.line(14, 137, 196, 137);
 
-                console.log("Gerando primeira tabela");
-                autoTable(doc, {
-                    head: [["DADOS PESSOAIS & CONTATO", ""]],
-                    body: personalData,
-                    startY: 105,
-                    theme: 'striped',
-                    headStyles: { fillColor: [11, 27, 50], textColor: [255, 255, 255], fontStyle: 'bold' },
-                    styles: { fontSize: 9, cellPadding: 4 },
-                    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 } }
-                });
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(10);
+                doc.setTextColor(80);
+                doc.text(`Email: ${insc.email || "-"}`, 14, 145);
+                doc.text(`Celular/WhatsApp: ${insc.celularWhatsapp || "-"}`, 14, 150);
+                doc.text(`Endereço: ${insc.endereco || "-"}, ${insc.bairro || "-"}`, 14, 155);
+                doc.text(`Cidade: ${insc.cidade || "-"} - CEP: ${insc.cep || "-"}`, 14, 160);
 
-                // Posicionar a segunda tabela com segurança
-                // Se a primeira tabela falhar por algum motivo, mantemos um fallback de Y=180
-                let currentY = 180;
-                const lastTable = (doc as any).lastAutoTable;
-                if (lastTable && lastTable.cursor) {
-                    currentY = lastTable.cursor.y + 10;
+                // Seção: Logística & Saúde
+                doc.setFont("helvetica", "bold");
+                doc.text("LOGÍSTICA & SAÚDE", 14, 175);
+                doc.line(14, 177, 196, 177);
+
+                doc.setFont("helvetica", "normal");
+                doc.text(`Forma de Deslocamento: ${insc.formaDeslocamento || "-"}`, 14, 185);
+                doc.text(`Problema de Saúde: ${insc.problemaSaude || "NÃO"}`, 14, 190);
+                if (insc.qualSaude) doc.text(`Qual: ${insc.qualSaude}`, 14, 195);
+                doc.text(`Cuidados Especiais: ${insc.cuidadosEspeciais || "NÃO"}`, 14, 200);
+                if (insc.quaisCuidados) doc.text(`Quais: ${insc.quaisCuidados}`, 14, 205);
+
+                // Seção: Acompanhantes
+                doc.setFont("helvetica", "bold");
+                doc.text("INFORMAÇÕES DE ACOMPANHANTE", 14, 220);
+                doc.line(14, 222, 196, 222);
+
+                doc.setFont("helvetica", "normal");
+                doc.text(`Possui Acompanhantes: ${insc.acompanhantes || "NÃO"}`, 14, 230);
+                if (insc.acompanhantes === "SIM") {
+                    doc.text(`Nome: ${insc.nomeAcompanhante || "-"}`, 14, 235);
+                    doc.text(`Parentesco: ${insc.parentesco || "-"}`, 14, 240);
+                    doc.text(`Quantidade: ${insc.quantosAcompanhantes || "1"}`, 14, 245);
                 }
-
-                const extraData = [
-                    ["DESLOCAMENTO", insc.formaDeslocamento || "-"],
-                    ["PROB. SAÚDE", insc.problemaSaude || "-"],
-                    ["QUAL SAÚDE?", insc.qualSaude || "N/A"],
-                    ["ACOMPANHANTE", insc.acompanhantes || "N/A"],
-                    ["NOME ACOMP.", insc.nomeAcompanhante || "N/A"],
-                    ["PARENTESCO", insc.parentesco || "N/A"]
-                ];
-
-                console.log("Gerando segunda tabela");
-                autoTable(doc, {
-                    head: [["LOGÍSTICA & INFORMAÇÕES ADICIONAIS", ""]],
-                    body: extraData,
-                    startY: currentY,
-                    theme: 'striped',
-                    headStyles: { fillColor: [11, 27, 50], textColor: [255, 255, 255], fontStyle: 'bold' },
-                    styles: { fontSize: 9, cellPadding: 4 },
-                    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 } }
-                });
 
                 // Rodapé
                 doc.setFontSize(8);
                 doc.setTextColor(150);
-                doc.text("Documento oficial emitido pelo sistema CONTEFFA Connect", 105, 285, { align: 'center' });
-                doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 285);
+                doc.text("Este documento é um comprovante oficial de inscrição no IX CONTEFFA.", 105, 280, { align: "center" });
+                doc.text(`Gerado via Painel Administrativo em ${new Date().toLocaleString('pt-BR')}`, 105, 285, { align: "center" });
 
-                console.log("Salvando arquivo");
-                const safeName = (insc.nomeCompleto || "ficha").replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                doc.save(`ficha_${safeName}.pdf`);
-                toast.success("Ficha baixada com sucesso!");
-            } catch (err: any) {
-                console.error("Erro crítico na geração do PDF:", err);
-                toast.error(`Erro ao gerar PDF: ${err.message || 'Erro desconhecido'}`);
-            } finally {
+                doc.save(`Ficha_Inscricao_${insc.nomeCompleto.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
                 toast.dismiss("pdf-individual");
+                toast.success("Ficha individual gerada!");
+            } catch (err: any) {
+                console.error("Erro fatal ao gerar PDF individual:", err);
+                toast.dismiss("pdf-individual");
+                toast.error("Erro crítico ao gerar o arquivo PDF.");
             }
         };
 
-        logoImg.onerror = (e) => {
-            console.error("Erro ao carregar logo para o PDF individual", e);
+        logoImg.onerror = () => {
             toast.dismiss("pdf-individual");
-            toast.error("Erro no servidor de imagens. Tente novamente.");
+            toast.error("Erro ao carregar logomarca para o PDF.");
         };
     };
 
@@ -1631,8 +1689,8 @@ const AdminDashboard = () => {
 
     const associacoes = [
         "ANTEFFA", "ATEFFA/RS", "ATEFFA/GO", "ATEFFA/SC", "ATEFFA/PR", "ATEFFA/SP", "ATEFFA/MG",
-        "ATEFFA/ES", "ATEFFA/SE", "ATEFFA/PI", "ATEFFA/RJ", "ATEFFA/MS", "ATEFFA/MT", "ATEFFA/BA",
-        "ATEFFA/CE", "ATEFFA/Região Norte", "ATEFFA/Região Nordeste", "Diretoria Executiva",
+        "ATEFFA/ES", "ATEFFA/PI", "ATEFFA/RJ", "ATEFFA/MS", "ATEFFA/MT", "ATEFFA/BA",
+        "ATEFFA/Região Norte", "ATEFFA/Região Nordeste", "Diretoria Executiva",
         "Palestrante", "Funcionário", "Convidado", "Apoio Operacional"
     ];
 
@@ -3329,6 +3387,12 @@ const AdminDashboard = () => {
                                                 <Filter className="w-4 h-4" /> {showFilters ? 'Ocultar Filtros' : 'Filtros'}
                                             </Button>
                                             <Button
+                                                onClick={handleExportExcel}
+                                                className="rounded-full gap-2 px-6 bg-[#217346] hover:bg-[#1e6a41] text-white shadow-lg shadow-emerald-500/10 font-black transition-all"
+                                            >
+                                                <FileSpreadsheet className="w-4 h-4" /> Exportar Excel
+                                            </Button>
+                                            <Button
                                                 onClick={() => setIsExportingPDF(true)}
                                                 className="rounded-full gap-2 px-6 bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 font-black transition-all"
                                             >
@@ -3486,10 +3550,24 @@ const AdminDashboard = () => {
                                                                 <div className="text-primary font-bold text-sm tracking-widest uppercase">{selectedInscricao.ateffa}</div>
                                                                 <div className="text-white/40 text-xs mt-2 font-medium italic">ID: #{selectedInscricao.id} — Inscrito em: {selectedInscricao.data}</div>
                                                             </div>
-                                                            <div className="flex flex-col gap-2">
-                                                                <span className="px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20 text-center">
-                                                                    Status: {selectedInscricao.status}
-                                                                </span>
+                                                            <div className="flex flex-col gap-2 min-w-[150px]">
+                                                                <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1 text-center">Status Inscrição</label>
+                                                                <Select
+                                                                    value={selectedInscricao.status || "PENDENTE"}
+                                                                    onValueChange={(v) => setSelectedInscricao({ ...selectedInscricao, status: v })}
+                                                                >
+                                                                    <SelectTrigger className={`rounded-full h-10 border-2 font-black text-[10px] uppercase tracking-widest transition-all ${selectedInscricao.status === 'APROVADO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                                                        selectedInscricao.status === 'REPROVADO' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                                            'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                                                        }`}>
+                                                                        <SelectValue />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent className="bg-[#122442] border-white/10 text-white">
+                                                                        <SelectItem value="PENDENTE">🟡 PENDENTE</SelectItem>
+                                                                        <SelectItem value="APROVADO">🟢 APROVADO</SelectItem>
+                                                                        <SelectItem value="REPROVADO">🔴 REPROVADO</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
                                                             </div>
                                                         </div>
 
@@ -3517,6 +3595,29 @@ const AdminDashboard = () => {
                                                                         onChange={(e) => setSelectedInscricao({ ...selectedInscricao, email: e.target.value })}
                                                                         className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
                                                                     />
+                                                                </div>
+
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">CPF (Obrigatório)</label>
+                                                                        <Input
+                                                                            value={selectedInscricao.cpf || ""}
+                                                                            onChange={(e) => setSelectedInscricao({ ...selectedInscricao, cpf: maskCPF(e.target.value) })}
+                                                                            placeholder="000.000.000-00"
+                                                                            required
+                                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Data Nascimento</label>
+                                                                        <Input
+                                                                            value={selectedInscricao.dataNascimento || ""}
+                                                                            onChange={(e) => setSelectedInscricao({ ...selectedInscricao, dataNascimento: maskDate(e.target.value) })}
+                                                                            placeholder="DD/MM/YYYY"
+                                                                            required
+                                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
+                                                                        />
+                                                                    </div>
                                                                 </div>
 
                                                                 <div className="grid grid-cols-2 gap-4">
@@ -3603,21 +3704,40 @@ const AdminDashboard = () => {
                                                                     </div>
                                                                 </div>
 
-                                                                <div className="space-y-2">
-                                                                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Forma de Deslocamento</label>
-                                                                    <Select
-                                                                        value={selectedInscricao.formaDeslocamento}
-                                                                        onValueChange={(v) => setSelectedInscricao({ ...selectedInscricao, formaDeslocamento: v })}
-                                                                    >
-                                                                        <SelectTrigger className="rounded-xl h-12 bg-white/5 border-white/10 text-white">
-                                                                            <SelectValue />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent className="bg-[#122442] border-white/10 text-white">
-                                                                            <SelectItem value="Transporte Aéreo">Transporte Aéreo</SelectItem>
-                                                                            <SelectItem value="Ônibus">Ônibus</SelectItem>
-                                                                            <SelectItem value="Veículo Próprio">Veículo Próprio</SelectItem>
-                                                                        </SelectContent>
-                                                                    </Select>
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Forma de Deslocamento</label>
+                                                                        <Select
+                                                                            value={selectedInscricao.formaDeslocamento}
+                                                                            onValueChange={(v) => setSelectedInscricao({ ...selectedInscricao, formaDeslocamento: v })}
+                                                                        >
+                                                                            <SelectTrigger className="rounded-xl h-12 bg-white/5 border-white/10 text-white">
+                                                                                <SelectValue />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent className="bg-[#122442] border-white/10 text-white">
+                                                                                <SelectItem value="Transporte Aéreo">Transporte Aéreo</SelectItem>
+                                                                                <SelectItem value="Ônibus">Ônibus</SelectItem>
+                                                                                <SelectItem value="Veículo Próprio">Veículo Próprio</SelectItem>
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Tamanho Camiseta</label>
+                                                                        <div className="flex flex-wrap gap-2 pt-1">
+                                                                            {["PP", "P", "M", "G", "GG", "XXG"].map(size => (
+                                                                                <button
+                                                                                    key={size}
+                                                                                    onClick={() => setSelectedInscricao({ ...selectedInscricao, tamanhoCamiseta: size })}
+                                                                                    className={`px-2 py-1.5 rounded-lg text-[10px] font-black transition-all border ${selectedInscricao.tamanhoCamiseta === size
+                                                                                        ? 'bg-primary border-primary text-white'
+                                                                                        : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20'
+                                                                                        }`}
+                                                                                >
+                                                                                    {size}
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
 
                                                                 <div className="grid grid-cols-2 gap-4">
@@ -3647,11 +3767,45 @@ const AdminDashboard = () => {
                                                                     </div>
                                                                 </div>
 
-                                                                <div className="grid grid-cols-2 gap-4">
+                                                                <div className="pt-4 mt-4 border-t border-white/5">
+                                                                    <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-4 flex items-center gap-2">
+                                                                        <Hotel className="w-3 h-3" /> HOSPEDAGEM
+                                                                    </h5>
+                                                                    <div className={`grid gap-4 ${selectedInscricao.hotel === 'Outros...' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                                                        <div className="space-y-2">
+                                                                            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Hotel</label>
+                                                                            <Select
+                                                                                value={selectedInscricao.hotel || "MarHotel"}
+                                                                                onValueChange={(v) => setSelectedInscricao({ ...selectedInscricao, hotel: v })}
+                                                                            >
+                                                                                <SelectTrigger className="rounded-xl h-12 bg-white/5 border-white/10 text-white">
+                                                                                    <SelectValue />
+                                                                                </SelectTrigger>
+                                                                                <SelectContent className="bg-[#122442] border-white/10 text-white">
+                                                                                    <SelectItem value="MarHotel">MarHotel</SelectItem>
+                                                                                    <SelectItem value="Outros...">Outros...</SelectItem>
+                                                                                </SelectContent>
+                                                                            </Select>
+                                                                        </div>
+                                                                        {selectedInscricao.hotel === 'Outros...' && (
+                                                                            <div className="space-y-2 animate-in fade-in slide-in-from-left-4 duration-300">
+                                                                                <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Qual?</label>
+                                                                                <Input
+                                                                                    value={selectedInscricao.qualHotel || ""}
+                                                                                    onChange={(e) => setSelectedInscricao({ ...selectedInscricao, qualHotel: e.target.value })}
+                                                                                    placeholder="Nome do hotel/pousada"
+                                                                                    className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
+                                                                                />
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-2 gap-4 mt-6">
                                                                     <div className="space-y-2">
-                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Acompanhante?</label>
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Possui Acompanhante(s)?</label>
                                                                         <Select
-                                                                            value={selectedInscricao.acompanhantes}
+                                                                            value={selectedInscricao.acompanhantes || "NÃO"}
                                                                             onValueChange={(v) => setSelectedInscricao({ ...selectedInscricao, acompanhantes: v })}
                                                                         >
                                                                             <SelectTrigger className="rounded-xl h-12 bg-white/5 border-white/10 text-white">
@@ -3664,12 +3818,39 @@ const AdminDashboard = () => {
                                                                         </Select>
                                                                     </div>
                                                                     <div className="space-y-2">
-                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Nome Acomp.</label>
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Parentesco</label>
+                                                                        <Select
+                                                                            disabled={selectedInscricao.acompanhantes === "NÃO"}
+                                                                            value={selectedInscricao.parentesco || ""}
+                                                                            onValueChange={(v) => setSelectedInscricao({ ...selectedInscricao, parentesco: v })}
+                                                                        >
+                                                                            <SelectTrigger className="rounded-xl h-12 bg-white/5 border-white/10 text-white disabled:opacity-30">
+                                                                                <SelectValue placeholder="Selecione..." />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent className="bg-[#122442] border-white/10 text-white">
+                                                                                <SelectItem value="Esposa(o)">Esposa(o)</SelectItem>
+                                                                                <SelectItem value="Filho(a)">Filho(a)</SelectItem>
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Quantos?</label>
+                                                                        <Input
+                                                                            disabled={selectedInscricao.acompanhantes === "NÃO"}
+                                                                            type="number"
+                                                                            value={selectedInscricao.quantosAcompanhantes || ""}
+                                                                            onChange={(e) => setSelectedInscricao({ ...selectedInscricao, quantosAcompanhantes: e.target.value })}
+                                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Nome do Acompanhante</label>
                                                                         <Input
                                                                             disabled={selectedInscricao.acompanhantes === "NÃO"}
                                                                             value={selectedInscricao.nomeAcompanhante || ""}
                                                                             onChange={(e) => setSelectedInscricao({ ...selectedInscricao, nomeAcompanhante: e.target.value })}
                                                                             className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
+                                                                            placeholder="Nome completo"
                                                                         />
                                                                     </div>
                                                                 </div>

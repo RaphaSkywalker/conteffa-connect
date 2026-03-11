@@ -25,14 +25,6 @@ const menuItems = [
       {
         label: "Local",
         path: "/local",
-        children: [
-          { label: "Atrações Turísticas", path: "/local/atracoes" },
-          { label: "Como Chegar", path: "/local/como-chegar" },
-          { label: "Empresas de Transfer", path: "/local/transfer" },
-          { label: "Hospedagem", path: "/local/hospedagem" },
-          { label: "Passagem Aérea", path: "/local/passagem" },
-          { label: "Serviço de Apoio", path: "/local/apoio" },
-        ],
       },
       {
         label: "Teses",
