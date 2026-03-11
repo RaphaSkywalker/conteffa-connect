@@ -630,14 +630,12 @@ const AdminDashboard = () => {
 
             doc.save(`relatorio_conteffa_${type}_${Date.now()}.pdf`);
             setIsExportingPDF(false);
-            toast.dismiss("pdf-export");
-            toast.success("Download iniciado!");
+            toast.success("Download iniciado!", { id: "pdf-export" });
         };
 
         img.onerror = () => {
             setIsExportingPDF(false);
-            toast.dismiss("pdf-export");
-            toast.error("Erro ao carregar logomarca.");
+            toast.error("Erro ao carregar logomarca.", { id: "pdf-export" });
         };
     };
 
@@ -647,52 +645,53 @@ const AdminDashboard = () => {
             return;
         }
 
-        toast.loading("Preparando planilha...", { id: "excel-export" });
+        const toastId = toast.loading("Preparando planilha...");
 
-        try {
-            const dataToExport = inscricoes.map((insc: any) => ({
-                "NOME COMPLETO": insc.nomeCompleto,
-                "CPF": insc.cpf,
-                "DATA NASCIMENTO": insc.dataNascimento,
-                "ENDEREÇO": insc.endereco,
-                "BAIRRO": insc.bairro,
-                "CIDADE": insc.cidade,
-                "CEP": insc.cep,
-                "ATEFFA": insc.ateffa,
-                "TELEFONE": insc.telefone,
-                "WHATSAPP": insc.celularWhatsapp,
-                "E-MAIL": insc.email,
-                "CARGO": insc.cargo,
-                "FORMA DESLOCAMENTO": insc.formaDeslocamento,
-                "TAMANHO CAMISETA": insc.tamanhoCamiseta,
-                "PROBLEMA SAÚDE": insc.problemaSaude,
-                "QUAL SAÚDE": insc.qualSaude,
-                "CUIDADOS ESPECIAIS": insc.cuidadosEspeciais,
-                "QUAIS CUIDADOS": insc.quaisCuidados,
-                "HOTEL": insc.hotel === 'Outros...' ? (insc.qualHotel || 'Outros') : (insc.hotel || "MarHotel"),
-                "HOTEL ESPECIFICO": insc.qualHotel || "",
-                "ACOMPANHANTE(S)?": insc.acompanhantes,
-                "PARENTESCO": insc.parentesco,
-                "QUANTIDADE ACOMPANHANTES": insc.quantosAcompanhantes,
-                "NOME ACOMPANHANTE": insc.nomeAcompanhante,
-                "STATUS": insc.status || 'PENDENTE',
-                "DATA INSCRIÇÃO": insc.data,
-                "ID": insc.id
-            }));
+        // Usamos um pequeno timeout para garantir que o toast de carregamento apareça antes do trabalho pesado bloquear a thread principal
+        setTimeout(() => {
+            try {
+                const dataToExport = inscricoes.map((insc: any) => ({
+                    "NOME COMPLETO": insc.nomeCompleto,
+                    "CPF": insc.cpf,
+                    "DATA NASCIMENTO": insc.dataNascimento,
+                    "ENDEREÇO": insc.endereco,
+                    "BAIRRO": insc.bairro,
+                    "CIDADE": insc.cidade,
+                    "CEP": insc.cep,
+                    "ATEFFA": insc.ateffa,
+                    "TELEFONE": insc.telefone,
+                    "WHATSAPP": insc.celularWhatsapp,
+                    "E-MAIL": insc.email,
+                    "CARGO": insc.cargo,
+                    "FORMA DESLOCAMENTO": insc.formaDeslocamento,
+                    "TAMANHO CAMISETA": insc.tamanhoCamiseta,
+                    "PROBLEMA SAÚDE": insc.problemaSaude,
+                    "QUAL SAÚDE": insc.qualSaude,
+                    "CUIDADOS ESPECIAIS": insc.cuidadosEspeciais,
+                    "QUAIS CUIDADOS": insc.quaisCuidados,
+                    "HOTEL": insc.hotel === 'Outros...' ? (insc.qualHotel || 'Outros') : (insc.hotel || "MarHotel"),
+                    "HOTEL ESPECIFICO": insc.qualHotel || "",
+                    "ACOMPANHANTE(S)?": insc.acompanhantes,
+                    "PARENTESCO": insc.parentesco,
+                    "QUANTIDADE ACOMPANHANTES": insc.quantosAcompanhantes,
+                    "NOME ACOMPANHANTE": insc.nomeAcompanhante,
+                    "STATUS": insc.status || 'PENDENTE',
+                    "DATA INSCRIÇÃO": insc.data,
+                    "ID": insc.id
+                }));
 
-            const ws = XLSX.utils.json_to_sheet(dataToExport);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Inscritos");
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Inscritos");
 
-            XLSX.writeFile(wb, `inscritos_conteffa_${Date.now()}.xlsx`);
+                XLSX.writeFile(wb, `inscritos_conteffa_${Date.now()}.xlsx`);
 
-            toast.dismiss("excel-export");
-            toast.success("Download Excel iniciado!");
-        } catch (err) {
-            console.error("Erro ao exportar Excel:", err);
-            toast.dismiss("excel-export");
-            toast.error("Erro ao gerar planilha.");
-        }
+                toast.success("Download Excel iniciado!", { id: toastId });
+            } catch (err) {
+                console.error("Erro ao exportar Excel:", err);
+                toast.error("Erro ao gerar planilha.", { id: toastId });
+            }
+        }, 100);
     };
 
     const handleExportIndividualPDF = (insc: any) => {
@@ -821,18 +820,15 @@ const AdminDashboard = () => {
                 doc.text(`Gerado via Painel Administrativo em ${new Date().toLocaleString('pt-BR')}`, 105, 285, { align: "center" });
 
                 doc.save(`Ficha_Inscricao_${insc.nomeCompleto.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
-                toast.dismiss("pdf-individual");
-                toast.success("Ficha individual gerada!");
+                toast.success("Ficha individual gerada!", { id: "pdf-individual" });
             } catch (err: any) {
                 console.error("Erro fatal ao gerar PDF individual:", err);
-                toast.dismiss("pdf-individual");
-                toast.error("Erro crítico ao gerar o arquivo PDF.");
+                toast.error("Erro crítico ao gerar o arquivo PDF.", { id: "pdf-individual" });
             }
         };
 
         logoImg.onerror = () => {
-            toast.dismiss("pdf-individual");
-            toast.error("Erro ao carregar logomarca para o PDF.");
+            toast.error("Erro ao carregar logomarca para o PDF.", { id: "pdf-individual" });
         };
     };
 
