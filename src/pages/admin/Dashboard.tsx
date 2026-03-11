@@ -651,33 +651,33 @@ const AdminDashboard = () => {
 
         try {
             const dataToExport = inscricoes.map((insc: any) => ({
+                "NOME COMPLETO": insc.nomeCompleto,
                 "CPF": insc.cpf,
                 "DATA NASCIMENTO": insc.dataNascimento,
-                "ID": insc.id,
-                "DATA INSCRIÇÃO": insc.data,
-                "STATUS": insc.status || 'PENDENTE',
-                "NOME COMPLETO": insc.nomeCompleto,
-                "E-MAIL": insc.email,
-                "TELEFONE": insc.telefone,
-                "WHATSAPP": insc.celularWhatsapp,
-                "ATEFFA": insc.ateffa,
-                "CARGO": insc.cargo,
-                "TAMANHO CAMISETA": insc.tamanhoCamiseta,
-                "HOTEL": insc.hotel === 'Outros...' ? (insc.qualHotel || 'Outros') : (insc.hotel || "MarHotel"),
                 "ENDEREÇO": insc.endereco,
                 "BAIRRO": insc.bairro,
                 "CIDADE": insc.cidade,
                 "CEP": insc.cep,
-                "DESLOCAMENTO": insc.formaDeslocamento,
+                "ATEFFA": insc.ateffa,
+                "TELEFONE": insc.telefone,
+                "WHATSAPP": insc.celularWhatsapp,
+                "E-MAIL": insc.email,
+                "CARGO": insc.cargo,
+                "FORMA DESLOCAMENTO": insc.formaDeslocamento,
+                "TAMANHO CAMISETA": insc.tamanhoCamiseta,
                 "PROBLEMA SAÚDE": insc.problemaSaude,
                 "QUAL SAÚDE": insc.qualSaude,
                 "CUIDADOS ESPECIAIS": insc.cuidadosEspeciais,
                 "QUAIS CUIDADOS": insc.quaisCuidados,
+                "HOTEL": insc.hotel === 'Outros...' ? (insc.qualHotel || 'Outros') : (insc.hotel || "MarHotel"),
                 "HOTEL ESPECIFICO": insc.qualHotel || "",
-                "ACOMPANHANTE": insc.acompanhantes,
-                "NOME ACOMPANHANTE": insc.nomeAcompanhante,
+                "ACOMPANHANTE(S)?": insc.acompanhantes,
                 "PARENTESCO": insc.parentesco,
-                "QUANTIDADE ACOMPANHANTES": insc.quantosAcompanhantes
+                "QUANTIDADE ACOMPANHANTES": insc.quantosAcompanhantes,
+                "NOME ACOMPANHANTE": insc.nomeAcompanhante,
+                "STATUS": insc.status || 'PENDENTE',
+                "DATA INSCRIÇÃO": insc.data,
+                "ID": insc.id
             }));
 
             const ws = XLSX.utils.json_to_sheet(dataToExport);
