@@ -344,17 +344,17 @@ const Index = () => {
 
           {palestrantes.length > 0 && (
             <div className="relative px-12 md:px-20">
-              {palestrantes.length > 3 && (
+              {palestrantes.length > 1 && (
                 <>
                   <button
                     onClick={() => scroll('left')}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full border border-primary/20 flex items-center justify-center bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90"
+                    className={`absolute left-0 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full border border-primary/20 flex items-center justify-center bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90 ${palestrantes.length <= 3 ? 'md:hidden' : ''}`}
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
                   <button
                     onClick={() => scroll('right')}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full border border-primary/20 flex items-center justify-center bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90"
+                    className={`absolute right-0 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full border border-primary/20 flex items-center justify-center bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90 ${palestrantes.length <= 3 ? 'md:hidden' : ''}`}
                   >
                     <ChevronRight className="w-6 h-6" />
                   </button>
@@ -363,7 +363,7 @@ const Index = () => {
 
               <div
                 ref={scrollContainerRef}
-                className={`flex overflow-x-auto gap-8 py-12 px-4 -mx-4 no-scrollbar scroll-smooth ${palestrantes.length <= 3 ? 'justify-center' : ''}`}
+                className={`flex overflow-x-auto gap-8 py-12 px-4 -mx-4 no-scrollbar scroll-smooth ${palestrantes.length <= 3 ? 'md:justify-center' : ''}`}
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
               >
                 {palestrantes.map((p: any, i: number) => (
