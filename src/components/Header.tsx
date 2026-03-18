@@ -7,7 +7,7 @@ import logo from "@/assets/logo.png";
 const menuItems = [
   {
     label: "Apresentação",
-    path: "/apresentacao",
+    path: "#",
     children: [
       { label: "Carta do Presidente", path: "/apresentacao/carta-presidente" },
       { label: "Histórico", path: "/apresentacao/historico" },
@@ -58,6 +58,7 @@ const DesktopMenuItem = ({
     >
       <Link
         to={item.path}
+        onClick={(e) => item.path === "#" && e.preventDefault()}
         className={`text-[15px] font-medium uppercase tracking-wider transition-all duration-300 flex items-center justify-between gap-1.5 ${level > 0
           ? `w-full px-6 py-2 ${index === 0 ? "rounded-t-lg" : index === total - 1 ? "rounded-b-lg" : "rounded-none"
           } ${location.pathname === item.path
@@ -113,7 +114,14 @@ const MobileMenuItem = ({ item, setMobileOpen }: { item: any; setMobileOpen: (op
       <div className="flex items-center justify-between">
         <Link
           to={item.path}
-          onClick={() => !hasChildren && setMobileOpen(false)}
+          onClick={(e) => {
+            if (item.path === "#") {
+              e.preventDefault();
+              setIsOpen(!isOpen);
+              return;
+            }
+            if (!hasChildren) setMobileOpen(false);
+          }}
           className="flex-1 px-4 py-2.5 text-[15px] font-medium uppercase tracking-wider text-white/80 hover:text-primary transition-colors"
         >
           {item.label}

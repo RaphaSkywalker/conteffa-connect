@@ -75,11 +75,11 @@ const Footer = () => {
             <div className="flex flex-col gap-3 mb-6">
               <div className="flex items-center gap-3 text-sm text-navy-foreground/70">
                 <Mail className="w-4 h-4 shrink-0" />
-                <span>contato@conteffa.com.br</span>
+                <span>congresso@anteffa.org.br</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-navy-foreground/70">
                 <Phone className="w-4 h-4 shrink-0" />
-                <span>(61) 3333-0000</span>
+                <span>(61) 3051-4545</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-navy-foreground/70">
                 <MapPin className="w-4 h-4 shrink-0" />

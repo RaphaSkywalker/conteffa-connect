@@ -10,6 +10,8 @@ import { toast } from "sonner";
 
 const Noticias = () => {
   const [noticias, setNoticias] = useState<any[]>([]);
+  const [activeNewsIndex, setActiveNewsIndex] = useState(0);
+  const [sidebarPage, setSidebarPage] = useState(0);
   const [instaConfig, setInstaConfig] = useState({ handle: "@anteffa", url: "#", photos: [] as string[] });
   const [sidebarTab, setSidebarTab] = useState<'recentes' | 'populares' | 'tags'>('recentes');
   const [expandedMonths, setExpandedMonths] = useState<string[]>([]);
@@ -205,110 +207,171 @@ const Noticias = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-12">
             <div className="lg:col-span-8 space-y-10">
               {noticias.length > 0 ? (
-                noticias.map((n, i) => (
-                  <motion.article
-                    key={i}
-                    id={`noticia-${i}`}
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.1 }}
-                    className="group bg-white rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 border border-slate-100 flex flex-col h-auto"
-                  >
-                    <div className="w-full relative overflow-hidden bg-slate-100 h-64">
-                      {n.photo ? (
-                        <img src={n.photo} alt={n.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Newspaper className="w-12 h-12 text-slate-300" />
-                        </div>
-                      )}
-                      <div className="absolute top-6 left-6">
-                        <span className="bg-primary text-white text-[10px] font-bold px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
-                          Destaque
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-10 flex flex-col">
-                      <div className="flex items-center gap-4 text-[11px] font-bold text-primary uppercase tracking-widest mb-4">
-                        <div className="flex items-center gap-1.5 opacity-80">
-                          <User className="w-3.5 h-3.5" /> Assessoria Conteffa
-                        </div>
-                        <span className="w-1 h-1 rounded-full bg-slate-300" />
-                        <div className="flex items-center gap-1.5 opacity-80">
-                          <Calendar className="w-3.5 h-3.5" /> {n.date}
-                        </div>
-                        {n.tags && (
-                          <>
-                            <span className="w-1 h-1 rounded-full bg-slate-300" />
-                            <div className="flex items-center gap-1 text-[9px] text-slate-400 font-bold uppercase">
-                              #{n.tags.split(',')[0]}
-                            </div>
-                          </>
+                (() => {
+                  const n = noticias[activeNewsIndex];
+                  if (!n) return null;
+                  return (
+                    <motion.article
+                      key={activeNewsIndex}
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.4 }}
+                      className="group bg-white rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 border border-slate-100 flex flex-col h-auto"
+                    >
+                      <div className="w-full relative overflow-hidden bg-slate-100 h-80 md:h-[450px]">
+                        {n.photo ? (
+                          <img src={n.photo} alt={n.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Newspaper className="w-12 h-12 text-slate-300" />
+                          </div>
                         )}
-                      </div>
-
-                      <h3 className="text-2xl md:text-3xl font-heading font-black mb-5 text-slate-900 group-hover:text-primary transition-colors leading-tight">
-                        {n.title}
-                      </h3>
-
-                      <p className="text-muted-foreground font-body text-base leading-relaxed mb-10 whitespace-pre-line">
-                        {n.summary}
-                      </p>
-
-                      <div className="flex items-center justify-between py-6 border-t border-slate-100 mb-2">
-                        <div className="flex items-center gap-6">
-                          <button
-                            onClick={() => handleLike(n.id, n.likes)}
-                            className="flex items-center gap-2 group/like cursor-pointer transition-all active:scale-95"
-                          >
-                            <Heart className={`w-5 h-5 transition-colors ${likedPosts.includes(n.id) ? 'fill-red-500 text-red-500' : 'text-slate-400 group-hover/like:text-red-500'}`} />
-                            <span className="text-sm font-bold text-slate-500">{(n.likes || 0)} Curtidas</span>
-                          </button>
-
-                          <button
-                            onClick={() => handleShare(n)}
-                            className="flex items-center gap-2 group/share cursor-pointer transition-all active:scale-95"
-                          >
-                            <Share2 className="w-5 h-5 text-slate-400 group-hover/share:text-primary transition-colors" />
-                            <span className="text-sm font-bold text-slate-500">Compartilhar</span>
-                          </button>
-                        </div>
-
-                        <div className="hidden md:flex items-center gap-2 text-slate-300 text-[10px] font-bold uppercase tracking-widest">
-                          <ThumbsUp className="w-3 h-3" /> Relevância Alta
+                        <div className="absolute top-6 left-6">
+                          <span className="bg-primary text-white text-[10px] font-bold px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
+                            Materia Atual
+                          </span>
                         </div>
                       </div>
 
-                      <div className="pt-8 border-t border-slate-100">
-                        <div className="flex items-center gap-2 mb-4">
-                          <div className="w-1 h-4 bg-primary rounded-full" />
-                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Últimas Notícias</h4>
+                      <div className="p-8 md:p-12 flex flex-col">
+                        <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold text-primary uppercase tracking-widest mb-6">
+                          <div className="flex items-center gap-1.5 opacity-80">
+                            <User className="w-3.5 h-3.5" /> Assessoria Conteffa
+                          </div>
+                          <span className="w-1 h-1 rounded-full bg-slate-300" />
+                          <div className="flex items-center gap-1.5 opacity-80">
+                            <Calendar className="w-3.5 h-3.5" /> {n.date}
+                          </div>
+                          {n.tags && (
+                            <>
+                              <span className="w-1 h-1 rounded-full bg-slate-300" />
+                              <div className="flex items-center gap-1 text-[9px] text-slate-400 font-bold uppercase">
+                                #{n.tags.split(',')[0]}
+                              </div>
+                            </>
+                          )}
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {noticias.slice(0, 2).map((latest, idx) => (
-                            <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group/mini">
-                              <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-slate-200">
-                                {latest.photo ? (
-                                  <img src={latest.photo} alt={latest.title} className="w-full h-full object-cover" />
-                                ) : (
-                                  <Newspaper className="w-6 h-6 text-slate-400 m-auto mt-5" />
-                                )}
-                              </div>
-                              <div className="flex flex-col justify-center">
-                                <span className="text-[9px] font-bold text-primary uppercase tracking-wider mb-1">{latest.date}</span>
-                                <h5 className="text-xs font-bold text-slate-700 line-clamp-2 leading-snug group-hover/mini:text-primary transition-colors">
-                                  {latest.title}
-                                </h5>
-                              </div>
+
+                        <h3 className="text-3xl md:text-4xl font-heading font-black mb-6 text-slate-900 leading-tight">
+                          {n.title}
+                        </h3>
+
+                        <p className="text-slate-600 font-body text-lg leading-relaxed mb-12 whitespace-pre-line text-justify">
+                          {n.summary}
+                        </p>
+
+                        <div className="flex flex-col md:flex-row items-center justify-between py-6 border-t border-slate-100 mb-4 gap-6">
+                          <div className="flex items-center gap-6">
+                            <button
+                              onClick={() => handleLike(n.id, n.likes)}
+                              className="flex items-center gap-2 group/like cursor-pointer transition-all active:scale-95"
+                            >
+                              <Heart className={`w-5 h-5 transition-colors ${likedPosts.includes(n.id) ? 'fill-red-500 text-red-500' : 'text-slate-400 group-hover/like:text-red-500'}`} />
+                              <span className="text-sm font-bold text-slate-500">{(n.likes || 0)} Curtidas</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleShare(n)}
+                              className="flex items-center gap-2 group/share cursor-pointer transition-all active:scale-95"
+                            >
+                              <Share2 className="w-5 h-5 text-slate-400 group-hover/share:text-primary transition-colors" />
+                              <span className="text-sm font-bold text-slate-500">Compartilhar</span>
+                            </button>
+                          </div>
+
+                          {/* Paginação Estilizada - Agora à direita */}
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              disabled={activeNewsIndex === 0}
+                              onClick={() => {
+                                setActiveNewsIndex(activeNewsIndex - 1);
+                                window.scrollTo({ top: 300, behavior: 'smooth' });
+                              }}
+                              className="w-8 h-8 rounded-xl border-slate-200 hover:border-primary hover:text-primary"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </Button>
+
+                            <div className="flex items-center gap-1 mx-1">
+                              {noticias.map((_, i) => {
+                                if (Math.abs(i - activeNewsIndex) > 1 && i !== 0 && i !== noticias.length - 1) {
+                                  if (Math.abs(i - activeNewsIndex) === 2) return <span key={i} className="text-slate-300">...</span>;
+                                  return null;
+                                }
+                                return (
+                                  <button
+                                    key={i}
+                                    onClick={() => {
+                                      setActiveNewsIndex(i);
+                                      window.scrollTo({ top: 300, behavior: 'smooth' });
+                                    }}
+                                    className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all ${activeNewsIndex === i 
+                                      ? "bg-primary text-white shadow-lg shadow-primary/20 scale-110" 
+                                      : "bg-slate-50 text-slate-400 hover:bg-slate-100"}`}
+                                  >
+                                    {i + 1}
+                                  </button>
+                                );
+                              })}
                             </div>
-                          ))}
+
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              disabled={activeNewsIndex === noticias.length - 1}
+                              onClick={() => {
+                                setActiveNewsIndex(activeNewsIndex + 1);
+                                window.scrollTo({ top: 300, behavior: 'smooth' });
+                              }}
+                              className="w-8 h-8 rounded-xl border-slate-200 hover:border-primary hover:text-primary"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Ultimas Noticias Footer 2x2 */}
+                        <div className="pt-8 border-t border-slate-100">
+                          <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-2">
+                              <div className="w-1 h-4 bg-primary rounded-full" />
+                              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Mais Conteúdo</h4>
+                            </div>
+                            <span className="text-[9px] font-bold text-slate-300 uppercase">Sugestões de Leitura</span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {noticias.filter((_, idx) => idx !== activeNewsIndex).slice(0, 2).map((latest, idx) => (
+                              <div 
+                                key={idx} 
+                                onClick={() => {
+                                  setActiveNewsIndex(noticias.findIndex(n => n.id === latest.id));
+                                  window.scrollTo({ top: 300, behavior: 'smooth' });
+                                }}
+                                className="flex gap-4 p-4 rounded-[1.5rem] bg-slate-50 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all cursor-pointer group/mini border border-transparent hover:border-slate-100"
+                              >
+                                <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-slate-200">
+                                  {latest.photo ? (
+                                    <img src={latest.photo} alt={latest.title} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <Newspaper className="w-6 h-6 text-slate-400 m-auto mt-5" />
+                                  )}
+                                </div>
+                                <div className="flex flex-col justify-center flex-1">
+                                  <span className="text-[9px] font-bold text-primary uppercase tracking-wider mb-1">{latest.date}</span>
+                                  <h5 className="text-xs font-bold text-slate-700 line-clamp-2 leading-snug group-hover/mini:text-primary transition-colors">
+                                    {latest.title}
+                                  </h5>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.article>
-                ))
+                    </motion.article>
+                  );
+                })()
               ) : (
                 <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
                   <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -385,46 +448,91 @@ const Noticias = () => {
 
                 <div className="p-0">
                   {sidebarTab === 'recentes' && (
-                    <div className="divide-y divide-slate-100">
-                      {meses.map((mes, idx) => (
-                        <div key={idx} className="flex flex-col">
-                          <div onClick={() => toggleMonth(mes.name)} className={`flex items-center justify-between px-8 py-4 hover:bg-slate-50 cursor-pointer ${expandedMonths.includes(mes.name) ? 'bg-slate-50' : ''}`}>
-                            <span className={`text-[11px] font-black uppercase tracking-widest ${expandedMonths.includes(mes.name) ? 'text-primary' : 'text-slate-900'}`}>{mes.name} 2026</span>
-                            <span className="text-[11px] font-black text-slate-400">({mes.count})</span>
+                    <div className="flex flex-col">
+                      <div className="p-6 space-y-4">
+                        {noticias.slice(sidebarPage * 10, (sidebarPage + 1) * 10).map((n, idx) => (
+                          <div 
+                            key={idx} 
+                            onClick={() => {
+                              setActiveNewsIndex(noticias.findIndex(notic => notic.id === n.id));
+                              window.scrollTo({ top: 300, behavior: 'smooth' });
+                            }}
+                            className="group cursor-pointer flex items-center gap-4 transition-colors"
+                          >
+                            <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
+                              {n.photo ? (
+                                <img src={n.photo} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                              ) : (
+                                <Newspaper className="w-6 h-6 text-slate-300 m-auto mt-4" />
+                              )}
+                            </div>
+                            <div className="flex flex-col justify-center flex-1">
+                              <h5 className="text-[11px] font-bold text-slate-800 line-clamp-2 leading-tight group-hover:text-primary transition-colors uppercase">
+                                {n.title}
+                              </h5>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{n.date}</span>
+                                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                <span className="text-[9px] font-black text-primary/40 uppercase tracking-widest">{n.views || 0} views</span>
+                              </div>
+                            </div>
                           </div>
-                          <AnimatePresence>
-                            {expandedMonths.includes(mes.name) && (
-                              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-slate-50/50 px-8 pb-5 overflow-hidden">
-                                <ul className="space-y-3 pt-3 border-t border-slate-200/50">
-                                  {mes.noticiasDoc.map((doc: any, dIdx: number) => (
-                                    <li key={dIdx}>
-                                      <a href={`#noticia-${noticias.findIndex(n => n.title === doc.title)}`} className="text-[11px] font-bold text-slate-500 hover:text-primary flex items-start gap-3 leading-snug">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                                        {doc.title}
-                                      </a>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
+                        ))}
+                      </div>
+
+                      {/* Paginação do Sidebar */}
+                      {noticias.length > 10 && (
+                        <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-center gap-1.5">
+                          <button 
+                            disabled={sidebarPage === 0}
+                            onClick={() => setSidebarPage(sidebarPage - 1)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-primary disabled:opacity-30 transition-colors"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          
+                          {Array.from({ length: Math.ceil(noticias.length / 10) }).map((_, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setSidebarPage(i)}
+                              className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all ${sidebarPage === i 
+                                ? "bg-primary text-white shadow-md shadow-primary/20" 
+                                : "text-slate-400 hover:bg-slate-100"}`}
+                            >
+                              {i + 1}
+                            </button>
+                          ))}
+
+                          <button 
+                            disabled={(sidebarPage + 1) * 10 >= noticias.length}
+                            onClick={() => setSidebarPage(sidebarPage + 1)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-primary disabled:opacity-30 transition-colors"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
 
                   {sidebarTab === 'populares' && (
                     <div className="p-6 space-y-4">
                       {populares.map((pop, idx) => (
-                        <div key={idx} className="flex gap-4 group cursor-pointer">
-                          <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
-                            {pop.photo ? <img src={pop.photo} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform" /> : <Newspaper className="w-6 h-6 text-slate-300 m-auto mt-4" />}
+                          <div 
+                            onClick={() => {
+                              setActiveNewsIndex(noticias.findIndex(n => n.id === pop.id));
+                              window.scrollTo({ top: 300, behavior: 'smooth' });
+                            }}
+                            className="flex gap-4 group cursor-pointer"
+                          >
+                            <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
+                              {pop.photo ? <img src={pop.photo} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform" /> : <Newspaper className="w-6 h-6 text-slate-300 m-auto mt-4" />}
+                            </div>
+                            <div className="flex flex-col justify-center">
+                              <h5 className="text-[11px] font-bold text-slate-800 line-clamp-2 leading-tight group-hover:text-primary uppercase">{pop.title}</h5>
+                              <span className="text-[9px] font-black text-primary/50 tracking-widest mt-1">{pop.views || 0} visualizações</span>
+                            </div>
                           </div>
-                          <div className="flex flex-col justify-center">
-                            <h5 className="text-[11px] font-bold text-slate-800 line-clamp-2 leading-tight group-hover:text-primary uppercase">{pop.title}</h5>
-                            <span className="text-[9px] font-black text-primary/50 tracking-widest mt-1">{pop.views || 0} visualizações</span>
-                          </div>
-                        </div>
                       ))}
                     </div>
                   )}

@@ -2990,7 +2990,7 @@ const AdminDashboard = () => {
                                             }}
                                             className="rounded-full gap-2 px-6 bg-pink-500 hover:bg-pink-600 text-white shadow-lg shadow-pink-500/20 border-none font-black uppercase text-xs tracking-widest"
                                         >
-                                            <Plus className="w-4 h-4" /> Novo Convidado
+                                            <Plus className="w-4 h-4" /> Novo Membro
                                         </Button>
                                     </div>
 
@@ -2999,9 +2999,9 @@ const AdminDashboard = () => {
                                             <div className="p-8 max-h-[90vh] overflow-y-auto custom-scrollbar">
                                                 <DialogHeader className="mb-8">
                                                     <DialogTitle className="font-heading font-black text-2xl text-white uppercase tracking-tighter">
-                                                        {newConvidado.id ? "Editando Convidado" : "Novo Convidado"}
+                                                        {newConvidado.id ? "Editando Comissão" : "Novo Membro"}
                                                     </DialogTitle>
-                                                    <p className="text-white/40 text-sm font-medium">Controle as informações do perfil do convidado.</p>
+                                                    <p className="text-white/40 text-sm font-medium">Controle as informações do perfil do membro da comissão.</p>
                                                 </DialogHeader>
 
                                                 <div className="space-y-6">
@@ -3043,14 +3043,31 @@ const AdminDashboard = () => {
                                                                 />
                                                             </div>
                                                         </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Mini Bio (Opcional)</label>
-                                                            <textarea
-                                                                value={newConvidado.bio}
-                                                                onChange={(e) => setNewConvidado({ ...newConvidado, bio: e.target.value })}
-                                                                placeholder="Breve descrição..."
-                                                                className="flex min-h-[180px] w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500/50 transition-all font-medium leading-relaxed"
-                                                            />
+                                                        <div className="space-y-4">
+                                                            <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Coordenação</label>
+                                                            <div className="grid grid-cols-1 gap-3 p-4 bg-white/5 rounded-2xl border border-white/10">
+                                                                {["Temática", "Finanças e Logística", "Comunicação e Marketing", "Cultural"].map((opt) => (
+                                                                    <label key={opt} className="flex items-center gap-3 cursor-pointer group">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={(newConvidado.bio || "").split(", ").includes(opt)}
+                                                                            onChange={(e) => {
+                                                                                const selected = (newConvidado.bio || "").split(", ").filter(i => i.length > 0);
+                                                                                let newList;
+                                                                                if (e.target.checked) {
+                                                                                    newList = [...selected, opt];
+                                                                                } else {
+                                                                                    newList = selected.filter(i => i !== opt);
+                                                                                }
+                                                                                setNewConvidado({ ...newConvidado, bio: newList.join(", ") });
+                                                                            }}
+                                                                            className="w-4 h-4 rounded border-white/20 bg-white/10 text-pink-500 focus:ring-pink-500/50"
+                                                                        />
+                                                                        <span className="text-sm font-medium text-white/70 group-hover:text-white transition-colors">{opt}</span>
+                                                                    </label>
+                                                                ))}
+                                                            </div>
+                                                            <p className="text-[10px] text-white/20 italic">Selecione as áreas de responsabilidade no organograma.</p>
                                                         </div>
                                                     </div>
 

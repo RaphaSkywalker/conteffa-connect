@@ -51,9 +51,9 @@ const Contato = () => {
           {/* Info Boxes Top */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             {[
-              { icon: Mail, label: "Email", value: "contato@conteffa.com.br" },
-              { icon: Phone, label: "Telefone", value: "(61) 3333-0000" },
-              { icon: MapPin, label: "Endereço", value: "SCS Qd. 1 Bloco L Número 17" },
+              { icon: Mail, label: "Email", value: "congresso@anteffa.org.br" },
+              { icon: Phone, label: "Telefone", value: "(61) 3051-4545" },
+              { icon: MapPin, label: "Endereço", value: "SHN – QD 02, BL J SL 09 - 21\nED. Garvey Park Hotel  - DF" },
             ].map((item, i) => (
               <motion.div
                 key={item.label}
@@ -66,7 +66,7 @@ const Contato = () => {
                   <item.icon className="w-6 h-6 text-primary" />
                 </div>
                 <p className="text-sm font-medium text-muted-foreground mb-1">{item.label}</p>
-                <p className="font-bold text-foreground">{item.value}</p>
+                <p className="font-bold text-foreground whitespace-pre-line">{item.value}</p>
               </motion.div>
             ))}
           </div>
