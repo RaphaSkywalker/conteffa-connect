@@ -43,7 +43,8 @@ import {
     Bell,
     Hotel,
     Upload,
-    FileSpreadsheet
+    FileSpreadsheet,
+    BookOpen
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import {
@@ -415,6 +416,135 @@ const AdminDashboard = () => {
             }
         ];
     });
+
+    // States for Teses
+    const [tesesTab, setTesesTab] = useState("regulamentos");
+    const [regulamentos, setRegulamentos] = useState<any[]>(() => {
+        const saved = localStorage.getItem("conteffa_regulamentos");
+        return saved ? JSON.parse(saved) : [
+            { id: 9, name: "IX CONTEFFA", fileUrl: "" },
+            { id: 8, name: "VIII CONTEFFA", fileUrl: "" },
+            { id: 7, name: "VII CONTEFFA", fileUrl: "" },
+            { id: 6, name: "VI CONTEFFA", fileUrl: "" },
+            { id: 5, name: "V CONTEFFA", fileUrl: "" },
+            { id: 4, name: "IV CONTEFFA", fileUrl: "" },
+            { id: 3, name: "III CONTEFFA", fileUrl: "" },
+            { id: 2, name: "II CONTEFFA", fileUrl: "" },
+            { id: 1, name: "I CONTEFFA", fileUrl: "" },
+        ];
+    });
+    const [cadernos, setCadernos] = useState<any[]>(() => {
+        const saved = localStorage.getItem("conteffa_cadernos");
+        return saved ? JSON.parse(saved) : [
+            { id: 9, name: "IX CONTEFFA", items: [] },
+            { id: 8, name: "VIII CONTEFFA", items: [] },
+            { id: 7, name: "VII CONTEFFA", items: [] },
+            { id: 6, name: "VI CONTEFFA", items: [] },
+            { id: 5, name: "V CONTEFFA", items: [] },
+            { id: 4, name: "IV CONTEFFA", items: [] },
+            { id: 3, name: "III CONTEFFA", items: [] },
+            { id: 2, name: "II CONTEFFA", items: [] },
+            { id: 1, name: "I CONTEFFA", items: [] },
+        ];
+    });
+    const [isAddingRegulamento, setIsAddingRegulamento] = useState(false);
+    const [isAddingCaderno, setIsAddingCaderno] = useState(false);
+    const [newRegulamento, setNewRegulamento] = useState({ name: "", fileUrl: "", id: null as any });
+    const [newCaderno, setNewCaderno] = useState({ name: "", items: [] as any[], id: null as any });
+    const [newTese, setNewTese] = useState({ title: "", author: "", fileUrl: "" });
+
+    const saveRegulamento = () => {
+        if (!newRegulamento.name) return toast.error("Preencha o nome.");
+        const updated = newRegulamento.id 
+            ? regulamentos.map(r => r.id === newRegulamento.id ? newRegulamento : r)
+            : [{ ...newRegulamento, id: Date.now() }, ...regulamentos];
+        setRegulamentos(updated);
+        localStorage.setItem("conteffa_regulamentos", JSON.stringify(updated));
+        setIsAddingRegulamento(false);
+        toast.success("Salvo com sucesso!");
+    };
+
+    const deleteRegulamento = (id: any) => {
+        const updated = regulamentos.filter(r => r.id !== id);
+        setRegulamentos(updated);
+        localStorage.setItem("conteffa_regulamentos", JSON.stringify(updated));
+        toast.success("Removido com sucesso!");
+    };
+
+    const saveCaderno = () => {
+        if (!newCaderno.name) return toast.error("Preencha o nome.");
+        const updated = newCaderno.id 
+            ? cadernos.map(c => c.id === newCaderno.id ? newCaderno : c)
+            : [{ ...newCaderno, id: Date.now() }, ...cadernos];
+        setCadernos(updated);
+        localStorage.setItem("conteffa_cadernos", JSON.stringify(updated));
+        setIsAddingCaderno(false);
+        toast.success("Salvo com sucesso!");
+    };
+
+    const deleteCaderno = (id: any) => {
+        const updated = cadernos.filter(c => c.id !== id);
+        setCadernos(updated);
+        localStorage.setItem("conteffa_cadernos", JSON.stringify(updated));
+        toast.success("Removido com sucesso!");
+    };
+
+    const addTeseToCaderno = () => {
+        if (!newTese.title || !newTese.author) return toast.error("Preencha título e autor.");
+        setNewCaderno(prev => ({ ...prev, items: [...prev.items, { ...newTese, id: Date.now() }] }));
+        setNewTese({ title: "", author: "", fileUrl: "" });
+    };
+
+    const removeTeseFromCaderno = (id: any) => {
+        setNewCaderno(prev => ({ ...prev, items: prev.items.filter(i => i.id !== id) }));
+    };
+
+    const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'regulamento' | 'tese') => {
+        const file = e.target.files?.[0];
+        if (file) {
+            toast.loading("Enviando arquivo PDF...", { id: "upload-pdf" });
+            try {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+                const filePath = `admin/teses/${type}/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('media')
+                    .upload(filePath, file);
+
+                let publicUrl = "";
+                if (!uploadError) {
+                    const { data } = supabase.storage.from('media').getPublicUrl(filePath);
+                    publicUrl = data.publicUrl;
+                } else {
+                    throw uploadError;
+                }
+
+                if (type === 'regulamento') {
+                    setNewRegulamento(prev => ({ ...prev, fileUrl: publicUrl }));
+                } else {
+                    setNewTese(prev => ({ ...prev, fileUrl: publicUrl }));
+                }
+                
+                toast.success("Arquivo PDF enviado com sucesso!", { id: "upload-pdf" });
+            } catch (error) {
+                console.error("PDF upload error:", error);
+                
+                // fallback base64 se erro na nuvem
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64String = reader.result as string;
+                    if (type === 'regulamento') {
+                        setNewRegulamento(prev => ({ ...prev, fileUrl: base64String }));
+                    } else {
+                        setNewTese(prev => ({ ...prev, fileUrl: base64String }));
+                    }
+                    toast.success("Arquivo processado localmente!", { id: "upload-pdf" });
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    };
 
     const [isAddingPalestrante, setIsAddingPalestrante] = useState(false);
     const [isAddingConvidado, setIsAddingConvidado] = useState(false);
@@ -1615,14 +1745,44 @@ const AdminDashboard = () => {
     const handleAddProgramacaoItem = () => {
         setNewProgramacao({
             ...newProgramacao,
-            items: [...newProgramacao.items, { time: "", title: "", speaker: "" }]
+            items: [...newProgramacao.items, { time: "", timeStart: "", timeEnd: "", local: "", title: "", speaker: "" }]
         });
     };
 
     const handleUpdateProgramacaoItem = (index: number, field: string, value: string) => {
         const updatedItems = [...newProgramacao.items];
-        updatedItems[index] = { ...updatedItems[index], [field]: value };
+        let item = { ...updatedItems[index] };
+        
+        if (item.timeStart === undefined && item.timeEnd === undefined && item.time) {
+            const parts = item.time.split(' - ');
+            item.timeStart = parts[0] ? parts[0].trim() : '';
+            item.timeEnd = parts.length > 1 ? parts[1].trim() : '';
+        }
+        
+        item[field] = value;
+        
+        if (field === 'timeStart' || field === 'timeEnd') {
+            const tStart = item.timeStart || '';
+            const tEnd = item.timeEnd || '';
+            item.time = tEnd ? `${tStart} - ${tEnd}` : tStart;
+        }
+        
+        updatedItems[index] = item;
         setNewProgramacao({ ...newProgramacao, items: updatedItems });
+    };
+
+    const handleTimeBlur = (index: number, field: string, value: string) => {
+        let clean = value.replace(/\D/g, "");
+        if (!clean) return;
+        let formatted = value;
+        if (clean.length <= 2) {
+            formatted = `${clean.padStart(2, '0')}:00`;
+        } else if (clean.length === 3) {
+            formatted = `0${clean[0]}:${clean.substring(1, 3)}`;
+        } else if (clean.length >= 4) {
+            formatted = `${clean.substring(0, 2)}:${clean.substring(2, 4)}`;
+        }
+        handleUpdateProgramacaoItem(index, field, formatted);
     };
 
     const handleRemoveProgramacaoItem = (index: number) => {
@@ -1687,9 +1847,10 @@ const AdminDashboard = () => {
         { id: "trafego", label: "Tráfego & Métricas", icon: BarChart3 },
         { id: "noticias", label: "Notícias", icon: Newspaper },
         { id: "palestrantes", label: "Palestrantes", icon: Mic },
-        { id: "convidados", label: "Convidados", icon: Users },
+        { id: "convidados", label: "Comissão", icon: Users },
         { id: "programacao", label: "Programação", icon: Calendar },
         { id: "galeria", label: "Galeria de Fotos", icon: ImageIcon },
+        { id: "teses", label: "Gestão de Teses", icon: BookOpen },
         { id: "inscricoes", label: "Inscrições", icon: FileText },
         ...(user.role === "admin" ? [{ id: "usuarios", label: "Usuários", icon: Shield }] : []),
         { id: "perfil", label: "Meu Perfil", icon: User },
@@ -1726,14 +1887,14 @@ const AdminDashboard = () => {
                     />
                 </div>
 
-                <nav className="flex-1 p-6 space-y-2">
+                <nav className="flex-1 p-6 space-y-1">
                     {tabs.map((tab) => {
                         const isActive = activeTab === tab.id;
                         return (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-medium transition-all duration-300 ${isActive
+                                className={`w-full flex items-center gap-4 px-6 py-2 rounded-2xl font-medium transition-all duration-300 ${isActive
                                     ? "bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]"
                                     : "text-white/60 hover:bg-white/5 hover:text-white"
                                     }`}
@@ -1878,7 +2039,7 @@ const AdminDashboard = () => {
                                         {[
                                             { label: "Inscritos", value: String(inscricoes.length), trend: "+12%", icon: Users, color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20" },
                                             { label: "Palestrantes", value: String(palestrantes.length), trend: "OK", icon: Mic, color: "text-purple-400", bg: "bg-purple-400/10", border: "border-purple-400/20" },
-                                            { label: "Convidados", value: String(convidados.length), trend: "OK", icon: Users, color: "text-pink-400", bg: "bg-pink-400/10", border: "border-pink-400/20" },
+                                            { label: "Comissão", value: String(convidados.length), trend: "OK", icon: Users, color: "text-pink-400", bg: "bg-pink-400/10", border: "border-pink-400/20" },
                                             { label: "Álbuns", value: String(albuns.length), trend: "Ativos", icon: ImageIcon, color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20" },
                                             { label: "Matérias", value: String(noticias.length), trend: "Live", icon: Newspaper, color: "text-amber-400", bg: "bg-amber-400/10", border: "border-amber-400/20" },
                                         ].map((metric, i) => (
@@ -2819,8 +2980,8 @@ const AdminDashboard = () => {
                                 <div className="space-y-6 pb-12">
                                     <div className="flex justify-between items-center bg-[#122442] p-6 rounded-3xl shadow-xl border border-white/5">
                                         <div>
-                                            <h3 className="font-heading font-black text-xl text-white">Gestão de Convidados</h3>
-                                            <p className="text-white/40 text-[13px] font-medium">Controle os convidados, diretoria e presidentes.</p>
+                                            <h3 className="font-heading font-black text-xl text-white">Gestão da Comissão</h3>
+                                            <p className="text-white/40 text-[13px] font-medium">Controle os membros da comissão, diretoria e presidentes.</p>
                                         </div>
                                         <Button
                                             onClick={() => {
@@ -3048,56 +3209,83 @@ const AdminDashboard = () => {
                                                                     initial={{ opacity: 0, x: -10 }}
                                                                     animate={{ opacity: 1, x: 0 }}
                                                                     key={idx}
-                                                                    className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-white/5 p-4 rounded-2xl border border-white/5 relative group"
+                                                                    className="bg-white/5 p-5 rounded-md border border-white/5 relative group space-y-4"
                                                                 >
-                                                                    <div className="md:col-span-2">
-                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-white/20 block mb-1">Horário</label>
-                                                                        <Input
-                                                                            value={item.time}
-                                                                            onChange={(e) => handleUpdateProgramacaoItem(idx, 'time', e.target.value)}
-                                                                            placeholder="08:00"
-                                                                            className="rounded-lg h-10 bg-white/5 border-white/10 text-white text-xs text-center"
-                                                                        />
-                                                                    </div>
-                                                                    <div className="md:col-span-5">
-                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-white/20 block mb-1">Título / Atividade</label>
-                                                                        <Input
-                                                                            value={item.title}
-                                                                            onChange={(e) => handleUpdateProgramacaoItem(idx, 'title', e.target.value)}
-                                                                            placeholder="Título da Palestra"
-                                                                            className="rounded-lg h-10 bg-white/5 border-white/10 text-white text-xs"
-                                                                        />
-                                                                    </div>
-                                                                    <div className="md:col-span-4">
-                                                                        <label className="text-[8px] font-black uppercase tracking-widest text-white/20 block mb-1">Palestrante</label>
-                                                                        <Select
-                                                                            value={item.speaker}
-                                                                            onValueChange={(val) => handleUpdateProgramacaoItem(idx, 'speaker', val)}
-                                                                        >
-                                                                            <SelectTrigger className="rounded-lg h-10 bg-white/5 border-white/10 text-white text-xs">
-                                                                                <SelectValue placeholder="Selecione..." />
-                                                                            </SelectTrigger>
-                                                                            <SelectContent className="bg-[#122442] border-white/10 text-white">
-                                                                                <SelectItem value="none">Sem Palestrante</SelectItem>
-                                                                                {/* Palestrantes e Convidados integrados */}
-                                                                                {[...palestrantes, ...convidados]
-                                                                                    .sort((a, b) => a.name.localeCompare(b.name))
-                                                                                    .map((p: any) => (
-                                                                                        <SelectItem key={p.id} value={p.name}>
-                                                                                            {p.name} {p.category && `(${p.category})`}
-                                                                                        </SelectItem>
-                                                                                    ))}
-                                                                            </SelectContent>
-                                                                        </Select>
-                                                                    </div>
-                                                                    <div className="md:col-span-1 flex items-end justify-center pb-1">
+                                                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                                                         <Button
                                                                             variant="ghost"
                                                                             onClick={() => handleRemoveProgramacaoItem(idx)}
-                                                                            className="h-8 w-8 p-0 text-white/20 hover:text-red-400 hover:bg-red-400/10 rounded-full"
+                                                                            className="h-6 w-6 p-0 text-white/50 hover:text-red-400 hover:bg-red-400/10 rounded-full"
                                                                         >
-                                                                            <X className="w-4 h-4" />
+                                                                            <X className="w-3 h-3" />
                                                                         </Button>
+                                                                    </div>
+                                                                    
+                                                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pr-6">
+                                                                        <div className="md:col-span-2">
+                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-white/20 block mb-1">Início</label>
+                                                                            <Input
+                                                                                value={item.timeStart !== undefined ? item.timeStart : (item.time?.split('-')[0]?.trim() || '')}
+                                                                                onChange={(e) => handleUpdateProgramacaoItem(idx, 'timeStart', e.target.value.replace(/[^\d:]/g, ''))}
+                                                                                onBlur={(e) => handleTimeBlur(idx, 'timeStart', e.target.value)}
+                                                                                placeholder="08:00"
+                                                                                maxLength={5}
+                                                                                className="rounded-sm h-10 bg-white/5 border-white/10 text-white text-xs text-center px-1"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="md:col-span-2">
+                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-white/20 block mb-1">Fim</label>
+                                                                            <Input
+                                                                                value={item.timeEnd !== undefined ? item.timeEnd : (item.time?.split('-')[1]?.trim() || '')}
+                                                                                onChange={(e) => handleUpdateProgramacaoItem(idx, 'timeEnd', e.target.value.replace(/[^\d:]/g, ''))}
+                                                                                onBlur={(e) => handleTimeBlur(idx, 'timeEnd', e.target.value)}
+                                                                                placeholder="09:00"
+                                                                                maxLength={5}
+                                                                                className="rounded-sm h-10 bg-white/5 border-white/10 text-white text-xs text-center px-1"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="md:col-span-8">
+                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-white/20 block mb-1">Local</label>
+                                                                            <Input
+                                                                                value={item.local || ''}
+                                                                                onChange={(e) => handleUpdateProgramacaoItem(idx, 'local', e.target.value)}
+                                                                                placeholder="Ex: Auditório Principal"
+                                                                                className="rounded-sm h-10 bg-white/5 border-white/10 text-white text-xs"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pb-1">
+                                                                        <div className="md:col-span-7">
+                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-white/20 block mb-1">Título / Atividade</label>
+                                                                            <Input
+                                                                                value={item.title}
+                                                                                onChange={(e) => handleUpdateProgramacaoItem(idx, 'title', e.target.value)}
+                                                                                placeholder="Título da Palestra"
+                                                                                className="rounded-sm h-10 bg-white/5 border-white/10 text-white text-xs"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="md:col-span-5">
+                                                                            <label className="text-[8px] font-black uppercase tracking-widest text-white/20 block mb-1">Palestrante</label>
+                                                                            <Select
+                                                                                value={item.speaker}
+                                                                                onValueChange={(val) => handleUpdateProgramacaoItem(idx, 'speaker', val)}
+                                                                            >
+                                                                                <SelectTrigger className="rounded-sm h-10 bg-white/5 border-white/10 text-white text-xs">
+                                                                                    <SelectValue placeholder="Selecione..." />
+                                                                                </SelectTrigger>
+                                                                                <SelectContent className="bg-[#122442] border-white/10 text-white">
+                                                                                    <SelectItem value="none">Sem Palestrante</SelectItem>
+                                                                                    {[...palestrantes, ...convidados]
+                                                                                        .sort((a, b) => a.name.localeCompare(b.name))
+                                                                                        .map((p: any) => (
+                                                                                            <SelectItem key={p.id} value={p.name}>
+                                                                                                {p.name} {p.category && `(${p.category})`}
+                                                                                            </SelectItem>
+                                                                                        ))}
+                                                                                </SelectContent>
+                                                                            </Select>
+                                                                        </div>
                                                                     </div>
                                                                 </motion.div>
                                                             ))}
@@ -3127,7 +3315,7 @@ const AdminDashboard = () => {
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                         {programacao.map((day: any) => (
                                             <div key={day.id || day.date} className="bg-[#122442] rounded-[2rem] border border-white/5 shadow-xl overflow-hidden flex flex-col group transition-all hover:border-primary/30">
-                                                <div className="p-6 bg-white/5 border-b border-white/5 flex justify-between items-center">
+                                                <div className="py-2 px-6 bg-white/5 border-b border-white/5 flex justify-between items-center">
                                                     <div>
                                                         <h4 className="font-heading font-black text-white">{day.date}</h4>
                                                         <p className="text-primary/70 text-[10px] font-black uppercase tracking-widest">{day.label}</p>
@@ -3137,17 +3325,20 @@ const AdminDashboard = () => {
                                                         <Button onClick={() => handleDeleteProgramacao(day.id || day.date)} variant="ghost" size="sm" className="rounded-full p-2 h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-400/10"><X className="w-4 h-4" /></Button>
                                                     </div>
                                                 </div>
-                                                <div className="p-4 space-y-2">
+                                                <div className="p-2 space-y-1">
                                                     {day.items.map((item: any, idx: number) => {
                                                         const speakerObj = palestrantes.find((p: any) => p.name === item.speaker);
                                                         return (
-                                                            <div key={idx} className="flex gap-4 justify-between items-center text-sm p-4 rounded-2xl hover:bg-white/5 transition-colors group/item">
+                                                            <div key={idx} className="flex gap-4 justify-between items-center text-sm py-1 px-4 rounded-2xl hover:bg-white/5 transition-colors group/item">
                                                                 <div className="flex gap-4 items-center">
-                                                                    <span className="font-black text-primary shrink-0 w-12">{item.time}</span>
+                                                                    <span className="font-black text-primary shrink-0 whitespace-nowrap px-2 rounded bg-primary/10">{item.time}</span>
                                                                     <div>
-                                                                        <p className="font-bold text-white group-hover/item:text-primary transition-colors">{item.title}</p>
+                                                                        <p className="font-bold text-white group-hover/item:text-primary transition-colors flex items-center gap-2">{item.title}</p>
+                                                                        {item.local && (
+                                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 mt-0.5">{item.local}</p>
+                                                                        )}
                                                                         {item.speaker && item.speaker !== "none" && (
-                                                                            <p className="text-[11px] font-bold uppercase tracking-wider text-white/30 mt-1">{item.speaker}</p>
+                                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-white/30">{item.speaker}</p>
                                                                         )}
                                                                     </div>
                                                                 </div>
@@ -3376,6 +3567,90 @@ const AdminDashboard = () => {
                                             </div>
                                         ))}
                                     </div>
+                                </div>
+                            )}
+
+                            {/* Teses Tab */}
+                            {activeTab === "teses" && (
+                                <div className="space-y-6 pb-12">
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-[#122442] p-6 rounded-3xl shadow-xl border border-white/5 gap-4">
+                                        <div>
+                                            <h3 className="font-heading font-black text-xl text-white">Gestão de Teses</h3>
+                                            <p className="text-white/40 text-[13px] font-medium">Controle os Regulamentos e os Cadernos de Teses.</p>
+                                        </div>
+                                        <div className="flex bg-white/5 p-1 rounded-full w-full md:w-auto overflow-hidden">
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() => setTesesTab("regulamentos")}
+                                                className={`rounded-full px-4 md:px-6 font-bold text-[10px] md:text-xs uppercase tracking-widest flex-1 ${tesesTab === "regulamentos" ? "bg-primary text-white" : "text-white/50 hover:text-white"}`}
+                                            >
+                                                Regulamentos
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() => setTesesTab("cadernos")}
+                                                className={`rounded-full px-4 md:px-6 font-bold text-[10px] md:text-xs uppercase tracking-widest flex-1 ${tesesTab === "cadernos" ? "bg-primary text-white" : "text-white/50 hover:text-white"}`}
+                                            >
+                                                Cadernos
+                                            </Button>
+                                        </div>
+                                        <Button
+                                            onClick={() => {
+                                                if (tesesTab === "regulamentos") {
+                                                    setNewRegulamento({ name: "", fileUrl: "", id: null as any });
+                                                    setIsAddingRegulamento(true);
+                                                } else {
+                                                    setNewCaderno({ name: "", items: [], id: null as any });
+                                                    setNewTese({ title: "", author: "", fileUrl: "" });
+                                                    setIsAddingCaderno(true);
+                                                }
+                                            }}
+                                            className="rounded-full gap-2 px-6 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 font-black uppercase text-xs tracking-widest h-12 w-full md:w-auto"
+                                        >
+                                            <Plus className="w-4 h-4" /> Adicionar
+                                        </Button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                        {tesesTab === "regulamentos" && regulamentos.map((reg) => (
+                                            <div key={reg.id} className="bg-white/5 border border-white/10 p-6 rounded-2xl flex flex-col justify-between hover:bg-white/10 transition-colors">
+                                                <div>
+                                                    <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mb-4 text-primary">
+                                                        <FileText />
+                                                    </div>
+                                                    <h4 className="text-white font-bold text-lg mb-1">{reg.name}</h4>
+                                                    <p className="text-white/40 text-[11px] truncate flex items-center gap-1">
+                                                        {reg.fileUrl ? <><Check className="w-3 h-3 text-emerald-400" /> Tem Arquivo PDF</> : "Sem arquivo PDF vinculado"}
+                                                    </p>
+                                                </div>
+                                                <div className="mt-6 flex justify-between gap-2">
+                                                    <Button variant="ghost" className="flex-1 border border-primary/30 text-primary hover:bg-primary/20 h-8 text-xs font-bold rounded-lg" onClick={() => { setNewRegulamento(reg); setIsAddingRegulamento(true); }}>Editar</Button>
+                                                    <Button variant="ghost" className="flex-1 border border-red-500/30 text-red-500 hover:bg-red-500/20 h-8 text-xs font-bold rounded-lg" onClick={() => deleteRegulamento(reg.id)}>Excluir</Button>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {tesesTab === "cadernos" && cadernos.map((cad) => (
+                                            <div key={cad.id} className="bg-white/5 border border-white/10 p-6 rounded-2xl flex flex-col justify-between hover:bg-white/10 transition-colors">
+                                                <div>
+                                                    <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mb-4 text-primary">
+                                                        <BookOpen />
+                                                    </div>
+                                                    <h4 className="text-white font-bold text-lg mb-1">{cad.name}</h4>
+                                                    <p className="text-white/40 text-[11px] font-bold tracking-widest uppercase">{cad.items?.length || 0} Teses</p>
+                                                </div>
+                                                <div className="mt-6 flex justify-between gap-2">
+                                                    <Button variant="ghost" className="flex-1 border border-primary/30 text-primary hover:bg-primary/20 h-8 text-xs font-bold rounded-lg" onClick={() => { setNewCaderno(cad); setIsAddingCaderno(true); }}>Editar</Button>
+                                                    <Button variant="ghost" className="flex-1 border border-red-500/30 text-red-500 hover:bg-red-500/20 h-8 text-xs font-bold rounded-lg" onClick={() => deleteCaderno(cad.id)}>Excluir</Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {((tesesTab === "regulamentos" && regulamentos.length === 0) || (tesesTab === "cadernos" && cadernos.length === 0)) && (
+                                        <div className="text-center p-12 bg-white/5 rounded-2xl border border-white/10 mt-6">
+                                            <p className="text-white/50 text-sm">Ainda não há registros nesta área.</p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -4385,6 +4660,123 @@ const AdminDashboard = () => {
                         >
                             Gerar Arquivo PDF
                         </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal de Regulamento */}
+            <Dialog open={isAddingRegulamento} onOpenChange={setIsAddingRegulamento}>
+                <DialogContent className="sm:max-w-xl bg-[#0B1B32] border-white/10 shadow-2xl p-0 overflow-hidden hide-scrollbar">
+                    <div className="p-8 border-b border-white/5 bg-gradient-to-br from-primary/10 to-transparent">
+                        <DialogTitle className="text-2xl font-heading font-black text-white flex items-center gap-3">
+                            <span className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                                <FileText className="w-5 h-5" />
+                            </span>
+                            {newRegulamento.id ? 'Editar Regulamento' : 'Novo Regulamento'}
+                        </DialogTitle>
+                    </div>
+                    <div className="p-8 space-y-6">
+                        <div className="space-y-4">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Nome da Caixa (Ex: IX CONTEFFA)</label>
+                            <Input
+                                value={newRegulamento.name}
+                                onChange={(e) => setNewRegulamento({ ...newRegulamento, name: e.target.value })}
+                                className="h-14 bg-white/5 border-white/10 text-white rounded-xl px-4"
+                                placeholder="VII CONTEFFA"
+                            />
+                        </div>
+                        <div className="space-y-4">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Arquivo PDF do Regulamento</label>
+                            
+                            <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-xl">
+                                <label className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/80 transition-colors text-white text-xs font-bold uppercase tracking-widest py-3 px-6 rounded-lg cursor-pointer">
+                                    <Upload className="w-4 h-4" /> Enviar PDF
+                                    <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handlePdfUpload(e, 'regulamento')} />
+                                </label>
+                                <span className="text-xs text-white/50 truncate flex-1">
+                                    {newRegulamento.fileUrl ? (newRegulamento.fileUrl.startsWith('data:') ? 'Arquivo PDF carregado (Local)' : 'Arquivo PDF salvo na nuvem') : 'Nenhum arquivo selecionado'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="p-6 bg-black/20 flex gap-3">
+                        <Button variant="ghost" onClick={() => setIsAddingRegulamento(false)} className="flex-1 rounded-xl text-white/40 hover:text-white">Cancelar</Button>
+                        <Button onClick={saveRegulamento} className="flex-1 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-lg">Salvar Regulamento</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal de Caderno de Teses */}
+            <Dialog open={isAddingCaderno} onOpenChange={setIsAddingCaderno}>
+                <DialogContent className="max-w-3xl bg-[#0B1B32] border-white/10 shadow-2xl p-0 overflow-y-auto max-h-[90vh] hide-scrollbar">
+                    <div className="p-8 border-b border-white/5 bg-gradient-to-br from-primary/10 to-transparent">
+                        <DialogTitle className="text-2xl font-heading font-black text-white flex items-center gap-3">
+                            <span className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                                <BookOpen className="w-5 h-5" />
+                            </span>
+                            {newCaderno.id ? 'Editar Caderno de Teses' : 'Novo Caderno'}
+                        </DialogTitle>
+                    </div>
+                    <div className="p-8 space-y-8">
+                        <div className="space-y-4">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Nome da Caixa (Ex: IX CONTEFFA)</label>
+                            <Input
+                                value={newCaderno.name}
+                                onChange={(e) => setNewCaderno({ ...newCaderno, name: e.target.value })}
+                                className="h-14 bg-white/5 border-white/10 text-white rounded-xl px-4"
+                                placeholder="VIII CONTEFFA"
+                            />
+                        </div>
+
+                        <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
+                            <h4 className="text-white font-bold mb-4 uppercase text-xs tracking-widest">Adicionar Nova Tese</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <Input
+                                    value={newTese.title}
+                                    onChange={(e) => setNewTese({ ...newTese, title: e.target.value })}
+                                    className="bg-black/20 border-white/5 text-white"
+                                    placeholder="Título da Tese"
+                                />
+                                <Input
+                                    value={newTese.author}
+                                    onChange={(e) => setNewTese({ ...newTese, author: e.target.value })}
+                                    className="bg-black/20 border-white/5 text-white"
+                                    placeholder="Autor(es)"
+                                />
+                                <div className="md:col-span-2 flex items-center gap-4 bg-black/20 border border-white/5 p-3 rounded-xl">
+                                    <label className="flex items-center justify-center gap-2 bg-primary/20 hover:bg-primary/40 border border-primary/30 transition-colors text-primary text-xs font-bold uppercase tracking-widest py-2 px-6 rounded-lg cursor-pointer">
+                                        <Upload className="w-4 h-4" /> PDF da Tese
+                                        <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handlePdfUpload(e, 'tese')} />
+                                    </label>
+                                    <span className="text-xs text-white/50 truncate flex-1 leading-tight">
+                                        {newTese.fileUrl ? (newTese.fileUrl.startsWith('data:') ? 'PDF Carregado (Local)' : 'PDF na Nuvem') : 'Nenhum selecionado'}
+                                    </span>
+                                </div>
+                            </div>
+                            <Button onClick={addTeseToCaderno} className="w-full gap-2 font-bold"><Plus className="w-4 h-4"/> Adicionar Tese</Button>
+                        </div>
+
+                        {newCaderno.items.length > 0 && (
+                            <div className="space-y-4">
+                                <h4 className="text-white font-bold uppercase text-xs tracking-widest">Teses Adicionadas</h4>
+                                <div className="space-y-2">
+                                    {newCaderno.items.map((i, idx) => (
+                                        <div key={idx} className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 bg-black/20 rounded-xl border border-white/5 gap-4">
+                                            <div>
+                                                <p className="text-white font-bold text-sm line-clamp-1">{i.title}</p>
+                                                <p className="text-white/50 text-xs">Por: {i.author}</p>
+                                                {i.fileUrl && <p className="text-emerald-400 text-[10px] mt-1 tracking-widest">COM PDF VINCULADO</p>}
+                                            </div>
+                                            <Button variant="ghost" size="sm" className="text-red-400 hover:bg-red-500/20" onClick={() => removeTeseFromCaderno(i.id)}><Trash2 className="w-4 h-4"/></Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="p-6 bg-black/20 flex gap-3">
+                        <Button variant="ghost" onClick={() => setIsAddingCaderno(false)} className="flex-1 rounded-xl text-white/40 hover:text-white">Fechar</Button>
+                        <Button onClick={saveCaderno} className="flex-1 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-lg">Salvar Caderno</Button>
                     </div>
                 </DialogContent>
             </Dialog>

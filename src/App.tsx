@@ -10,7 +10,7 @@ import Programacao from "./pages/Programacao";
 import Inscricao from "./pages/Inscricao";
 import Noticias from "./pages/Noticias";
 import { LocalPage, Atracoes, ComoChegar, Transfer, Hospedagem, Passagem, Apoio } from "./pages/Local";
-import { CadernoTeses, RegulamentoTeses, VisualizarTeses } from "./pages/Teses";
+import Teses from "./pages/Teses";
 import Indicativos from "./pages/Indicativos";
 import Galeria from "./pages/Galeria";
 import Contato from "./pages/Contato";
@@ -45,9 +45,7 @@ const App = () => (
           <Route path="/local/hospedagem" element={<Hospedagem />} />
           <Route path="/local/passagem" element={<Passagem />} />
           <Route path="/local/apoio" element={<Apoio />} />
-          <Route path="/teses/caderno" element={<CadernoTeses />} />
-          <Route path="/teses/regulamento" element={<RegulamentoTeses />} />
-          <Route path="/teses/visualizar" element={<VisualizarTeses />} />
+          <Route path="/teses" element={<Teses />} />
           <Route path="/indicativos" element={<Indicativos />} />
           <Route path="/galeria" element={<Galeria />} />
           <Route path="/contato" element={<Contato />} />

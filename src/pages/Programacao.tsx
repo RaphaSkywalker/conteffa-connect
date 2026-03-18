@@ -4,7 +4,7 @@ import PageLayout from "@/components/PageLayout";
 import PageBanner from "@/components/PageBanner";
 import SectionTitle from "@/components/SectionTitle";
 import { motion } from "framer-motion";
-import { Clock, User } from "lucide-react";
+import { Clock, User, MapPin } from "lucide-react";
 
 const Programacao = () => {
   const [days, setDays] = useState<any[]>([]);
@@ -83,11 +83,11 @@ const Programacao = () => {
                 transition={{ delay: di * 0.1 }}
                 className="group bg-white rounded-[2rem] border border-border/50 card-shadow overflow-hidden h-fit"
               >
-                <div className="bg-navy px-8 py-6 text-white relative overflow-hidden">
+                <div className="bg-navy px-8 py-4 text-white relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-primary/20 rounded-bl-[3rem]" />
                   <div className="relative z-10">
                     <h3 className="text-xl md:text-2xl font-heading font-black">{day.date}</h3>
-                    <p className="text-white/60 font-medium uppercase tracking-widest text-[10px] mt-1">{day.label}</p>
+                    <p className="text-white/60 font-medium uppercase tracking-widest text-[10px] sm:mt-0.5">{day.label}</p>
                   </div>
                 </div>
                 <div className="divide-y divide-border/50">
@@ -96,16 +96,26 @@ const Programacao = () => {
                     return (
                       <div key={i} className="px-8 py-5 flex items-center justify-between gap-4 hover:bg-primary/5 transition-colors group/row">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
-                          <div className="flex items-center gap-2 text-primary shrink-0 sm:w-28 bg-primary/10 px-3 py-1.5 rounded-full justify-center sm:justify-start">
+                          <div className="flex items-center gap-2 text-primary shrink-0 w-full sm:w-auto sm:min-w-[120px] bg-primary/10 px-3 py-1.5 rounded-full justify-center sm:justify-start whitespace-nowrap">
                             <Clock className="w-3.5 h-3.5" />
                             <span className="text-sm font-black">{item.time}</span>
                           </div>
                           <div className="flex-1">
                             <p className="text-base font-heading font-bold text-foreground leading-tight group-hover/row:text-primary transition-colors">{item.title}</p>
-                            {item.speaker && item.speaker !== "none" && (
-                              <div className="flex items-center gap-2 mt-2">
-                                <User className="w-3 h-3 text-primary" />
-                                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{item.speaker}</span>
+                            {(item.local || (item.speaker && item.speaker !== "none")) && (
+                              <div className="flex flex-col gap-0.5 mt-1">
+                                {item.local && (
+                                  <div className="flex items-center gap-1.5">
+                                    <MapPin className="w-3 h-3 text-primary" />
+                                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{item.local}</span>
+                                  </div>
+                                )}
+                                {item.speaker && item.speaker !== "none" && (
+                                  <div className="flex items-center gap-1.5">
+                                    <User className="w-3 h-3 text-primary" />
+                                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{item.speaker}</span>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

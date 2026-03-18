@@ -26,15 +26,7 @@ const menuItems = [
         label: "Local",
         path: "/local",
       },
-      {
-        label: "Teses",
-        path: "/teses",
-        children: [
-          { label: "Caderno de Teses", path: "/teses/caderno" },
-          { label: "Regulamento", path: "/teses/regulamento" },
-          { label: "Visualizar Teses", path: "/teses/visualizar" },
-        ],
-      },
+      { label: "Teses", path: "/teses" },
       { label: "Indicativos", path: "/indicativos" },
       { label: "Galeria", path: "/galeria" },
     ],

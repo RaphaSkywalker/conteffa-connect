@@ -6,7 +6,7 @@ import { CalendarDays, Users, Mic, MapPin, FileText, ArrowRight, User, Calendar,
 import PageLayout from "@/components/PageLayout";
 import Countdown from "@/components/Countdown";
 import SectionTitle from "@/components/SectionTitle";
-import heroBg from "@/assets/hero-congress.jpg";
+import heroBg from "@/assets/hero-conteffa3.jpg";
 import { Button } from "@/components/ui/button";
 
 const stats = [
@@ -19,23 +19,23 @@ const stats = [
 const highlights = [
   {
     icon: Mic,
-    title: "Palestras de Alto Nível",
-    description: "Especialistas renomados compartilhando conhecimentos e experiências.",
+    title: "Unificação dos Cargos",
+    description: "Abordagem sintética do anteprojeto de lei - APL que trata da reorganização dos cargos de nível intermediário do PCTAF",
   },
   {
     icon: Users,
-    title: "Networking Nacional",
-    description: "Conecte-se com profissionais de todo o Brasil durante o congresso.",
+    title: "Nivelamento dos Cargos de Nível Auxiliar",
+    description: "Equiparação da Tabela Remuneratória entre os cargos AL e AOA.",
   },
   {
     icon: FileText,
-    title: "Apresentação de Teses",
-    description: "Espaço para discussão e apresentação de trabalhos acadêmicos.",
+    title: "PL da Indenização de Folga Remunerada",
+    description: "Institui a indenização de serviço voluntário em folga remunerada.",
   },
   {
     icon: MapPin,
-    title: "Localização Privilegiada",
-    description: "Evento realizado em um dos melhores centros de convenções do país.",
+    title: "Regras para Aposentadoria",
+    description: "A integralidade e paridade são garantias dos Servidores Federais.",
   },
 ];
 
@@ -236,13 +236,23 @@ const Index = () => {
             IX CONTEFFA
           </motion.h1>
 
+          <motion.h2
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.8 }}
+            style={{ fontFamily: "'Poppins', 'Inter', sans-serif" }}
+            className="text-[23px] text-white/95 font-medium tracking-wide -mt-2 mb-1 md:-mt-4 md:mb-1 max-w-5xl mx-auto drop-shadow-md leading-snug md:leading-relaxed text-center"
+          >
+            Construindo o futuro em tempos de mudança.
+          </motion.h2>
+
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="text-2xl sm:text-3xl md:text-[35px] text-[#00ABE5] max-w-5xl mx-auto mt-2 md:-mt-4 mb-6 md:mb-4 font-black uppercase tracking-wider leading-snug md:leading-relaxed"
+            className="text-[21px] sm:text-[27px] md:text-[31px] text-[#00ABE5] max-w-5xl mx-auto mt-1 md:-mt-1 mb-6 md:mb-4 font-black uppercase tracking-wider leading-snug md:leading-relaxed"
           >
-            12 a 16 NOV 2026, Recife-PE
+            12 a 15 NOV 2026, RECIFE-PE
           </motion.p>
 
           <motion.div

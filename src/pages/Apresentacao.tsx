@@ -4,7 +4,8 @@ import SectionTitle from "@/components/SectionTitle";
 import { supabase } from "@/lib/supabase";
 import PageBanner from "@/components/PageBanner";
 import { motion } from "framer-motion";
-import { User, Quote } from "lucide-react";
+import { User, Quote, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const CartaPresidente = () => (
   <PageLayout>
@@ -253,10 +254,9 @@ const Evento = () => (
     <PageBanner title="O EVENTO" />
     <section className="section-padding">
       <div className="container mx-auto max-w-4xl">
-        <SectionTitle title="O Evento" subtitle="Conheça o IX CONTEFFA 2026" />
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 text-muted-foreground leading-relaxed">
-          <p>O IX CONTEFFA 2026 será realizado de 12 a 16 de novembro de 2026, no <strong>Mar Hotel Conventions</strong>, em Recife - PE. O evento reunirá profissionais de todo o Brasil em cinco dias de palestras, debates, apresentações de teses e atividades de integração.</p>
-          <p>Organizado pela ANTEFFA, o congresso focará no fortalecimento da categoria e nos desafios da fiscalização federal agropecuária.</p>
+        <SectionTitle title="O Evento" subtitle="Conheça o IX CONTEFFA 2026" label="EVENTO" />
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 text-muted-foreground leading-relaxed text-justify">
+          <p>O IX CONTEFFA, será realizado de 12 a 15 de novembro de 2026, no <strong>Mar Hotel Conventions</strong>, em Recife - PE. O evento tem como objetivo geral promover um espaço qualificado de debate, reflexão e construção coletiva sobre o papel estratégico da Fiscalização Agropecuária Federal, na proteção da saúde pública, na defesa sanitária animal e vegetal, na garantia da qualidade dos produtos agropecuários e na sustentabilidade do agronegócio brasileiro.</p>
         </motion.div>
       </div>
     </section>
@@ -269,8 +269,12 @@ const Regimento = () => (
     <section className="section-padding">
       <div className="container mx-auto max-w-4xl">
         <SectionTitle title="Regimento do Congresso" subtitle="Normas e regulamentos do IX CONTEFFA 2026" />
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} className="bg-navy rounded-[3rem] p-12 text-white/80 leading-relaxed text-xl shadow-2xl">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} className="bg-navy rounded-[3rem] p-12 text-white/80 leading-relaxed text-xl shadow-2xl flex flex-col items-center text-center space-y-8">
           <p>O regimento completo do IX CONTEFFA 2026 será disponibilizado em breve. Fique atento às atualizações.</p>
+          <Button className="gap-2 font-bold px-8 h-14 text-base rounded-full shadow-lg hover:-translate-y-1 transition-transform">
+            <Download className="w-5 h-5" />
+            Baixar Regimento em PDF
+          </Button>
         </motion.div>
       </div>
     </section>
