@@ -2336,25 +2336,25 @@ const AdminDashboard = () => {
                                             </div>
                                         </div>
 
-                                        {/* Gráfico de Engajamento */}
+                                        {/* Gráfico de Visitas Mensais */}
                                         <div className="bg-[#122442] p-6 rounded-3xl border border-white/5 shadow-xl">
-                                            <h4 className="text-[20px] font-heading font-black text-white mb-6">Engajamento Mensal (Likes)</h4>
+                                            <h4 className="text-[20px] font-heading font-black text-white mb-6">Visitas Mensais</h4>
                                             <div className="h-[300px] w-full">
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <AreaChart
                                                         data={[
-                                                            { name: 'Jan', likes: 120 },
-                                                            { name: 'Fev', likes: 210 },
-                                                            { name: 'Mar', likes: noticias.reduce((acc, n) => acc + (n.likes || 0), 0) + 50 },
-                                                            { name: 'Abr', likes: 0 },
-                                                            { name: 'Mai', likes: 0 },
+                                                            { name: 'Jan', visits: 450 },
+                                                            { name: 'Fev', visits: 890 },
+                                                            { name: 'Mar', visits: noticias.reduce((acc, n) => acc + (n.views || 0), 0) + albuns.reduce((acc, a) => acc + (a.views || 0), 0) },
+                                                            { name: 'Abr', visits: 0 },
+                                                            { name: 'Mai', visits: 0 },
                                                         ]}
                                                         margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                                                     >
                                                         <defs>
-                                                            <linearGradient id="colorLikes" x1="0" y1="0" x2="0" y2="1">
-                                                                <stop offset="5%" stopColor="#EC4899" stopOpacity={0.3} />
-                                                                <stop offset="95%" stopColor="#EC4899" stopOpacity={0} />
+                                                            <linearGradient id="colorVisits" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#1EAEDB" stopOpacity={0.3} />
+                                                                <stop offset="95%" stopColor="#1EAEDB" stopOpacity={0} />
                                                             </linearGradient>
                                                         </defs>
                                                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
@@ -2374,7 +2374,7 @@ const AdminDashboard = () => {
                                                             itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
                                                             cursor={{ stroke: 'rgba(255, 255, 255, 0.1)', strokeWidth: 1 }}
                                                         />
-                                                        <Area type="monotone" dataKey="likes" stroke="#EC4899" fillOpacity={1} fill="url(#colorLikes)" strokeWidth={3} />
+                                                        <Area type="monotone" dataKey="visits" stroke="#1EAEDB" fillOpacity={1} fill="url(#colorVisits)" strokeWidth={3} />
                                                     </AreaChart>
                                                 </ResponsiveContainer>
                                             </div>

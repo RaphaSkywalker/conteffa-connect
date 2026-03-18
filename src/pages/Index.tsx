@@ -555,7 +555,7 @@ const Index = () => {
             viewport={{ once: true }}
           >
             <h2 className="text-4xl md:text-7xl font-heading font-black text-white mb-8 leading-[1.1]">
-              Sua presença é fundamental <br /> para o <span className="underline decoration-white/30 decoration-8 underline-offset-8">nosso sucesso</span>.
+              Sua presença é fundamental <br /> para o <span className="underline decoration-white/30 decoration-8 underline-offset-8">sucesso do CONTEFFA</span>.
             </h2>
             <p className="text-white/80 text-xl md:text-2xl max-w-2xl font-body mx-auto mb-12">
               Garanta agora sua participação no maior evento nacional da categoria. O primeiro lote está disponível por tempo limitado.

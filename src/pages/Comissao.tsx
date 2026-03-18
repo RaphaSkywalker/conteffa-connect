@@ -57,10 +57,10 @@ const Comissao = () => {
                 
                 if (error) throw error;
 
-                // Filtra apenas membros da categoria Comissão
+                // Filtra apenas membros da categoria Comissão e ordena alfabeticamente
                 const membros = (data || []).filter((g: any) =>
                     g.category === "Comissão" || g.category === "Comissao"
-                );
+                ).sort((a: any, b: any) => a.name.localeCompare(b.name));
                 setComissao(membros);
             } catch (err) {
                 console.error("Failed to fetch comissao", err);
