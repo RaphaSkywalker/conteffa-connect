@@ -6,7 +6,7 @@ import { CalendarDays, Users, Mic, MapPin, FileText, ArrowRight, User, Calendar,
 import PageLayout from "@/components/PageLayout";
 import Countdown from "@/components/Countdown";
 import SectionTitle from "@/components/SectionTitle";
-import heroBg from "@/assets/hero-home.png";
+import heroBg from "@/assets/hero-home-v3.jpg";
 import { Button } from "@/components/ui/button";
 
 const stats = [

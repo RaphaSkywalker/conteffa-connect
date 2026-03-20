@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import heroBg from "@/assets/hero-congress.jpg";
+import heroBg from "@/assets/hero-home-v3.jpg";
 
 interface PageBannerProps {
     title: string;
