@@ -207,7 +207,7 @@ const Index = () => {
           className="absolute inset-0 bg-cover bg-fixed bg-center"
           style={{ backgroundImage: `url(${heroBg})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--hero-overlay)/0.9)] via-[hsl(var(--hero-overlay)/0.75)] to-[hsl(var(--hero-overlay)/0.95)]" />
+        <div className="absolute inset-0 bg-black/40" />
 
         {/* Animated background logos */}
         <div className="absolute bottom-[15%] -left-32 w-[420px] h-[420px] opacity-[0.05] pointer-events-none animate-bounce [animation-duration:9s]">
