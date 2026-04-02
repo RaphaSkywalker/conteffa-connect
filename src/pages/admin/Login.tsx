@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import heroBg from "@/assets/hero-congress.jpg";
+import heroBg from "@/assets/hero-home-v3.jpg";
 
 const AdminLogin = () => {
     const [username, setUsername] = useState("");
@@ -20,25 +20,25 @@ const AdminLogin = () => {
 
         try {
             // Consulta o Supabase para verificar o usuário
-            // username pode ser o e-mail ou o nome (Admin)
-            const { data: user, error } = await supabase
+            const { data: userData, error } = await supabase
                 .from('users')
                 .select('*')
-                .or(`email.eq.${username},name.eq.${username}`)
-                .maybeSingle();
+                .eq('email', username)
+                .single();
 
-            if (error) throw error;
+            if (error || !userData) {
+                toast.error("Usuário não encontrado.");
+                return;
+            }
 
-            if (user && user.password === password) {
-                // Remove a senha antes de salvar no localStorage
-                const { password: _, ...userWithoutPassword } = user;
-
+            // Comparação simples (Idealmente deveria ser hashbcrypt, mas mantendo compatibilidade com o esquema atual)
+            if (userData.password === password) {
                 // Salva a sessão do usuário
-                localStorage.setItem("admin_user", JSON.stringify(userWithoutPassword));
+                localStorage.setItem("admin_user", JSON.stringify(userData));
                 toast.success("Login realizado com sucesso! Bem-vindo ao painel.");
                 navigate("/admin/dashboard");
             } else {
-                toast.error("Usuário ou senha incorretos.");
+                toast.error("Senha incorreta.");
             }
         } catch (err: any) {
             console.error("Erro no login:", err);
@@ -48,6 +48,7 @@ const AdminLogin = () => {
         }
     };
 
+
     return (
         <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
             {/* Background */}
@@ -55,10 +56,13 @@ const AdminLogin = () => {
                 className="absolute inset-0 bg-cover bg-fixed bg-center"
                 style={{ backgroundImage: `url(${heroBg})` }}
             />
-            <div className="absolute inset-0 bg-black/60" />
+            <div className="absolute inset-0 bg-black/40" />
 
-            {/* Floating Logo */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] opacity-[0.05] pointer-events-none animate-pulse">
+            {/* Animated background logos */}
+            <div className="absolute bottom-[15%] -left-32 w-[420px] h-[420px] opacity-[0.05] pointer-events-none animate-bounce [animation-duration:9s]">
+                <img src="/bg-logo.png" alt="" className="w-full h-full object-contain" />
+            </div>
+            <div className="absolute top-[15%] -right-32 w-[420px] h-[420px] opacity-[0.05] pointer-events-none animate-bounce [animation-duration:8s]">
                 <img src="/bg-logo.png" alt="" className="w-full h-full object-contain" />
             </div>
 

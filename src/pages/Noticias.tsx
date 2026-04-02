@@ -406,9 +406,16 @@ const Noticias = () => {
                     ))
                   )}
                 </div>
-                <Button className="w-full mt-6 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-xl shadow-lg">
-                  Ver Perfil Completo
-                </Button>
+                <a 
+                  href={`https://www.instagram.com/${instaConfig.handle?.replace('@', '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block mt-6"
+                >
+                  <Button className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-xl shadow-lg">
+                    Ver Perfil Completo
+                  </Button>
+                </a>
               </div>
 
               <div className="bg-[#0B1B32] rounded-[2rem] p-8 shadow-xl text-white relative overflow-hidden group">

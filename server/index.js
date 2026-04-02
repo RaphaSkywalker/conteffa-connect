@@ -163,7 +163,9 @@ const initDb = async () => {
             cpf TEXT,
             dataNascimento TEXT,
             tamanhoCamiseta TEXT,
-            hotel TEXT
+            hotel TEXT,
+            qualHotel TEXT,
+            acompanhantesNames TEXT
         )
     `);
 
@@ -172,7 +174,9 @@ const initDb = async () => {
         { name: 'cpf', type: 'TEXT' },
         { name: 'dataNascimento', type: 'TEXT' },
         { name: 'tamanhoCamiseta', type: 'TEXT' },
-        { name: 'hotel', type: 'TEXT' }
+        { name: 'hotel', type: 'TEXT' },
+        { name: 'qualHotel', type: 'TEXT' },
+        { name: 'acompanhantesNames', type: 'TEXT' }
     ];
 
     for (const col of columns) {
@@ -210,6 +214,22 @@ const initDb = async () => {
             type TEXT DEFAULT 'info',
             is_read INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    await dbRun(`
+        CREATE TABLE IF NOT EXISTS regulamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            fileUrl TEXT
+        )
+    `);
+
+    await dbRun(`
+        CREATE TABLE IF NOT EXISTS cadernos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            items TEXT
         )
     `);
 
@@ -635,17 +655,21 @@ app.post('/api/registrations', async (req, res) => {
         'bairro', 'cidade', 'cep', 'ateffa', 'cargo', 'formaDeslocamento',
         'problemaSaude', 'qualSaude', 'cuidadosEspeciais', 'quaisCuidados',
         'acompanhantes', 'parentesco', 'quantosAcompanhantes', 'nomeAcompanhante',
-        'foto', 'data', 'status'
+        'foto', 'data', 'status', 'cpf', 'dataNascimento', 'tamanhoCamiseta', 'hotel',
+        'qualHotel', 'acompanhantesNames'
     ];
 
     const placeholders = fields.map(() => '?').join(', ');
     const values = fields.map(field => req.body[field]);
+
+    console.log(`Creating registration for: ${req.body.nomeCompleto}`);
 
     try {
         const result = await dbRun(`
             INSERT INTO registrations (${fields.join(', ')})
             VALUES (${placeholders})
         `, values);
+        console.log(`Registration created with ID: ${result.lastID}`);
         res.json({ id: result.lastID });
     } catch (e) {
         console.error('Error saving registration:', e);
@@ -659,25 +683,35 @@ app.put('/api/registrations/:id', async (req, res) => {
         'bairro', 'cidade', 'cep', 'ateffa', 'cargo', 'formaDeslocamento',
         'problemaSaude', 'qualSaude', 'cuidadosEspeciais', 'quaisCuidados',
         'acompanhantes', 'parentesco', 'quantosAcompanhantes', 'nomeAcompanhante',
-        'foto', 'data', 'status'
+        'foto', 'data', 'status', 'cpf', 'dataNascimento', 'tamanhoCamiseta', 'hotel',
+        'qualHotel', 'acompanhantesNames'
     ];
 
     const setClause = fields.map(field => `${field} = ?`).join(', ');
     const values = fields.map(field => req.body[field]);
     values.push(req.params.id);
 
+    console.log(`Updating registration ID: ${req.params.id}`);
+
     try {
-        await dbRun(`UPDATE registrations SET ${setClause} WHERE id = ?`, values);
-        res.json({ success: true });
+        const result = await dbRun(`UPDATE registrations SET ${setClause} WHERE id = ?`, values);
+        if (result.changes === 0) {
+            console.warn(`No registration found with ID: ${req.params.id} to update`);
+        } else {
+            console.log(`Registration ID: ${req.params.id} updated successfully`);
+        }
+        res.json({ success: true, changes: result.changes });
     } catch (e) {
+        console.error(`Error updating registration ${req.params.id}:`, e);
         res.status(500).json({ error: e.message });
     }
 });
 
 app.delete('/api/registrations/:id', async (req, res) => {
     try {
-        await dbRun('DELETE FROM registrations WHERE id = ?', [req.params.id]);
-        res.json({ success: true });
+        const result = await dbRun('DELETE FROM registrations WHERE id = ?', [req.params.id]);
+        console.log(`Deleted registration ID: ${req.params.id}`);
+        res.json({ success: true, changes: result.changes });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -698,6 +732,7 @@ app.post('/api/config/:key', async (req, res) => {
         const { key } = req.params;
         const value = JSON.stringify(req.body);
         await dbRun('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', [key, value]);
+        console.log(`Config ${key} updated`);
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -721,6 +756,104 @@ app.post('/api/metrics/increment/:id', async (req, res) => {
             VALUES (?, 1) 
             ON CONFLICT(id) DO UPDATE SET count = count + 1
         `, [req.params.id]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Regulamentos
+app.get('/api/regulamentos', async (req, res) => {
+    try {
+        const rows = await dbAll('SELECT * FROM regulamentos ORDER BY id DESC');
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/regulamentos', async (req, res) => {
+    const { name, fileUrl } = req.body;
+    console.log(`Creating regulamento: ${name}`);
+    try {
+        const result = await dbRun('INSERT INTO regulamentos (name, fileUrl) VALUES (?, ?)', [name, fileUrl]);
+        console.log(`Regulamento created with ID: ${result.lastID}`);
+        res.json({ id: result.lastID });
+    } catch (e) {
+        console.error('Error creating regulamento:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/regulamentos/:id', async (req, res) => {
+    const { name, fileUrl } = req.body;
+    console.log(`Updating regulamento ID: ${req.params.id}`);
+    try {
+        const result = await dbRun('UPDATE regulamentos SET name = ?, fileUrl = ? WHERE id = ?', [name, fileUrl, req.params.id]);
+        if (result.changes === 0) {
+            console.warn(`No regulamento found with ID: ${req.params.id} to update. Falling back to INSERT.`);
+            const insertResult = await dbRun('INSERT INTO regulamentos (name, fileUrl) VALUES (?, ?)', [name, fileUrl]);
+            return res.json({ success: true, id: insertResult.lastID, note: 'Inserted as new because ID not found' });
+        }
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Error updating regulamento:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/regulamentos/:id', async (req, res) => {
+    try {
+        await dbRun('DELETE FROM regulamentos WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Cadernos
+app.get('/api/cadernos', async (req, res) => {
+    try {
+        const rows = await dbAll('SELECT * FROM cadernos ORDER BY id DESC');
+        res.json(rows.map(r => ({ ...r, items: JSON.parse(r.items || '[]') })));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/cadernos', async (req, res) => {
+    const { name, items } = req.body;
+    console.log(`Creating caderno: ${name}`);
+    try {
+        const result = await dbRun('INSERT INTO cadernos (name, items) VALUES (?, ?)', [name, JSON.stringify(items || [])]);
+        console.log(`Caderno created with ID: ${result.lastID}`);
+        res.json({ id: result.lastID });
+    } catch (e) {
+        console.error('Error creating caderno:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/cadernos/:id', async (req, res) => {
+    const { name, items } = req.body;
+    console.log(`Updating caderno ID: ${req.params.id}`);
+    try {
+        const result = await dbRun('UPDATE cadernos SET name = ?, items = ? WHERE id = ?', [name, JSON.stringify(items || []), req.params.id]);
+        if (result.changes === 0) {
+            console.warn(`No caderno found with ID: ${req.params.id} to update. Falling back to INSERT.`);
+            const insertResult = await dbRun('INSERT INTO cadernos (name, items) VALUES (?, ?)', [name, JSON.stringify(items || [])]);
+            return res.json({ success: true, id: insertResult.lastID, note: 'Inserted as new because ID not found' });
+        }
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Error updating caderno:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/cadernos/:id', async (req, res) => {
+    try {
+        await dbRun('DELETE FROM cadernos WHERE id = ?', [req.params.id]);
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });

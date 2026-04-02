@@ -68,127 +68,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 
-const API_URL = "http://localhost:3001/api";
 
-const apiFetch = async (endpoint: string, options: any = {}) => {
-    // Helper to map endpoints to Supabase tables
-    const tableMap: Record<string, string> = {
-        '/users': 'users',
-        '/news': 'news',
-        '/speakers': 'speakers',
-        '/programming': 'programming',
-        '/albums': 'albums',
-        '/registrations': 'registrations',
-        '/guests': 'guests',
-        '/timeline_events': 'timeline_events',
-        '/site_settings': 'site_settings',
-        '/config/instagram': 'config',
-        '/messages': 'messages'
-    };
-
-    const tableName = tableMap[endpoint] || endpoint.replace('/', '').split('/')[0];
-    const method = options.method || 'GET';
-    const body = options.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : null;
-
-    try {
-        // Special case for config table (key-value)
-        if (tableName === 'config' && endpoint.includes('/config/')) {
-            const key = endpoint.split('/').pop();
-            if (method === 'GET') {
-                const { data, error } = await supabase.from('config').select('value').eq('key', key).maybeSingle();
-                if (error) throw error;
-                return data ? JSON.parse(data.value) : null;
-            }
-            if (method === 'POST') {
-                const { data, error } = await supabase.from('config').upsert({ key, value: JSON.stringify(body) }).select();
-                if (error) throw error;
-                return data;
-            }
-        }
-
-        if (method === 'GET') {
-            let query = supabase.from(tableName).select('*');
-
-            // Ordem decrescente para tabelas que precisam dos mais novos primeiro
-            if (['news', 'albums', 'registrations'].includes(tableName)) {
-                query = query.order('id', { ascending: false });
-            }
-
-            const { data, error } = await query;
-            if (error) {
-                console.warn(`Supabase GET warning for ${tableName}:`, error.message);
-                return []; // Graceful fallback
-            }
-
-            if (data) {
-                return data.map(item => {
-                    const newItem = { ...item };
-                    // Formatar data para exibição (YYYY-MM-DD -> DD/MM/YYYY)
-                    if (newItem.date && typeof newItem.date === 'string' && newItem.date.includes('-') && !newItem.date.includes('/')) {
-                        const parts = newItem.date.split('-');
-                        if (parts.length === 3) {
-                            const [y, m, d] = parts;
-                            newItem.date = `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
-                        }
-                    }
-                    // Campos JSON
-                    if (tableName === 'programming' || tableName === 'albums') {
-                        newItem.items = typeof item.items === 'string' ? JSON.parse(item.items) : (item.items || []);
-                        newItem.photos = typeof item.photos === 'string' ? JSON.parse(item.photos) : (item.photos || []);
-                    }
-                    return newItem;
-                });
-            }
-            return data || [];
-        }
-
-        // Remove ID from body for insert/update to avoid conflicts with auto-generated IDs
-        const cleanBody = body ? { ...body } : null;
-        const updateId = body?.id || endpoint.split('/').pop();
-
-        if (cleanBody) {
-            if ('id' in cleanBody) delete cleanBody.id;
-            // Álbuns não possuem coluna 'items'
-            if (tableName === 'albums' && 'items' in cleanBody) delete cleanBody.items;
-            if (tableName === 'programming' && 'photos' in cleanBody) delete cleanBody.photos;
-
-            // Formatar data para o banco (DD/MM/YYYY -> YYYY-MM-DD)
-            if (cleanBody.date && typeof cleanBody.date === 'string' && cleanBody.date.includes('/')) {
-                const parts = cleanBody.date.split('/');
-                if (parts.length === 3) {
-                    const [d, m, y] = parts;
-                    cleanBody.date = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-                }
-            }
-        }
-
-
-        if (method === 'POST') {
-            const { data, error } = await supabase.from(tableName).insert([cleanBody]).select();
-            if (error) throw error;
-            return data && data.length > 0 ? data[0] : data;
-        }
-
-        if (method === 'PUT' || method === 'PATCH') {
-            const { data, error } = await supabase.from(tableName).update(cleanBody).eq('id', updateId).select();
-            if (error) throw error;
-            return data;
-        }
-
-        if (method === 'DELETE') {
-            const id = endpoint.split('/').pop();
-            const { error } = await supabase.from(tableName).delete().eq('id', id);
-            if (error) throw error;
-            return { success: true };
-        }
-    } catch (err: any) {
-        console.error(`Supabase error for ${endpoint}:`, err);
-        if (method === 'GET') return [];
-        // Re-throw with a more descriptive error if possible
-        const errorMsg = err.message || err.details || JSON.stringify(err);
-        throw new Error(errorMsg);
-    }
-};
 
 const AdminDashboard = () => {
     // Load initial user state from localStorage or use default
@@ -275,9 +155,9 @@ const AdminDashboard = () => {
 
     const fetchMessages = async () => {
         try {
-            const data = await apiFetch("/messages");
-            if (data && Array.isArray(data)) {
-                setMessages(data.sort((a, b) => b.id - a.id));
+            const { data, error } = await supabase.from('messages').select('*').order('id', { ascending: false });
+            if (!error && data) {
+                setMessages(data);
                 const unread = data.filter((m: any) => !m.is_read).length;
                 setUnreadNotifications(unread);
             }
@@ -419,74 +299,107 @@ const AdminDashboard = () => {
 
     // States for Teses
     const [tesesTab, setTesesTab] = useState("regulamentos");
-    const [regulamentos, setRegulamentos] = useState<any[]>(() => {
-        const saved = localStorage.getItem("conteffa_regulamentos");
-        return saved ? JSON.parse(saved) : [
-            { id: 9, name: "IX CONTEFFA", fileUrl: "" },
-            { id: 8, name: "VIII CONTEFFA", fileUrl: "" },
-            { id: 7, name: "VII CONTEFFA", fileUrl: "" },
-            { id: 6, name: "VI CONTEFFA", fileUrl: "" },
-            { id: 5, name: "V CONTEFFA", fileUrl: "" },
-            { id: 4, name: "IV CONTEFFA", fileUrl: "" },
-            { id: 3, name: "III CONTEFFA", fileUrl: "" },
-            { id: 2, name: "II CONTEFFA", fileUrl: "" },
-            { id: 1, name: "I CONTEFFA", fileUrl: "" },
-        ];
-    });
-    const [cadernos, setCadernos] = useState<any[]>(() => {
-        const saved = localStorage.getItem("conteffa_cadernos");
-        return saved ? JSON.parse(saved) : [
-            { id: 9, name: "IX CONTEFFA", items: [] },
-            { id: 8, name: "VIII CONTEFFA", items: [] },
-            { id: 7, name: "VII CONTEFFA", items: [] },
-            { id: 6, name: "VI CONTEFFA", items: [] },
-            { id: 5, name: "V CONTEFFA", items: [] },
-            { id: 4, name: "IV CONTEFFA", items: [] },
-            { id: 3, name: "III CONTEFFA", items: [] },
-            { id: 2, name: "II CONTEFFA", items: [] },
-            { id: 1, name: "I CONTEFFA", items: [] },
-        ];
-    });
+    const [regulamentos, setRegulamentos] = useState<any[]>([]);
+    const [cadernos, setCadernos] = useState<any[]>([]);
     const [isAddingRegulamento, setIsAddingRegulamento] = useState(false);
     const [isAddingCaderno, setIsAddingCaderno] = useState(false);
     const [newRegulamento, setNewRegulamento] = useState({ name: "", fileUrl: "", id: null as any });
     const [newCaderno, setNewCaderno] = useState({ name: "", items: [] as any[], id: null as any });
     const [newTese, setNewTese] = useState({ title: "", author: "", fileUrl: "" });
 
-    const saveRegulamento = () => {
+    const saveRegulamento = async () => {
         if (!newRegulamento.name) return toast.error("Preencha o nome.");
-        const updated = newRegulamento.id 
-            ? regulamentos.map(r => r.id === newRegulamento.id ? newRegulamento : r)
-            : [{ ...newRegulamento, id: Date.now() }, ...regulamentos];
-        setRegulamentos(updated);
-        localStorage.setItem("conteffa_regulamentos", JSON.stringify(updated));
-        setIsAddingRegulamento(false);
-        toast.success("Salvo com sucesso!");
+        try {
+            // Salvar no estado local primeiro
+            let updatedList;
+            if (newRegulamento.id) {
+                updatedList = regulamentos.map(r => r.id === newRegulamento.id ? newRegulamento : r);
+            } else {
+                const item = { ...newRegulamento, id: Date.now() };
+                updatedList = [item, ...regulamentos];
+            }
+            
+            setRegulamentos(updatedList);
+            
+            // Persistir no Supabase Config
+            const { error } = await supabase.from('config').upsert({
+                key: 'regulamentos_data',
+                value: JSON.stringify(updatedList),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+
+            if (error) throw error;
+            
+            setIsAddingRegulamento(false);
+            toast.success("Regulamentos atualizados no servidor!");
+        } catch (err) {
+            console.error("Erro ao salvar regulamento:", err);
+            toast.error("Erro ao sincronizar com o Supabase.");
+        }
     };
 
-    const deleteRegulamento = (id: any) => {
-        const updated = regulamentos.filter(r => r.id !== id);
-        setRegulamentos(updated);
-        localStorage.setItem("conteffa_regulamentos", JSON.stringify(updated));
-        toast.success("Removido com sucesso!");
+    const deleteRegulamento = async (id: any) => {
+        try {
+            const updatedList = regulamentos.filter(r => r.id !== id);
+            setRegulamentos(updatedList);
+            
+            await supabase.from('config').upsert({
+                key: 'regulamentos_data',
+                value: JSON.stringify(updatedList),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+
+            toast.success("Regulamento removido.");
+        } catch (err) {
+            toast.error("Erro ao remover no servidor.");
+        }
     };
 
-    const saveCaderno = () => {
-        if (!newCaderno.name) return toast.error("Preencha o nome.");
-        const updated = newCaderno.id 
-            ? cadernos.map(c => c.id === newCaderno.id ? newCaderno : c)
-            : [{ ...newCaderno, id: Date.now() }, ...cadernos];
-        setCadernos(updated);
-        localStorage.setItem("conteffa_cadernos", JSON.stringify(updated));
-        setIsAddingCaderno(false);
-        toast.success("Salvo com sucesso!");
+    const saveCaderno = async () => {
+        if (!newCaderno.name) return toast.error("Preencha o nome do caderno.");
+        try {
+            let updatedList;
+            if (newCaderno.id) {
+                updatedList = cadernos.map(c => c.id === newCaderno.id ? newCaderno : c);
+            } else {
+                const item = { ...newCaderno, id: Date.now() };
+                updatedList = [item, ...cadernos];
+            }
+            
+            setCadernos(updatedList);
+            
+            const { error } = await supabase.from('config').upsert({
+                key: 'cadernos_data',
+                value: JSON.stringify(updatedList),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+
+            if (error) throw error;
+
+            setIsAddingCaderno(false);
+            setNewCaderno({ name: "", items: [] as any[], id: null as any });
+            toast.success("Cadernos salvos com sucesso na nuvem!");
+        } catch (err) {
+            console.error("Erro ao salvar caderno no Supabase:", err);
+            toast.error("Erro ao sincronizar com a nuvem.");
+        }
     };
 
-    const deleteCaderno = (id: any) => {
-        const updated = cadernos.filter(c => c.id !== id);
-        setCadernos(updated);
-        localStorage.setItem("conteffa_cadernos", JSON.stringify(updated));
-        toast.success("Removido com sucesso!");
+    const deleteCaderno = async (id: any) => {
+        try {
+            const updatedList = cadernos.filter(c => c.id !== id);
+            setCadernos(updatedList);
+            
+            await supabase.from('config').upsert({
+                key: 'cadernos_data',
+                value: JSON.stringify(updatedList),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+
+            toast.success("Caderno removido.");
+        } catch (err) {
+            toast.error("Erro ao remover no servidor.");
+        }
     };
 
     const addTeseToCaderno = () => {
@@ -602,18 +515,17 @@ const AdminDashboard = () => {
 
     const handleSaveEditedInscricao = async () => {
         try {
-            // 1. Save to Supabase via apiFetch
-            await apiFetch(`/registrations/${selectedInscricao.id}`, {
-                method: 'PUT',
-                body: JSON.stringify(selectedInscricao)
-            });
+            // 1. Save to Supabase - Sanitize first
+            const { id, acompanhantesNames, ...dataToUpdate } = selectedInscricao;
+            const { error } = await supabase
+                .from('registrations')
+                .update(dataToUpdate)
+                .eq('id', id);
 
-            // 2. Update local state and localStorage
-            const updatedInscricoes = inscricoes.map(insc =>
-                insc.id === selectedInscricao.id ? selectedInscricao : insc
-            );
-            setInscricoes(updatedInscricoes);
-            localStorage.setItem("conteffa_inscricoes", JSON.stringify(updatedInscricoes));
+            if (error) throw error;
+
+            // 2. Update local state
+            setInscricoes(prev => prev.map(insc => insc.id === selectedInscricao.id ? selectedInscricao : insc));
 
             setIsViewingInscricao(false);
             toast.success("Inscrição atualizada com sucesso!");
@@ -983,127 +895,131 @@ const AdminDashboard = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                // Fetch all data from backend
-                const [dbUsers, dbNews, dbSpeakers, dbProg, dbAlbums, dbGuests, dbInscricoes, dbMessages] = await Promise.all([
-                    apiFetch("/users").catch(() => []),
-                    apiFetch("/news").catch(() => []),
-                    apiFetch("/speakers").catch(() => []),
-                    apiFetch("/programming").catch(() => []),
-                    apiFetch("/albums").catch(() => []),
-                    apiFetch("/guests").catch(() => []),
-                    apiFetch("/registrations").catch(() => []),
-                    apiFetch("/messages").catch(() => [])
+                // Fetch all data from Supabase
+                const fetchTable = async (table: string, orderCol?: string, ascending = false) => {
+                    let query = supabase.from(table).select('*');
+                    if (orderCol) query = query.order(orderCol, { ascending });
+                    const { data, error } = await query;
+                    if (error) console.error(`Error fetching ${table}:`, error);
+                    return data || [];
+                };
+
+                const [
+                    dbUsers,
+                    dbNews,
+                    dbSpeakers,
+                    dbProg,
+                    dbAlbums,
+                    dbGuests,
+                    dbInscricoes,
+                    dbMessages,
+                    configData
+                ] = await Promise.all([
+                    fetchTable('users'),
+                    fetchTable('news', 'created_at', false),
+                    fetchTable('speakers'),
+                    fetchTable('programming', 'id', true),
+                    fetchTable('albums', 'id', false),
+                    fetchTable('guests'),
+                    fetchTable('registrations', 'id', false),
+                    fetchTable('messages', 'id', false),
+                    fetchTable('config')
                 ]);
 
-                if (dbMessages && Array.isArray(dbMessages)) {
-                    setMessages(dbMessages.sort((a: any, b: any) => b.id - a.id));
+                if (dbMessages) {
+                    setMessages(dbMessages);
                     setUnreadNotifications(dbMessages.filter((m: any) => !m.is_read).length);
+                }
+
+                // Load Config-based data (Instagram, Regulamentos, Cadernos, Goal, Clicks)
+                if (configData) {
+                    const insta = configData.find((c: any) => c.key === 'instagram');
+                    if (insta && insta.value) {
+                        try {
+                            const parsed = typeof insta.value === 'string' ? JSON.parse(insta.value) : insta.value;
+                            setInstagramConfig({
+                                handle: parsed.handle || "@anteffa_nacional",
+                                url: parsed.url || "https://instagram.com/anteffa_nacional",
+                                photos: parsed.photos || []
+                            });
+                        } catch (e) {
+                             setInstagramConfig({ handle: "@anteffa_nacional", url: "https://instagram.com/anteffa_nacional", photos: [] });
+                        }
+                    }
+
+                    const regs = configData.find((c: any) => c.key === 'regulamentos_data');
+                    if (regs && regs.value) {
+                        try {
+                            setRegulamentos(typeof regs.value === 'string' ? JSON.parse(regs.value) : regs.value);
+                        } catch (e) { /* ignore error */ }
+                    } else {
+                        // Default if not in DB
+                        setRegulamentos([
+                            { id: 9, name: "IX CONTEFFA", fileUrl: "" },
+                            { id: 8, name: "VIII CONTEFFA", fileUrl: "" },
+                            { id: 7, name: "VII CONTEFFA", fileUrl: "" },
+                            { id: 6, name: "VI CONTEFFA", fileUrl: "" },
+                            { id: 5, name: "V CONTEFFA", fileUrl: "" },
+                            { id: 4, name: "IV CONTEFFA", fileUrl: "" },
+                            { id: 3, name: "III CONTEFFA", fileUrl: "" },
+                            { id: 2, name: "II CONTEFFA", fileUrl: "" },
+                            { id: 1, name: "I CONTEFFA", fileUrl: "" },
+                        ]);
+                    }
+
+                    const cads = configData.find((c: any) => c.key === 'cadernos_data');
+                    if (cads && cads.value) {
+                        try {
+                            setCadernos(typeof cads.value === 'string' ? JSON.parse(cads.value) : cads.value);
+                        } catch (e) { /* ignore error */ }
+                    } else {
+                        setCadernos([
+                            { id: 9, name: "IX CONTEFFA", items: [] },
+                            { id: 8, name: "VIII CONTEFFA", items: [] },
+                            { id: 7, name: "VII CONTEFFA", items: [] },
+                            { id: 6, name: "VI CONTEFFA", items: [] },
+                            { id: 5, name: "V CONTEFFA", items: [] },
+                            { id: 4, name: "IV CONTEFFA", items: [] },
+                            { id: 3, name: "III CONTEFFA", items: [] },
+                            { id: 2, name: "II CONTEFFA", items: [] },
+                            { id: 1, name: "I CONTEFFA", items: [] },
+                        ]);
+                    }
+
+                    const goal = configData.find((c: any) => c.key === 'registration_goal');
+                    if (goal) {
+                        setRegistrationGoal(Number(goal.value));
+                        setTempGoal(Number(goal.value));
+                    }
+
+                    const clicks = configData.find((c: any) => c.key === 'ad_clicks');
+                    if (clicks) setAdClicks(Number(clicks.value));
+
+                    const ad = configData.find((c: any) => c.key === 'divulgacao');
+                    if (ad && ad.value) setAdImage(ad.value);
+                }
+
+                if (dbInscricoes && dbInscricoes.length > 0) {
+                    setInscricoes(dbInscricoes);
                 }
 
                 if (dbUsers && dbUsers.length > 0) {
                     setActiveUsers(dbUsers);
-                    // Sincroniza o perfil do usuário logado com os dados vindos do banco
                     const currentUser = dbUsers.find((u: any) => u.email === user.email || u.id === (user.id || 1));
                     if (currentUser) {
                         setUser(prev => ({ ...prev, ...currentUser }));
                     }
                 }
 
-                if (dbNews && dbNews.length > 0) {
-                    // Prioritiza dados do Supabase
-                    setNoticias(dbNews.sort((a: any, b: any) => {
-                        const valA = String(a.created_at || a.id || 0);
-                        const valB = String(b.created_at || b.id || 0);
-                        return valB.localeCompare(valA);
-                    }));
-                }
+                if (dbNews) setNoticias(dbNews);
+                if (dbSpeakers) setPalestrantes(dbSpeakers);
+                if (dbProg) setProgramacao(dbProg);
+                if (dbGuests) setConvidados(dbGuests);
+                if (dbAlbums) setAlbuns(dbAlbums);
 
-                if (dbSpeakers && dbSpeakers.length > 0) {
-                    setPalestrantes(prev => {
-                        const current = Array.isArray(prev) ? prev : [];
-                        const dbIds = new Set(dbSpeakers.map((s: any) => s.id));
-                        return [...dbSpeakers, ...current.filter(p => p && p.id && !dbIds.has(p.id))];
-                    });
-                }
-
-                if (dbProg && dbProg.length > 0) {
-                    setProgramacao(prev => {
-                        const current = Array.isArray(prev) ? prev : [];
-                        const dbLabels = new Set(dbProg.map((p: any) => p.label));
-                        return [...dbProg, ...current.filter(p => p && p.label && !dbLabels.has(p.label))];
-                    });
-                }
-
-                if (dbGuests && dbGuests.length > 0) {
-                    setConvidados(prev => {
-                        const current = Array.isArray(prev) ? prev : [];
-                        const dbIds = new Set(dbGuests.map((g: any) => g.id));
-                        return [...dbGuests, ...current.filter(p => p && p.id && !dbIds.has(p.id))];
-                    });
-                }
-
-                if (dbInscricoes && dbInscricoes.length > 0) setInscricoes(dbInscricoes);
-
-                if (dbAlbums && dbAlbums.length > 0) {
-                    setAlbuns(prev => {
-                        const current = Array.isArray(prev) ? prev : [];
-                        const dbIds = new Set(dbAlbums.map((a: any) => a.id));
-                        const merged = [...dbAlbums, ...current.filter(p => p && p.id && !dbIds.has(p.id))];
-                        return merged.sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0));
-                    });
-                }
-
-                try {
-                    const dbInsta = await apiFetch("/config/instagram");
-                    if (dbInsta) {
-                        setInstagramConfig({
-                            handle: dbInsta.handle || "@anteffa_nacional",
-                            url: dbInsta.url || "https://instagram.com/anteffa_nacional",
-                            photos: dbInsta.photos || []
-                        });
-                    }
-                } catch (e) {
-                    const localInsta = localStorage.getItem("conteffa_instagram");
-                    if (localInsta) {
-                        const parsed = JSON.parse(localInsta);
-                        setInstagramConfig({
-                            handle: parsed.handle || "@anteffa_nacional",
-                            url: parsed.url || "https://instagram.com/anteffa_nacional",
-                            photos: parsed.photos || []
-                        });
-                    }
-                }
-
-                try {
-                    const { data: adData } = await supabase.from('config').select('value').eq('key', 'divulgacao').maybeSingle();
-                    if (adData && adData.value) {
-                        setAdImage(adData.value);
-                    }
-                } catch (e) {
-                    const localAd = localStorage.getItem("conteffa_ad_image");
-                    if (localAd) setAdImage(localAd);
-                }
-
-                // Carregar Métricas e Metas da Nuvem (Supabase)
-                try {
-                    // 1. Meta de Inscrições
-                    const dbGoal = await apiFetch("/config/registration_goal");
-                    if (dbGoal) {
-                        setRegistrationGoal(Number(dbGoal));
-                        setTempGoal(Number(dbGoal));
-                    }
-
-                    // 2. Cliques de Divulgação
-                    const dbClicks = await apiFetch("/config/ad_clicks");
-                    if (dbClicks) {
-                        setAdClicks(Number(dbClicks));
-                    }
-                } catch (e) {
-                    console.warn("Erro ao carregar métricas da nuvem:", e);
-                }
             } catch (err) {
-                console.error("Failed to load backend data", err);
-                toast.error("Erro ao carregar dados do servidor. Verifique se o backend está rodando.");
+                console.error("Failed to load data from Supabase", err);
+                toast.error("Erro ao carregar dados do Supabase.");
             }
         };
 
@@ -1195,18 +1111,7 @@ const AdminDashboard = () => {
                     publicUrl = data.publicUrl;
                 }
 
-                // 2. Upload para o Servidor Local (para persistência local e PDFs)
-                const formData = new FormData();
-                formData.append('photo', file);
-
-                const response = await fetch('http://localhost:3001/api/upload', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                const localData = await response.json();
-                const finalUrl = localData.success ? localData.url : publicUrl;
-
+                const finalUrl = publicUrl;
                 if (!finalUrl) throw new Error("Falha no upload");
 
                 // 3. Atualizar o estado correspondente
@@ -1308,29 +1213,26 @@ const AdminDashboard = () => {
 
         try {
             if (newAlbum.id && newAlbum.id > 0) {
-                await apiFetch(`/albums/${newAlbum.id}`, { method: 'PUT', body: JSON.stringify(newAlbum) });
+                // Update
+                const { error } = await supabase.from('albums').update(newAlbum).eq('id', newAlbum.id);
+                if (error) throw error;
                 const updatedList = albuns.map((a: any) => a.id === newAlbum.id ? { ...a, ...newAlbum } : a);
-                const sorted = [...updatedList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0));
-                setAlbuns(sorted);
-                localStorage.setItem("conteffa_albuns", JSON.stringify(sorted));
+                setAlbuns([...updatedList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0)));
                 toast.success("Álbum atualizado!");
             } else {
-                const res = await apiFetch("/albums", { method: 'POST', body: JSON.stringify(newAlbum) });
-                const newList = [{ ...newAlbum, id: res.id, count: newAlbum.photos.length }, ...albuns.filter(a => a.id !== newAlbum.id)];
-                const sorted = [...newList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0));
-                setAlbuns(sorted);
-                localStorage.setItem("conteffa_albuns", JSON.stringify(sorted));
+                // Create
+                const { id, ...albumToSave } = newAlbum;
+                const { data, error } = await supabase.from('albums').insert([albumToSave]).select().single();
+                if (error) throw error;
+                const newList = [{ ...newAlbum, id: data.id, count: newAlbum.photos.length }, ...albuns];
+                setAlbuns([...newList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0)));
                 toast.success("Álbum criado com sucesso!");
             }
             setIsAddingAlbum(false);
             setNewAlbum({ title: "", date: "", location: "", cover: null, photos: [], id: null });
         } catch (err: any) {
-            const tempAlbum = { ...newAlbum, id: Date.now(), count: newAlbum.photos.length };
-            const newList = [tempAlbum, ...albuns];
-            setAlbuns([...newList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0)));
-            toast.success(`Salvo localmente. Motivo: ${err.message || "Servidor offline"}`);
-            setIsAddingAlbum(false);
-            setNewAlbum({ title: "", date: "", location: "", cover: null, photos: [], id: null });
+            console.error("Erro ao salvar álbum:", err);
+            toast.error("Erro ao sincronizar com o Supabase.");
         }
     };
 
@@ -1342,19 +1244,14 @@ const AdminDashboard = () => {
     const confirmDeleteAlbum = async () => {
         if (!albumToDelete) return;
         try {
-            await apiFetch(`/albums/${albumToDelete.id}`, { method: 'DELETE' });
+            const { error } = await supabase.from('albums').delete().eq('id', albumToDelete.id);
+            if (error) throw error;
             const updated = albuns.filter((a: any) => a.id !== albumToDelete.id);
             setAlbuns(updated);
-            localStorage.setItem("conteffa_albuns", JSON.stringify(updated));
             toast.success("Álbum removido.");
             setAlbumToDelete(null);
         } catch (err: any) {
-            console.warn("Falha ao remover do Supabase, removendo localmente:", err.message);
-            const updated = albuns.filter((a: any) => a.id !== albumToDelete.id);
-            setAlbuns(updated);
-            localStorage.setItem("conteffa_albuns", JSON.stringify(updated));
-            toast.success("Removido com sucesso (Limpado do navegador)");
-            setAlbumToDelete(null);
+            toast.error("Erro ao remover no Supabase.");
         }
     };
 
@@ -1367,23 +1264,24 @@ const AdminDashboard = () => {
         try {
             if (newUser.id) {
                 // Update existing user
-                await apiFetch(`/users/${newUser.id}`, { method: 'PUT', body: JSON.stringify(newUser) });
+                const { error } = await supabase.from('users').update(newUser).eq('id', newUser.id);
+                if (error) throw error;
 
                 const updatedUsers = activeUsers.map((u: any) =>
                     u.id === newUser.id ? { ...u, ...newUser } : u
                 );
                 setActiveUsers(updatedUsers);
 
-                // Se o usuário editado for o admin logado, atualizar o estado global do perfil também
-                if (newUser.id === 1 || newUser.email === user.email) {
+                if (newUser.id === user.id || newUser.email === user.email) {
                     setUser({ ...user, ...newUser });
                 }
 
                 toast.success("Usuário atualizado com sucesso!");
             } else {
                 // New user registration
-                const res = await apiFetch("/users", { method: 'POST', body: JSON.stringify(newUser) });
-                const userToAdd = { ...newUser, id: res.id, role: "editor", status: "Ativo" };
+                const { data, error } = await supabase.from('users').insert([{ ...newUser, role: "editor", status: "Ativo" }]).select().single();
+                if (error) throw error;
+                const userToAdd = { ...newUser, id: data.id, role: "editor", status: "Ativo" };
                 setActiveUsers([userToAdd, ...activeUsers]);
                 toast.success("Usuário cadastrado com sucesso!");
             }
@@ -1391,7 +1289,7 @@ const AdminDashboard = () => {
             setIsAddingUser(false);
             setNewUser({ name: "", email: "", password: "", phone: "", cargo: "", association: "", photo: null, id: null });
         } catch (err: any) {
-            toast.error(err.message || "Erro ao salvar usuário.");
+            toast.error("Erro ao salvar usuário no Supabase.");
         }
     };
 
@@ -1428,7 +1326,8 @@ const AdminDashboard = () => {
     const confirmDelete = async () => {
         if (userToDelete) {
             try {
-                await apiFetch(`/users/${userToDelete.id}`, { method: 'DELETE' });
+                const { error } = await supabase.from('users').delete().eq('id', userToDelete.id);
+                if (error) throw error;
                 setActiveUsers(activeUsers.filter((u: any) => u.id !== userToDelete.id));
                 toast.success(`Usuário ${userToDelete.name} removido.`);
                 setUserToDelete(null);
@@ -1441,31 +1340,30 @@ const AdminDashboard = () => {
     const confirmDeleteInscricao = async () => {
         if (!inscricaoToDelete) return;
         try {
-            await apiFetch(`/registrations/${inscricaoToDelete.id}`, { method: 'DELETE' });
+            const { error } = await supabase.from('registrations').delete().eq('id', inscricaoToDelete.id);
+            if (error) throw error;
             const updated = inscricoes.filter((i: any) => i.id !== inscricaoToDelete.id);
             setInscricoes(updated);
-            localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
-            toast.success("Inscrição removida com sucesso!");
+            toast.success("Inscrição removida do Supabase!");
             setInscricaoToDelete(null);
         } catch (err: any) {
-            console.warn("Falha ao remover do servidor, tentando localmente:", err.message);
-            const updated = inscricoes.filter((i: any) => i.id !== inscricaoToDelete.id);
-            setInscricoes(updated);
-            localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
-            toast.success("Inscrição removida localmente.");
-            setInscricaoToDelete(null);
+            toast.error("Erro ao remover no Supabase.");
         }
     };
 
     const handleUpdateGoal = async () => {
         try {
-            await apiFetch(`/config/registration_goal`, {
-                method: 'POST',
-                body: tempGoal
-            });
+            const { error } = await supabase.from('config').upsert({
+                key: 'registration_goal',
+                value: tempGoal.toString(),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+            
+            if (error) throw error;
+            
             setRegistrationGoal(tempGoal);
             setIsEditingGoal(false);
-            toast.success("Meta atualizada na nuvem!");
+            toast.success("Meta atualizada no Supabase!");
         } catch (err) {
             toast.error("Erro ao sincronizar meta.");
         }
@@ -1473,13 +1371,14 @@ const AdminDashboard = () => {
 
     const handleUpdateProfile = async () => {
         try {
-            await apiFetch(`/users/${user.id || 1}`, { method: 'PUT', body: JSON.stringify(user) });
-            // Garantir que a lista de usuários ativos também receba essas atualizações do admin
+            const { error } = await supabase.from('users').update(user).eq('id', user.id || 1);
+            if (error) throw error;
+            
             const updatedUsers = activeUsers.map((u: any) =>
                 (u.id === user.id || u.email === user.email) ? { ...u, ...user } : u
             );
             setActiveUsers(updatedUsers);
-            toast.success("Dados do perfil atualizados com sucesso!");
+            toast.success("Perfil atualizado no Supabase!");
         } catch (err) {
             toast.error("Erro ao atualizar perfil.");
         }
@@ -1496,19 +1395,16 @@ const AdminDashboard = () => {
             return;
         }
 
-        if (passwordData.newPassword.length < 6) {
-            toast.error("A senha deve ter pelo menos 6 caracteres.");
-            return;
-        }
-
         try {
-            await apiFetch(`/users/${user.id || 1}`, {
-                method: 'PUT',
-                body: JSON.stringify({ ...user, password: passwordData.newPassword })
-            });
+            const { error } = await supabase.from('users').update({
+                password: passwordData.newPassword
+            }).eq('id', user.id || 1);
+            
+            if (error) throw error;
+            
             setUser({ ...user, password: passwordData.newPassword });
             setPasswordData({ newPassword: "", confirmPassword: "" });
-            toast.success("Senha alterada com sucesso!");
+            toast.success("Senha atualizada no Supabase!");
         } catch (err) {
             toast.error("Erro ao alterar senha.");
         }
@@ -1522,42 +1418,24 @@ const AdminDashboard = () => {
 
         try {
             if (newNoticia.id) {
-                await apiFetch(`/news/${newNoticia.id}`, { method: 'PUT', body: JSON.stringify(newNoticia) });
+                const { error } = await supabase.from('news').update(newNoticia).eq('id', newNoticia.id);
+                if (error) throw error;
                 const updated = noticias.map((n: any) => n.id === newNoticia.id ? { ...n, ...newNoticia } : n);
                 setNoticias(updated);
-                toast.success("Matéria atualizada!");
+                toast.success("Notícia atualizada!");
             } else {
-                const res = await apiFetch("/news", { method: 'POST', body: JSON.stringify(newNoticia) });
-                const updated = [{ ...newNoticia, id: res.id, status: "Publicado" }, ...noticias];
+                const { id, ...noticiaToSave } = newNoticia;
+                const { data, error } = await supabase.from('news').insert([{ ...noticiaToSave, status: "Publicado" }]).select().single();
+                if (error) throw error;
+                const updated = [{ ...newNoticia, id: data.id, status: "Publicado" }, ...noticias];
                 setNoticias(updated);
-                toast.success("Matéria publicada!");
+                toast.success("Notícia publicada!");
             }
 
             setIsAddingNoticia(false);
-            setNewNoticia({
-                title: "",
-                summary: "",
-                tags: "",
-                date: new Date().toLocaleDateString('pt-BR'),
-                status: "Rascunho",
-                photo: null,
-                id: null
-            });
+            setNewNoticia({ title: "", summary: "", tags: "", date: new Date().toLocaleDateString('pt-BR'), status: "Rascunho", photo: null, id: null });
         } catch (err: any) {
-            const tempNoticia = { ...newNoticia, id: Date.now(), status: "Publicado" };
-            const updated = [tempNoticia, ...noticias];
-            setNoticias(updated);
-            toast.success(`Salvo localmente. Motivo: ${err.message || "Servidor offline"}`);
-            setIsAddingNoticia(false);
-            setNewNoticia({
-                title: "",
-                summary: "",
-                tags: "",
-                date: new Date().toLocaleDateString('pt-BR'),
-                status: "Rascunho",
-                photo: null,
-                id: null
-            });
+            toast.error("Erro ao salvar notícia no Supabase.");
         }
     };
 
@@ -1568,17 +1446,13 @@ const AdminDashboard = () => {
 
     const handleDeleteNoticia = async (id: number) => {
         try {
-            await apiFetch(`/news/${id}`, { method: 'DELETE' });
+            const { error } = await supabase.from('news').delete().eq('id', id);
+            if (error) throw error;
             const updated = noticias.filter((n: any) => n.id !== id);
             setNoticias(updated);
-            localStorage.setItem("conteffa_noticias", JSON.stringify(updated));
-            toast.success("Matéria removida.");
+            toast.success("Notícia removida!");
         } catch (err: any) {
-            console.warn("Falha ao remover do Supabase, removendo localmente:", err.message);
-            const updated = noticias.filter((n: any) => n.id !== id);
-            setNoticias(updated);
-            localStorage.setItem("conteffa_noticias", JSON.stringify(updated));
-            toast.success("Removido com sucesso (Limpado do navegador)");
+            toast.error("Erro ao remover notícia.");
         }
     };
 
@@ -1590,38 +1464,24 @@ const AdminDashboard = () => {
 
         try {
             if (newPalestrante.id) {
-                await apiFetch(`/speakers/${newPalestrante.id}`, { method: 'PUT', body: JSON.stringify(newPalestrante) });
+                const { error } = await supabase.from('speakers').update(newPalestrante).eq('id', newPalestrante.id);
+                if (error) throw error;
                 const updated = palestrantes.map((p: any) => p.id === newPalestrante.id ? { ...p, ...newPalestrante } : p);
                 setPalestrantes(updated);
-                localStorage.setItem("conteffa_palestrantes", JSON.stringify(updated));
                 toast.success("Palestrante atualizado!");
             } else {
-                const res = await apiFetch("/speakers", { method: 'POST', body: JSON.stringify(newPalestrante) });
-                const updated = [...palestrantes, { ...newPalestrante, id: res.id }];
+                const { id, ...palestranteToSave } = newPalestrante;
+                const { data, error } = await supabase.from('speakers').insert([palestranteToSave]).select().single();
+                if (error) throw error;
+                const updated = [...palestrantes, { ...newPalestrante, id: data.id }];
                 setPalestrantes(updated);
-                localStorage.setItem("conteffa_palestrantes", JSON.stringify(updated));
                 toast.success("Palestrante cadastrado!");
             }
 
             setIsAddingPalestrante(false);
-            setNewPalestrante({
-                name: "",
-                cargo: "",
-                bio: "",
-                instagram: "",
-                linkedin: "",
-                twitter: "",
-                photo: null,
-                id: null
-            });
+            setNewPalestrante({ name: "", cargo: "", bio: "", instagram: "", linkedin: "", twitter: "", photo: null, id: null });
         } catch (err: any) {
-            console.warn("Falha ao salvar no Supabase, usando local storage:", err.message);
-            const tempSpeaker = { ...newPalestrante, id: Date.now() };
-            const updated = [...palestrantes, tempSpeaker];
-            setPalestrantes(updated);
-            localStorage.setItem("conteffa_palestrantes", JSON.stringify(updated));
-            toast.warning(`Salvo no navegador. Motivo: ${err.message}`);
-            setIsAddingPalestrante(false);
+            toast.error("Erro ao salvar palestrante no Supabase.");
         }
     };
 
@@ -1632,17 +1492,13 @@ const AdminDashboard = () => {
 
     const handleDeletePalestrante = async (id: number) => {
         try {
-            await apiFetch(`/speakers/${id}`, { method: 'DELETE' });
+            const { error } = await supabase.from('speakers').delete().eq('id', id);
+            if (error) throw error;
             const updated = palestrantes.filter((p: any) => p.id !== id);
             setPalestrantes(updated);
-            localStorage.setItem("conteffa_palestrantes", JSON.stringify(updated));
-            toast.success("Palestrante removido.");
+            toast.success("Palestrante removido!");
         } catch (err: any) {
-            console.warn("Falha ao remover do Supabase, removendo localmente:", err.message);
-            const updated = palestrantes.filter((p: any) => p.id !== id);
-            setPalestrantes(updated);
-            localStorage.setItem("conteffa_palestrantes", JSON.stringify(updated));
-            toast.success("Removido com sucesso (Limpado do navegador)");
+            toast.error("Erro ao remover palestrante.");
         }
     };
 
@@ -1654,26 +1510,25 @@ const AdminDashboard = () => {
 
         try {
             if (newConvidado.id) {
-                await apiFetch(`/guests/${newConvidado.id}`, { method: 'PUT', body: JSON.stringify(newConvidado) });
+                const { id, ...dataToUpdate } = newConvidado;
+                const { error } = await supabase.from('guests').update(dataToUpdate).eq('id', id);
+                if (error) throw error;
                 const updated = convidados.map((c: any) => c.id === newConvidado.id ? { ...newConvidado } : c);
                 setConvidados(updated);
-                localStorage.setItem("conteffa_convidados", JSON.stringify(updated));
-                toast.success("Convidado atualizado!");
+                toast.success("Membro da Comissão atualizado!");
             } else {
-                const res = await apiFetch("/guests", { method: 'POST', body: JSON.stringify(newConvidado) });
-                const guestToAdd = { ...newConvidado, id: res.id };
-                const updated = [...convidados, guestToAdd];
+                const { id, ...convidadoToSave } = newConvidado;
+                const { data, error } = await supabase.from('guests').insert([convidadoToSave]).select().single();
+                if (error) throw error;
+                const updated = [...convidados, { ...newConvidado, id: data.id }];
                 setConvidados(updated);
-                localStorage.setItem("conteffa_convidados", JSON.stringify(updated));
-                toast.success("Convidado cadastrado!");
+                toast.success("Membro da Comissão cadastrado!");
             }
 
             setIsAddingConvidado(false);
             setNewConvidado({ name: "", cargo: "", category: "Convidado", bio: "", photo: null, id: null });
         } catch (err: any) {
-            localStorage.setItem("conteffa_convidados", JSON.stringify([...convidados, { ...newConvidado, id: Date.now() }]));
-            toast.success(`Salvo localmente. Motivo: ${err.message || "Servidor offline"}`);
-            setIsAddingConvidado(false);
+            toast.error("Erro ao salvar convidado no Supabase.");
         }
     };
 
@@ -1684,17 +1539,13 @@ const AdminDashboard = () => {
 
     const handleDeleteConvidado = async (id: number) => {
         try {
-            await apiFetch(`/guests/${id}`, { method: 'DELETE' });
+            const { error } = await supabase.from('guests').delete().eq('id', id);
+            if (error) throw error;
             const updated = convidados.filter((c: any) => c.id !== id);
             setConvidados(updated);
-            localStorage.setItem("conteffa_convidados", JSON.stringify(updated));
-            toast.success("Convidado removido.");
+            toast.success("Convidado removido!");
         } catch (err: any) {
-            console.warn("Falha ao remover do Supabase, removendo localmente:", err.message);
-            const updated = convidados.filter((c: any) => c.id !== id);
-            setConvidados(updated);
-            localStorage.setItem("conteffa_convidados", JSON.stringify(updated));
-            toast.success("Removido com sucesso (Limpado do navegador)");
+            toast.error("Erro ao remover convidado.");
         }
     };
 
@@ -1706,34 +1557,24 @@ const AdminDashboard = () => {
 
         try {
             if (newProgramacao.id) {
-                await apiFetch(`/programming/${newProgramacao.id}`, { method: 'PUT', body: JSON.stringify(newProgramacao) });
+                const { error } = await supabase.from('programming').update(newProgramacao).eq('id', newProgramacao.id);
+                if (error) throw error;
                 const updated = programacao.map((p: any) => p.id === newProgramacao.id ? { ...p, ...newProgramacao } : p);
                 setProgramacao(updated);
-                localStorage.setItem("conteffa_programacao", JSON.stringify(updated));
                 toast.success("Agenda atualizada!");
             } else {
-                const res = await apiFetch("/programming", { method: 'POST', body: JSON.stringify(newProgramacao) });
-                const updated = [...programacao, { ...newProgramacao, id: res.id }];
+                const { id, ...progToSave } = newProgramacao;
+                const { data, error } = await supabase.from('programming').insert([progToSave]).select().single();
+                if (error) throw error;
+                const updated = [...programacao, { ...newProgramacao, id: data.id }];
                 setProgramacao(updated);
-                localStorage.setItem("conteffa_programacao", JSON.stringify(updated));
                 toast.success("Dia cadastrado!");
             }
 
             setIsAddingProgramacao(false);
             setNewProgramacao({ date: "", label: "", items: [], id: null });
         } catch (err: any) {
-            let updated;
-            if (newProgramacao.id) {
-                updated = programacao.map((p: any) => p.id === newProgramacao.id ? { ...p, ...newProgramacao } : p);
-            } else {
-                const tempDay = { ...newProgramacao, id: Date.now() };
-                updated = [...programacao, tempDay];
-            }
-            setProgramacao(updated);
-            localStorage.setItem("conteffa_programacao", JSON.stringify(updated));
-            toast.success(`Salvo localmente. ${err.message ? `Motivo: ${err.message}` : "Servidor offline"}`);
-            setIsAddingProgramacao(false);
-            setNewProgramacao({ date: "", label: "", items: [], id: null });
+            toast.error("Erro ao salvar programação no Supabase.");
         }
     };
 
@@ -1792,31 +1633,30 @@ const AdminDashboard = () => {
 
     const handleDeleteProgramacao = async (id: number) => {
         try {
-            await apiFetch(`/programming/${id}`, { method: 'DELETE' });
+            const { error } = await supabase.from('programming').delete().eq('id', id);
+            if (error) throw error;
             const updated = programacao.filter((p: any) => p.id !== id);
             setProgramacao(updated);
-            localStorage.setItem("conteffa_programacao", JSON.stringify(updated));
-            toast.success("Dia removido.");
+            toast.success("Dia removido!");
         } catch (err: any) {
-            console.warn("Falha ao remover do Supabase, removendo localmente:", err.message);
-            const updated = programacao.filter((p: any) => p.id !== id);
-            setProgramacao(updated);
-            localStorage.setItem("conteffa_programacao", JSON.stringify(updated));
-            toast.success("Agenda limpa localmente.");
+            toast.error("Erro ao remover dia.");
         }
     };
 
     const handleSaveInstagram = async () => {
         try {
-            await apiFetch("/config/instagram", {
-                method: 'POST',
-                body: JSON.stringify(instagramConfig)
-            });
-            localStorage.setItem("conteffa_instagram", JSON.stringify(instagramConfig));
-            toast.success("Configuração do Instagram atualizada!");
+            const { error } = await supabase.from('config').upsert({
+                key: 'instagram',
+                value: JSON.stringify(instagramConfig),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+
+            if (error) throw error;
+
+            toast.success("Galeria do Instagram atualizada com sucesso!");
         } catch (err) {
-            localStorage.setItem("conteffa_instagram", JSON.stringify(instagramConfig));
-            toast.success("Salvo localmente (Servidor offline)");
+            console.error("Erro ao salvar Instagram no Supabase:", err);
+            toast.error("Erro ao sincronizar galeria com a nuvem.");
         }
     };
 
@@ -1830,11 +1670,10 @@ const AdminDashboard = () => {
 
             if (error) throw error;
 
-            localStorage.setItem("conteffa_ad_image", adImage || "");
-            toast.success("Banner de divulgação atualizado!");
+            toast.success("Banner de divulgação atualizado no Supabase!");
         } catch (err) {
-            localStorage.setItem("conteffa_ad_image", adImage || "");
-            toast.success("Salvo localmente (Erro ao subir)");
+            console.error("Erro ao salvar banner no Supabase:", err);
+            toast.error("Erro ao subir banner para a nuvem.");
         }
     };
 
@@ -1918,7 +1757,7 @@ const AdminDashboard = () => {
             </motion.aside>
 
             {/* Main Content */}
-            <main className="flex-1 bg-[#0C1A32] relative overflow-hidden flex flex-col h-screen text-slate-100">
+            <main className="flex-1 bg-[#0C1A32] relative flex flex-col min-h-screen text-slate-100">
                 {/* Top Header */}
                 <header className="bg-[#122442]/95 backdrop-blur-md px-8 py-6 border-b border-white/5 flex items-center justify-between sticky top-0 z-30 shadow-lg">
                     <h1 className="text-2xl font-heading font-black text-white">
@@ -2000,7 +1839,7 @@ const AdminDashboard = () => {
                 </header>
 
                 {/* Dynamic Content Area */}
-                <div className="flex-1 overflow-auto p-8 relative">
+                <div className="flex-1 p-8 relative">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={activeTab}
@@ -3617,7 +3456,7 @@ const AdminDashboard = () => {
                                                     setNewRegulamento({ name: "", fileUrl: "", id: null as any });
                                                     setIsAddingRegulamento(true);
                                                 } else {
-                                                    setNewCaderno({ name: "", items: [], id: null as any });
+                                                    setNewCaderno({ name: "", items: [] as any[], id: null as any });
                                                     setNewTese({ title: "", author: "", fileUrl: "" });
                                                     setIsAddingCaderno(true);
                                                 }
@@ -3654,7 +3493,12 @@ const AdminDashboard = () => {
                                                         <BookOpen />
                                                     </div>
                                                     <h4 className="text-white font-bold text-lg mb-1">{cad.name}</h4>
-                                                    <p className="text-white/40 text-[11px] font-bold tracking-widest uppercase">{cad.items?.length || 0} Teses</p>
+                                                    <p className="text-white/40 text-[11px] font-bold tracking-widest uppercase">
+                                                        {cad.items?.length || 0} Teses
+                                                        {cad.items?.some((i: any) => i.fileUrl) && (
+                                                            <span className="ml-2 bg-emerald-500/20 text-emerald-400 text-[8px] px-2 py-0.5 rounded-full border border-emerald-500/30">COM PDF</span>
+                                                        )}
+                                                    </p>
                                                 </div>
                                                 <div className="mt-6 flex justify-between gap-2">
                                                     <Button variant="ghost" className="flex-1 border border-primary/30 text-primary hover:bg-primary/20 h-8 text-xs font-bold rounded-lg" onClick={() => { setNewCaderno(cad); setIsAddingCaderno(true); }}>Editar</Button>
@@ -3766,7 +3610,15 @@ const AdminDashboard = () => {
                                                                 <td className="px-6 py-5 font-medium">{insc.email}</td>
                                                                 <td className="px-6 py-5 opacity-60">{insc.data}</td>
                                                                 <td className="px-6 py-5">
-                                                                    <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">{insc.status}</span>
+                                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                                                                        (insc.status || "PENDENTE").toUpperCase() === "APROVADO" 
+                                                                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                                                                        : (insc.status || "PENDENTE").toUpperCase() === "REPROVADO"
+                                                                        ? "bg-red-500/10 text-red-400 border-red-500/20"
+                                                                        : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                                                    }`}>
+                                                                        {insc.status || "PENDENTE"}
+                                                                    </span>
                                                                 </td>
                                                                 <td className="px-6 py-5">
                                                                     <div className="flex items-center gap-2">
@@ -4705,14 +4557,26 @@ const AdminDashboard = () => {
                         <div className="space-y-4">
                             <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Arquivo PDF do Regulamento</label>
                             
-                            <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-xl">
-                                <label className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/80 transition-colors text-white text-xs font-bold uppercase tracking-widest py-3 px-6 rounded-lg cursor-pointer">
-                                    <Upload className="w-4 h-4" /> Enviar PDF
-                                    <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handlePdfUpload(e, 'regulamento')} />
-                                </label>
-                                <span className="text-xs text-white/50 truncate flex-1">
-                                    {newRegulamento.fileUrl ? (newRegulamento.fileUrl.startsWith('data:') ? 'Arquivo PDF carregado (Local)' : 'Arquivo PDF salvo na nuvem') : 'Nenhum arquivo selecionado'}
-                                </span>
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-xl">
+                                    <label className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/80 transition-colors text-white text-xs font-bold uppercase tracking-widest py-3 px-6 rounded-lg cursor-pointer">
+                                        <Upload className="w-4 h-4" /> Enviar PDF
+                                        <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handlePdfUpload(e, 'regulamento')} />
+                                    </label>
+                                    <span className="text-xs text-white/50 truncate flex-1">
+                                        {newRegulamento.fileUrl ? (newRegulamento.fileUrl.startsWith('data:') ? 'Arquivo PDF carregado (Local)' : 'Arquivo PDF salvo na nuvem') : 'Nenhum arquivo selecionado'}
+                                    </span>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-1">Ou cole o Link direto do PDF</label>
+                                    <Input
+                                        value={newRegulamento.fileUrl}
+                                        onChange={(e) => setNewRegulamento({ ...newRegulamento, fileUrl: e.target.value })}
+                                        className="h-12 bg-white/5 border-white/10 text-white rounded-xl px-4 text-xs"
+                                        placeholder="https://exemplo.com/regulamento.pdf"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -4760,14 +4624,26 @@ const AdminDashboard = () => {
                                     className="bg-black/20 border-white/5 text-white"
                                     placeholder="Autor(es)"
                                 />
-                                <div className="md:col-span-2 flex items-center gap-4 bg-black/20 border border-white/5 p-3 rounded-xl">
-                                    <label className="flex items-center justify-center gap-2 bg-primary/20 hover:bg-primary/40 border border-primary/30 transition-colors text-primary text-xs font-bold uppercase tracking-widest py-2 px-6 rounded-lg cursor-pointer">
-                                        <Upload className="w-4 h-4" /> PDF da Tese
-                                        <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handlePdfUpload(e, 'tese')} />
-                                    </label>
-                                    <span className="text-xs text-white/50 truncate flex-1 leading-tight">
-                                        {newTese.fileUrl ? (newTese.fileUrl.startsWith('data:') ? 'PDF Carregado (Local)' : 'PDF na Nuvem') : 'Nenhum selecionado'}
-                                    </span>
+                                <div className="md:col-span-2 space-y-4">
+                                    <div className="flex items-center gap-4 bg-black/20 border border-white/5 p-3 rounded-xl">
+                                        <label className="flex items-center justify-center gap-2 bg-primary/20 hover:bg-primary/40 border border-primary/30 transition-colors text-primary text-xs font-bold uppercase tracking-widest py-2 px-6 rounded-lg cursor-pointer">
+                                            <Upload className="w-4 h-4" /> PDF da Tese
+                                            <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handlePdfUpload(e, 'tese')} />
+                                        </label>
+                                        <span className="text-xs text-white/50 truncate flex-1 leading-tight">
+                                            {newTese.fileUrl ? (newTese.fileUrl.startsWith('data:') ? 'PDF Carregado (Local)' : 'PDF na Nuvem') : 'Nenhum selecionado'}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-1">Ou cole o Link da Tese</label>
+                                        <Input
+                                            value={newTese.fileUrl}
+                                            onChange={(e) => setNewTese({ ...newTese, fileUrl: e.target.value })}
+                                            className="h-10 bg-black/20 border-white/5 text-white text-xs"
+                                            placeholder="Link do PDF da tese..."
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             <Button onClick={addTeseToCaderno} className="w-full gap-2 font-bold"><Plus className="w-4 h-4"/> Adicionar Tese</Button>

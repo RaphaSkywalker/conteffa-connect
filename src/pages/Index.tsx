@@ -69,6 +69,7 @@ const Index = () => {
   const [palestrantes, setPalestrantes] = useState<any[]>([]);
   const [noticias, setNoticias] = useState<any[]>([]);
   const [inscritosCount, setInscritosCount] = useState(0);
+  const [tesesCount, setTesesCount] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: 'left' | 'right') => {
@@ -99,6 +100,29 @@ const Index = () => {
         const regCount = regs ? regs.length : 0;
         if (regError) {
           console.error("Erro ao carregar inscritos:", regError.message);
+        }
+
+        // 4. Contagem de Teses (PDFs em Cadernos) do Supabase
+        const { data: configData } = await supabase.from('config').select('*');
+        if (configData) {
+          const cadsEntry = configData.find((c: any) => c.key === 'cadernos_data');
+          if (cadsEntry && cadsEntry.value) {
+            try {
+              const cadsArr = typeof cadsEntry.value === 'string' ? JSON.parse(cadsEntry.value) : cadsEntry.value;
+              let totalPDFs = 0;
+              if (Array.isArray(cadsArr)) {
+                cadsArr.forEach((c: any) => {
+                  if (c.items && Array.isArray(c.items)) {
+                    // Conta apenas itens que têm fileUrl (PDF)
+                    totalPDFs += c.items.filter((item: any) => item.fileUrl && item.fileUrl.trim() !== "").length;
+                  }
+                });
+              }
+              setTesesCount(totalPDFs);
+            } catch (e) {
+              console.error("Erro ao processar contagem de teses:", e);
+            }
+          }
         }
 
         if (speakersData && speakersData.length > 0) {
@@ -190,6 +214,11 @@ const Index = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'registrations' },
+        () => fetchAllData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'config' },
         () => fetchAllData()
       )
       .subscribe();
@@ -449,7 +478,7 @@ const Index = () => {
               { icon: Users, value: String(inscritosCount), label: "Inscritos" },
               { icon: Mic, value: String(palestrantes.length), label: "Palestrantes" },
               { icon: CalendarDays, value: "5", label: "Dias de Evento" },
-              { icon: FileText, value: "80+", label: "Teses" },
+              { icon: FileText, value: String(tesesCount), label: "Teses" },
             ].map((stat, i) => (
               <motion.div
                 key={stat.label}
@@ -566,7 +595,7 @@ const Index = () => {
                 variant="secondary"
                 className="font-body font-medium text-[15px] px-10 h-12 rounded-full hover:scale-105 transition-transform shadow-2xl shadow-black/20 uppercase tracking-widest"
               >
-                GARANTIR INSCRIÇÃO
+                FAÇA SUA INSCRIÇÃO
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>

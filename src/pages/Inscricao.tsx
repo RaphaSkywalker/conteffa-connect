@@ -20,39 +20,42 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle, Camera, User, Mail, Phone, MapPin, Info, AlertCircle, Check, Hotel } from "lucide-react";
+import { CheckCircle, Camera, User, Mail, Phone, MapPin, Info, AlertCircle, Check, Hotel, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+
+const initialFormState = {
+  foto: null as string | null,
+  nomeCompleto: "",
+  endereco: "",
+  bairro: "",
+  cidade: "",
+  cep: "",
+  ateffa: "",
+  telefone: "",
+  celularWhatsapp: "",
+  email: "",
+  cargo: "",
+  formaDeslocamento: "",
+  problemaSaude: "NÃO",
+  qualSaude: "",
+  cuidadosEspeciais: "NÃO",
+  quaisCuidados: "",
+  acompanhantes: "NÃO",
+  parentesco: "",
+  quantosAcompanhantes: "",
+  nomeAcompanhante: "",
+  acompanhantesNames: [] as string[],
+  cpf: "",
+  dataNascimento: "",
+  tamanhoCamiseta: "",
+  hotel: "MarHotel",
+  qualHotel: "",
+};
 
 const Inscricao = () => {
   const [submitted, setSubmitted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState({
-    foto: null as string | null,
-    nomeCompleto: "",
-    endereco: "",
-    bairro: "",
-    cidade: "",
-    cep: "",
-    ateffa: "",
-    telefone: "",
-    celularWhatsapp: "",
-    email: "",
-    cargo: "",
-    formaDeslocamento: "",
-    problemaSaude: "NÃO",
-    qualSaude: "",
-    cuidadosEspeciais: "NÃO",
-    quaisCuidados: "",
-    acompanhantes: "NÃO",
-    parentesco: "",
-    quantosAcompanhantes: "",
-    nomeAcompanhante: "",
-    cpf: "",
-    dataNascimento: "",
-    tamanhoCamiseta: "",
-    hotel: "MarHotel",
-    qualHotel: "",
-  });
+  const [form, setForm] = useState(initialFormState);
 
   const maskCPF = (value: string) => {
     return value
@@ -91,21 +94,7 @@ const Inscricao = () => {
           .from('media')
           .getPublicUrl(filePath);
 
-        // 2. Upload to Local Server
-        const formData = new FormData();
-        formData.append('photo', file);
-
-        const response = await fetch('http://localhost:3001/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        const localData = await response.json();
-
-        // Use local URL if successful, otherwise fallback to Supabase
-        const finalUrl = localData.success ? localData.url : publicUrl;
-
-        setForm({ ...form, foto: finalUrl });
+        setForm({ ...form, foto: publicUrl });
         toast.success("Foto carregada com sucesso!", { id: "upload" });
       } catch (err) {
         console.error("Erro no upload:", err);
@@ -123,20 +112,32 @@ const Inscricao = () => {
 
     try {
       // Prepare data to save
+      // join companion names into the main string for storage
+      const finalNomeAcompanhante = form.acompanhantesNames.filter(n => n.trim()).join(", ");
+      
       const newInscricao = {
         ...form,
+        nomeAcompanhante: finalNomeAcompanhante,
         data: new Date().toLocaleDateString('pt-BR'),
         status: "Pendente"
       };
 
-      // Save to Supabase
-      const { data: dbData, error } = await supabase.from('registrations').insert([newInscricao]).select();
+      // Ensure we don't save the extra UI array properties to DB if we want clean data
+      delete (newInscricao as any).acompanhantesNames;
+
+      // 1. Save to Supabase
+      const { data: dbData, error } = await supabase
+        .from('registrations')
+        .insert([newInscricao])
+        .select()
+        .single();
+
       if (error) throw error;
 
       // Also save to localStorage for fallback/resilience
       const saved = localStorage.getItem("conteffa_inscricoes");
       const current = saved ? JSON.parse(saved) : [];
-      const updated = [...current, { ...newInscricao, id: dbData?.[0]?.id || Date.now() }];
+      const updated = [...current, { ...newInscricao, id: dbData?.id || Date.now() }];
       localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
 
       // Trigger Success Modal
@@ -145,14 +146,19 @@ const Inscricao = () => {
     } catch (err) {
       console.error("Erro ao salvar inscrição:", err);
       // Fallback to local storage if DB fails
+      const finalNomeAcompanhante = form.acompanhantesNames.filter(n => n.trim()).join(", ");
+      const newInscricao = { ...form, nomeAcompanhante: finalNomeAcompanhante, id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), status: "Pendente" };
+      delete (newInscricao as any).acompanhantesNames;
+      
       const saved = localStorage.getItem("conteffa_inscricoes");
       const current = saved ? JSON.parse(saved) : [];
-      const updated = [...current, { ...form, id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), status: "Pendente" }];
+      const updated = [...current, newInscricao];
       localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
 
       setSubmitted(true);
       toast.success("Inscrito salvo no navegador.");
     }
+
   };
 
 
@@ -291,7 +297,14 @@ const Inscricao = () => {
                 {/* ATEFFA */}
                 <div className="md:col-span-2 space-y-2">
                   <Label className="text-sm font-bold text-white ml-1">ATEFFA</Label>
-                  <Select onValueChange={(v) => setForm({ ...form, ateffa: v })}>
+                  <Select onValueChange={(v) => {
+                    const isDisabling = ["Palestrante", "Colaborador", "Convidado", "Apoio Operacional"].includes(v);
+                    setForm({ 
+                      ...form, 
+                      ateffa: v,
+                      cargo: isDisabling ? "" : form.cargo 
+                    });
+                  }}>
                     <SelectTrigger className={`h-14 rounded-xl bg-white/5 border-white/10 focus:ring-primary/50 ${form.ateffa ? "text-white" : "text-white/20"}`}>
                       <SelectValue placeholder="Selecione a Associação Vinculada" />
                     </SelectTrigger>
@@ -313,7 +326,7 @@ const Inscricao = () => {
                       <SelectItem value="ATEFFA/Região Nordeste">ATEFFA/Região Nordeste</SelectItem>
                       <SelectItem value="Diretoria Executiva">Diretoria Executiva</SelectItem>
                       <SelectItem value="Palestrante">Palestrante</SelectItem>
-                      <SelectItem value="Funcionário">Funcionário</SelectItem>
+                      <SelectItem value="Colaborador">Colaborador</SelectItem>
                       <SelectItem value="Convidado">Convidado</SelectItem>
                       <SelectItem value="Apoio Operacional">Apoio Operacional</SelectItem>
                     </SelectContent>
@@ -364,10 +377,14 @@ const Inscricao = () => {
 
                 {/* Cargo */}
                 <div className="md:col-span-2 space-y-2">
-                  <Label className="text-sm font-bold text-white ml-1">Cargo</Label>
-                  <Select onValueChange={(v) => setForm({ ...form, cargo: v })}>
-                    <SelectTrigger className={`h-14 rounded-xl bg-white/5 border-white/10 focus:ring-primary/50 ${form.cargo ? "text-white" : "text-white/20"}`}>
-                      <SelectValue placeholder="Selecione seu cargo" />
+                  <Label className={`text-sm font-bold text-white ml-1 ${["Palestrante", "Colaborador", "Convidado", "Apoio Operacional"].includes(form.ateffa) ? "opacity-30" : ""}`}>Cargo</Label>
+                  <Select 
+                    value={form.cargo}
+                    onValueChange={(v) => setForm({ ...form, cargo: v })}
+                    disabled={["Palestrante", "Colaborador", "Convidado", "Apoio Operacional"].includes(form.ateffa)}
+                  >
+                    <SelectTrigger className={`h-14 rounded-xl bg-white/5 border-white/10 focus:ring-primary/50 transition-all ${form.cargo ? "text-white" : "text-white/20"} disabled:opacity-30`}>
+                      <SelectValue placeholder={["Palestrante", "Colaborador", "Convidado", "Apoio Operacional"].includes(form.ateffa) ? "Não aplicável para esta categoria" : "Selecione seu cargo"} />
                     </SelectTrigger>
                     <SelectContent className="bg-[#122442] border-white/10 text-white shadow-2xl">
                       <SelectItem value="Agente de Atividades Agropecuária">Agente de Atividades Agropecuária</SelectItem>
@@ -512,7 +529,14 @@ const Inscricao = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-2">
                       <Label className="text-sm font-bold text-white ml-1">Possui Acompanhante(s)?</Label>
-                      <Select onValueChange={(v) => setForm({ ...form, acompanhantes: v })} defaultValue="NÃO">
+                      <Select onValueChange={(v) => {
+                        setForm({ 
+                          ...form, 
+                          acompanhantes: v,
+                          quantosAcompanhantes: v === "NÃO" ? "" : "0",
+                          acompanhantesNames: []
+                        });
+                      }} defaultValue="NÃO">
                         <SelectTrigger className="h-14 rounded-2xl bg-white/5 border-white/10 text-white">
                           <SelectValue />
                         </SelectTrigger>
@@ -535,31 +559,92 @@ const Inscricao = () => {
                         <SelectContent className="bg-[#122442] border-white/10 text-white shadow-2xl">
                           <SelectItem value="Esposa(o)">Esposa(o)</SelectItem>
                           <SelectItem value="Filho(a)">Filho(a)</SelectItem>
+                          <SelectItem value="Outros">Outros</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
                       <Label className="text-sm font-bold text-white ml-1">Quantos?</Label>
-                      <Input
-                        disabled={form.acompanhantes === "NÃO"}
-                        type="number"
-                        min="0"
-                        value={form.quantosAcompanhantes}
-                        onChange={(e) => setForm({ ...form, quantosAcompanhantes: e.target.value })}
-                        className="h-14 rounded-2xl bg-white/5 border-white/10 text-white focus:border-primary/50 disabled:opacity-30"
-                      />
+                      <div className="relative group">
+                        <Input
+                          disabled={form.acompanhantes === "NÃO"}
+                          type="number"
+                          min="0"
+                          max="10"
+                          value={form.quantosAcompanhantes}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const count = parseInt(val) || 0;
+                            
+                            // update array size
+                            let newNames = [...form.acompanhantesNames];
+                            if (count > newNames.length) {
+                               newNames = [...newNames, ...Array(count - newNames.length).fill("")];
+                            } else if (count < newNames.length) {
+                               newNames = newNames.slice(0, count);
+                            }
+                            
+                            setForm({ 
+                              ...form, 
+                              quantosAcompanhantes: val,
+                              acompanhantesNames: newNames
+                            });
+                          }}
+                          className="h-14 rounded-2xl bg-white/5 border-white/10 text-white focus:border-primary/50 disabled:opacity-30 pr-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
+                        />
+                        <div className="absolute right-0 top-0 h-full flex flex-col border-l border-white/10 overflow-hidden w-10 rounded-r-2xl">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentCount = parseInt(form.quantosAcompanhantes) || 0;
+                              if (currentCount < 10) {
+                                const nextCount = currentCount + 1;
+                                const newNames = [...form.acompanhantesNames, ""];
+                                setForm({ ...form, quantosAcompanhantes: nextCount.toString(), acompanhantesNames: newNames });
+                              }
+                            }}
+                            className="flex-1 hover:bg-white/5 flex items-center justify-center text-white/40 hover:text-primary transition-all border-b border-white/5"
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentCount = parseInt(form.quantosAcompanhantes) || 0;
+                              if (currentCount > 0) {
+                                const nextCount = currentCount - 1;
+                                const newNames = form.acompanhantesNames.slice(0, -1);
+                                setForm({ ...form, quantosAcompanhantes: nextCount.toString(), acompanhantesNames: newNames });
+                              }
+                            }}
+                            className="flex-1 hover:bg-white/5 flex items-center justify-center text-white/40 hover:text-primary transition-all"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-sm font-bold text-white ml-1">Nome do Acompanhante</Label>
-                      <Input
-                        disabled={form.acompanhantes === "NÃO"}
-                        value={form.nomeAcompanhante}
-                        onChange={(e) => setForm({ ...form, nomeAcompanhante: e.target.value })}
-                        className="h-14 rounded-2xl bg-white/5 border-white/10 text-white focus:border-primary/50 disabled:opacity-30"
-                        placeholder="Nome completo"
-                      />
+                    <div className="md:col-span-2 space-y-4">
+                      {form.acompanhantesNames.map((name, idx) => (
+                        <div key={idx} className="space-y-2 animate-in fade-in slide-in-from-left-4 duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
+                          <Label className="text-sm font-bold text-white ml-1">
+                            Nome do Acompanhante {form.acompanhantesNames.length > 1 ? `#${idx + 1}` : ""}
+                          </Label>
+                          <Input
+                            disabled={form.acompanhantes === "NÃO"}
+                            value={name}
+                            onChange={(e) => {
+                              const newNames = [...form.acompanhantesNames];
+                              newNames[idx] = e.target.value;
+                              setForm({ ...form, acompanhantesNames: newNames });
+                            }}
+                            className="h-14 rounded-2xl bg-white/5 border-white/10 text-white focus:border-primary/50 disabled:opacity-30"
+                            placeholder={`Nome completo do acompanhante ${idx + 1}`}
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -592,10 +677,17 @@ const Inscricao = () => {
             <h3 className="font-heading font-black text-2xl text-white mb-4 uppercase tracking-tighter">CADASTRO FINALIZADO COM SUCESSO!</h3>
             <p className="text-white/60 text-lg font-medium leading-relaxed">
               Sua inscrição para o IX CONTEFFA foi registrada. <br />
-              <span className="text-primary font-black mt-4 block text-xl">Até mais no IX CONTEFFA!</span>
+              <span className="text-primary font-black mt-4 block text-xl mb-4">Te vejo no IX CONTEFFA</span>
+              <span className="block text-[10px] font-black uppercase tracking-widest text-white/30 flex items-center justify-center gap-2">
+                <CheckCircle className="w-3 h-3 text-primary" /> Dados protegidos pela LGPD
+              </span>
             </p>
             <Button
-              onClick={() => setSubmitted(false)}
+              onClick={() => {
+                setForm(initialFormState);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+                setSubmitted(false);
+              }}
               className="mt-10 w-full h-14 rounded-xl bg-primary font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20"
             >
               ENTENDIDO
