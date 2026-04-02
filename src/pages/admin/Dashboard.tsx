@@ -3830,13 +3830,23 @@ const AdminDashboard = () => {
                                                                     <div className="w-4 h-1 bg-primary rounded-full" /> Localização & Extras
                                                                 </h5>
 
-                                                                <div className="space-y-2">
-                                                                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Endereço Completo</label>
-                                                                    <Input
-                                                                        value={selectedInscricao.endereco}
-                                                                        onChange={(e) => setSelectedInscricao({ ...selectedInscricao, endereco: e.target.value })}
-                                                                        className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
-                                                                    />
+                                                                <div className="grid grid-cols-1 gap-4">
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Endereço Completo</label>
+                                                                        <Input
+                                                                            value={selectedInscricao.endereco || ""}
+                                                                            onChange={(e) => setSelectedInscricao({ ...selectedInscricao, endereco: e.target.value })}
+                                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Bairro</label>
+                                                                        <Input
+                                                                            value={selectedInscricao.bairro || ""}
+                                                                            onChange={(e) => setSelectedInscricao({ ...selectedInscricao, bairro: e.target.value })}
+                                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
+                                                                        />
+                                                                    </div>
                                                                 </div>
 
                                                                 <div className="grid grid-cols-2 gap-4">
@@ -3916,6 +3926,33 @@ const AdminDashboard = () => {
                                                                             disabled={selectedInscricao.problemaSaude === "NÃO"}
                                                                             value={selectedInscricao.qualSaude || ""}
                                                                             onChange={(e) => setSelectedInscricao({ ...selectedInscricao, qualSaude: e.target.value })}
+                                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-2 gap-4">
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Cuidados Especiais?</label>
+                                                                        <Select
+                                                                            value={selectedInscricao.cuidadosEspeciais || "NÃO"}
+                                                                            onValueChange={(v) => setSelectedInscricao({ ...selectedInscricao, cuidadosEspeciais: v })}
+                                                                        >
+                                                                            <SelectTrigger className="rounded-xl h-12 bg-white/5 border-white/10 text-white">
+                                                                                <SelectValue />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent className="bg-[#122442] border-white/10 text-white">
+                                                                                <SelectItem value="SIM">SIM</SelectItem>
+                                                                                <SelectItem value="NÃO">NÃO</SelectItem>
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Quais?</label>
+                                                                        <Input
+                                                                            disabled={(selectedInscricao.cuidadosEspeciais || "NÃO") === "NÃO"}
+                                                                            value={selectedInscricao.quaisCuidados || ""}
+                                                                            onChange={(e) => setSelectedInscricao({ ...selectedInscricao, quaisCuidados: e.target.value })}
                                                                             className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
                                                                         />
                                                                     </div>
