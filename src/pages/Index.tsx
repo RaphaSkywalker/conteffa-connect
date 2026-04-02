@@ -43,12 +43,14 @@ const StatCounter = ({ value }: { value: string }) => {
   const ref = useRef(null);
   const isInView = useInView(ref);
   const [displayValue, setDisplayValue] = useState("0");
+  const [hasAnimated, setHasAnimated] = useState(false);
 
   useEffect(() => {
-    if (isInView) {
-      const numericPart = parseInt(value.replace(/\D/g, "")) || 0;
+    const numericPart = parseInt(value.replace(/\D/g, "")) || 0;
+    
+    // Only animate if value is > 0 and isInView, but only once
+    if (isInView && !hasAnimated && numericPart > 0) {
       const suffix = value.replace(/[0-9]/g, "");
-
       const controls = animate(0, numericPart, {
         duration: 2,
         ease: "easeOut",
@@ -56,11 +58,13 @@ const StatCounter = ({ value }: { value: string }) => {
           setDisplayValue(Math.floor(v).toLocaleString('pt-BR') + suffix);
         },
       });
+      setHasAnimated(true);
       return () => controls.stop();
-    } else {
+    } else if (!hasAnimated) {
+      // If not yet animated, keep updating with the raw value (from Supabase)
       setDisplayValue(value);
     }
-  }, [value, isInView]);
+  }, [value, isInView, hasAnimated]);
 
   return <span ref={ref}>{displayValue}</span>;
 };
@@ -112,9 +116,9 @@ const Index = () => {
         // 2. Notícias do Supabase
         const { data: newsData } = await supabase.from('news').select('*').order('created_at', { ascending: false }).limit(3);
 
-        // 3. Contagem de Inscritos do Supabase
-        const { data: regs, error: regError } = await supabase.from('registrations').select('id');
-        const regCount = regs ? regs.length : 0;
+        // 3. Contagem de Inscritos do Supabase (Otimizado)
+        const { count, error: regError } = await supabase.from('registrations').select('*', { count: 'exact', head: true });
+        const regCount = count || 0;
         if (regError) {
           console.error("Erro ao carregar inscritos:", regError.message);
         }
