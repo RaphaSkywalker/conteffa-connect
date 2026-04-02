@@ -123,25 +123,31 @@ const Index = () => {
           console.error("Erro ao carregar inscritos:", regError.message);
         }
 
-        // 4. Contagem de Teses (PDFs em Cadernos) do Supabase
-        const { data: configData } = await supabase.from('config').select('*');
+        // 4. Contagem de Teses (PDFs em Cadernos) do Supabase (Melhorado)
+        const { data: configData, error: configError } = await supabase.from('config').select('*');
+        if (configError) {
+          console.error("Erro ao carregar config para teses:", configError.message);
+        }
+
         if (configData) {
           const cadsEntry = configData.find((c: any) => c.key === 'cadernos_data');
           if (cadsEntry && cadsEntry.value) {
             try {
               const cadsArr = typeof cadsEntry.value === 'string' ? JSON.parse(cadsEntry.value) : cadsEntry.value;
-              let totalPDFs = 0;
+              let totalPDFsFound = 0;
               if (Array.isArray(cadsArr)) {
                 cadsArr.forEach((c: any) => {
                   if (c.items && Array.isArray(c.items)) {
-                    // Conta apenas itens que têm fileUrl (PDF)
-                    totalPDFs += c.items.filter((item: any) => item.fileUrl && item.fileUrl.trim() !== "").length;
+                    // Conta apenas itens que têm algum arquivo vinculado
+                    const validItems = c.items.filter((item: any) => (item.fileUrl && item.fileUrl.trim() !== "") || (item.url && item.url.trim() !== ""));
+                    totalPDFsFound += validItems.length;
                   }
                 });
               }
-              setTesesCount(totalPDFs);
+              console.log("Total de teses calculadas:", totalPDFsFound);
+              setTesesCount(totalPDFsFound);
             } catch (e) {
-              console.error("Erro ao processar contagem de teses:", e);
+              console.error("Erro ao processar JSON de teses:", e);
             }
           }
         }
