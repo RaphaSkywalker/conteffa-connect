@@ -1263,8 +1263,9 @@ const AdminDashboard = () => {
 
         try {
             if (newUser.id) {
-                // Update existing user
-                const { error } = await supabase.from('users').update(newUser).eq('id', newUser.id);
+                // Update existing user. Extract 'id' to prevent Postgres from throwing identity column error
+                const { id, ...dataToUpdate } = newUser;
+                const { error } = await supabase.from('users').update(dataToUpdate).eq('id', newUser.id);
                 if (error) throw error;
 
                 const updatedUsers = activeUsers.map((u: any) =>
