@@ -499,12 +499,16 @@ const AdminDashboard = () => {
 
     const [searchInscricao, setSearchInscricao] = useState("");
     const [ateffaFilter, setAteffaFilter] = useState("TODAS");
+    const [statusFilter, setStatusFilter] = useState("TODAS");
+    const [dateFilter, setDateFilter] = useState("");
     const [showFilters, setShowFilters] = useState(false);
 
     const filteredInscricoes = inscricoes.filter(insc => {
         const matchesSearch = (insc.nomeCompleto || "").toLowerCase().includes(searchInscricao.toLowerCase());
         const matchesAteffa = ateffaFilter === "TODAS" || insc.ateffa === ateffaFilter;
-        return matchesSearch && matchesAteffa;
+        const matchesStatus = statusFilter === "TODAS" || (insc.status || "PENDENTE") === statusFilter;
+        const matchesDate = !dateFilter || (insc.data || "").includes(dateFilter);
+        return matchesSearch && matchesAteffa && matchesStatus && matchesDate;
     });
 
     // Get unique ATEFFAs for filter
@@ -3555,7 +3559,7 @@ const AdminDashboard = () => {
 
                                     {showFilters && (
                                         <div className="bg-[#122442] p-6 rounded-3xl shadow-xl border border-white/5 animate-in fade-in slide-in-from-top-4 duration-300">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Buscar por Nome</label>
                                                     <div className="relative">
@@ -3563,7 +3567,7 @@ const AdminDashboard = () => {
                                                         <Input
                                                             value={searchInscricao}
                                                             onChange={(e) => setSearchInscricao(e.target.value)}
-                                                            placeholder="Digite o nome do participante..."
+                                                            placeholder="Digite o nome..."
                                                             className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50 pl-11"
                                                         />
                                                     </div>
@@ -3580,6 +3584,29 @@ const AdminDashboard = () => {
                                                             ))}
                                                         </SelectContent>
                                                     </Select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Filtrar por Status</label>
+                                                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                                        <SelectTrigger className="rounded-xl h-12 bg-white/5 border-white/10 text-white">
+                                                            <SelectValue placeholder="Status" />
+                                                        </SelectTrigger>
+                                                        <SelectContent className="bg-[#122442] border-white/10 text-white">
+                                                            <SelectItem value="TODAS">TODOS OS STATUS</SelectItem>
+                                                            <SelectItem value="PENDENTE">PENDENTE</SelectItem>
+                                                            <SelectItem value="APROVADO">APROVADO</SelectItem>
+                                                            <SelectItem value="REPROVADO">REPROVADO</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Buscar por Data</label>
+                                                    <Input
+                                                        value={dateFilter}
+                                                        onChange={(e) => setDateFilter(e.target.value)}
+                                                        placeholder="Ex: 31/03/2026"
+                                                        className="rounded-xl h-12 bg-white/5 border-white/10 text-white focus:border-primary/50"
+                                                    />
                                                 </div>
                                             </div>
                                         </div>
