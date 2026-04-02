@@ -1289,7 +1289,8 @@ const AdminDashboard = () => {
             setIsAddingUser(false);
             setNewUser({ name: "", email: "", password: "", phone: "", cargo: "", association: "", photo: null, id: null });
         } catch (err: any) {
-            toast.error("Erro ao salvar usuário no Supabase.");
+            console.error(err);
+            toast.error(`Erro ao salvar usuário no Supabase: ${err.message || 'Desconhecido'}`);
         }
     };
 
