@@ -14,9 +14,10 @@ const PORT = process.env.PORT || 3000;
 // (essa é a pasta otimizada gerada pelo vite)
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// SPA Routing: Redireciona qualquer requisição que não seja um arquivo (ex: /admin) 
-// para o index.html gerenciar a rota via React Router
-app.get('/:path(.*)', (req, res) => {
+// SPA Routing: Redireciona qualquer requisição que não seja um arquivo estático (ex: /admin) 
+// para o index.html gerenciar a rota via React Router.
+// O 'app.use' limpo garante evitar qualquer erro de sintaxe de Regex do Express 5.x.
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
