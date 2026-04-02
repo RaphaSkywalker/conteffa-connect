@@ -1278,10 +1278,11 @@ const AdminDashboard = () => {
 
                 toast.success("Usuário atualizado com sucesso!");
             } else {
-                // New user registration
-                const { data, error } = await supabase.from('users').insert([{ ...newUser, role: "editor", status: "Ativo" }]).select().single();
+                // New user registration. Extract out 'id' so Supabase can auto-generate it.
+                const { id, ...userToInsert } = newUser;
+                const { data, error } = await supabase.from('users').insert([{ ...userToInsert, role: "editor", status: "Ativo" }]).select().single();
                 if (error) throw error;
-                const userToAdd = { ...newUser, id: data.id, role: "editor", status: "Ativo" };
+                const userToAdd = { ...userToInsert, id: data.id, role: "editor", status: "Ativo" };
                 setActiveUsers([userToAdd, ...activeUsers]);
                 toast.success("Usuário cadastrado com sucesso!");
             }
