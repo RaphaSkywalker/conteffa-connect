@@ -1212,17 +1212,19 @@ const AdminDashboard = () => {
         }
 
         try {
-            if (newAlbum.id && newAlbum.id > 0) {
+            // Removemos 'count' e dados visuais antes de enviar pro banco
+            const { id, count, ...albumPayload } = newAlbum as any;
+
+            if (id && id > 0) {
                 // Update
-                const { error } = await supabase.from('albums').update(newAlbum).eq('id', newAlbum.id);
+                const { error } = await supabase.from('albums').update(albumPayload).eq('id', id);
                 if (error) throw error;
-                const updatedList = albuns.map((a: any) => a.id === newAlbum.id ? { ...a, ...newAlbum } : a);
+                const updatedList = albuns.map((a: any) => a.id === id ? { ...a, ...newAlbum } : a);
                 setAlbuns([...updatedList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0)));
                 toast.success("Álbum atualizado!");
             } else {
                 // Create
-                const { id, ...albumToSave } = newAlbum;
-                const { data, error } = await supabase.from('albums').insert([albumToSave]).select().single();
+                const { data, error } = await supabase.from('albums').insert([albumPayload]).select().single();
                 if (error) throw error;
                 const newList = [{ ...newAlbum, id: data.id, count: newAlbum.photos.length }, ...albuns];
                 setAlbuns([...newList].sort((a: any, b: any) => (Number(b.id) || 0) - (Number(a.id) || 0)));
