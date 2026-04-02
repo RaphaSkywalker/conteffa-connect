@@ -531,7 +531,7 @@ const AdminDashboard = () => {
             toast.success("Inscrição atualizada com sucesso!");
         } catch (err: any) {
             console.error("Erro ao salvar edição:", err);
-            toast.error("Erro ao salvar alterações no banco de dados.");
+            toast.error(`Erro do BD: ${err.message || 'Desconhecido'}`);
 
             // Fallback for local persistence even on network error
             const updatedInscricoes = inscricoes.map(insc =>
