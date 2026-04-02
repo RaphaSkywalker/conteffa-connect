@@ -1349,7 +1349,7 @@ const AdminDashboard = () => {
             toast.success("Inscrição removida do Supabase!");
             setInscricaoToDelete(null);
         } catch (err: any) {
-            toast.error("Erro ao remover no Supabase.");
+            toast.error(`Erro ao remover no Supabase: ${err.message || 'Desconhecido'}`);
         }
     };
 
