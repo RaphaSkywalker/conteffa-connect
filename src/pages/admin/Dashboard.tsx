@@ -517,28 +517,26 @@ const AdminDashboard = () => {
         try {
             // 1. Save to Supabase - Sanitize first
             const { id, acompanhantesNames, ...dataToUpdate } = selectedInscricao;
-            const { error } = await supabase
-                .from('registrations')
-                .update(dataToUpdate)
-                .eq('id', id);
-
-            if (error) throw error;
+            
+            // Only sync to Supabase if it's a valid UUID. Local fallback records use timestamp digits.
+            if (String(id).includes('-')) {
+                const { error } = await supabase
+                    .from('registrations')
+                    .update(dataToUpdate)
+                    .eq('id', id);
+                if (error) throw error;
+            }
 
             // 2. Update local state
-            setInscricoes(prev => prev.map(insc => insc.id === selectedInscricao.id ? selectedInscricao : insc));
+            const updatedInscricoes = inscricoes.map(insc => insc.id === selectedInscricao.id ? selectedInscricao : insc);
+            setInscricoes(updatedInscricoes);
+            localStorage.setItem("conteffa_inscricoes", JSON.stringify(updatedInscricoes));
 
             setIsViewingInscricao(false);
             toast.success("Inscrição atualizada com sucesso!");
         } catch (err: any) {
             console.error("Erro ao salvar edição:", err);
             toast.error(`Erro do BD: ${err.message || 'Desconhecido'}`);
-
-            // Fallback for local persistence even on network error
-            const updatedInscricoes = inscricoes.map(insc =>
-                insc.id === selectedInscricao.id ? selectedInscricao : insc
-            );
-            setInscricoes(updatedInscricoes);
-            localStorage.setItem("conteffa_inscricoes", JSON.stringify(updatedInscricoes));
             setIsViewingInscricao(false);
         }
     };
@@ -1342,11 +1340,16 @@ const AdminDashboard = () => {
     const confirmDeleteInscricao = async () => {
         if (!inscricaoToDelete) return;
         try {
-            const { error } = await supabase.from('registrations').delete().eq('id', inscricaoToDelete.id);
-            if (error) throw error;
+            if (String(inscricaoToDelete.id).includes('-')) {
+                const { error } = await supabase.from('registrations').delete().eq('id', inscricaoToDelete.id);
+                if (error) throw error;
+            }
+            
             const updated = inscricoes.filter((i: any) => i.id !== inscricaoToDelete.id);
             setInscricoes(updated);
-            toast.success("Inscrição removida do Supabase!");
+            localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
+            
+            toast.success("Inscrição removida!");
             setInscricaoToDelete(null);
         } catch (err: any) {
             toast.error(`Erro ao remover no Supabase: ${err.message || 'Desconhecido'}`);
