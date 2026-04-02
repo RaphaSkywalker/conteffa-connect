@@ -86,6 +86,23 @@ const Index = () => {
     }
   };
 
+  const highlightsScrollRef = useRef<HTMLDivElement>(null);
+  
+  const scrollHighlights = (direction: 'left' | 'right') => {
+    if (highlightsScrollRef.current) {
+      const { scrollLeft, clientWidth } = highlightsScrollRef.current;
+      // Scroll by exactly 1 item width on mobile
+      const scrollTo = direction === 'left'
+        ? scrollLeft - clientWidth
+        : scrollLeft + clientWidth;
+
+      highlightsScrollRef.current.scrollTo({
+        left: scrollTo,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   useEffect(() => {
     const fetchAllData = async () => {
       try {
@@ -337,34 +354,53 @@ const Index = () => {
             light={true}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-10">
-            {highlights.map((item, i) => (
-              <motion.div
-                key={item.title}
-                initial={{ opacity: 0, y: 40 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1, duration: 0.6 }}
-                className="group relative p-10 rounded-[3rem] bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-[5rem] group-hover:bg-white/10 transition-colors" />
+          <div className="relative">
+            <button
+              onClick={() => scrollHighlights('left')}
+              className="absolute -left-6 md:-left-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 md:w-12 md:h-12 rounded-full border border-white/20 flex items-center justify-center bg-[#0B1B32]/80 backdrop-blur-sm text-white hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90 xl:hidden"
+            >
+              <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
+            </button>
+            <button
+              onClick={() => scrollHighlights('right')}
+              className="absolute -right-6 md:-right-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 md:w-12 md:h-12 rounded-full border border-white/20 flex items-center justify-center bg-[#0B1B32]/80 backdrop-blur-sm text-white hover:bg-primary hover:text-white transition-all shadow-xl active:scale-90 xl:hidden"
+            >
+              <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
+            </button>
 
-                <div className="relative z-10">
-                  <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500">
-                    <item.icon className="w-8 h-8 text-white" />
+            <div 
+              ref={highlightsScrollRef}
+              className="flex xl:grid xl:grid-cols-4 overflow-x-auto gap-6 xl:gap-10 py-4 px-1 xl:px-0 no-scrollbar scroll-smooth snap-x snap-mandatory"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {highlights.map((item, i) => (
+                <motion.div
+                  key={item.title}
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1, duration: 0.6 }}
+                  className="w-full min-w-full xl:min-w-0 xl:w-auto flex-shrink-0 xl:flex-shrink snap-center group relative p-8 md:p-10 rounded-[3rem] bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden flex flex-col"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-[5rem] group-hover:bg-white/10 transition-colors" />
+
+                  <div className="relative z-10 flex flex-col h-full">
+                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white/20 flex items-center justify-center mb-6 md:mb-8 group-hover:scale-110 transition-transform duration-500">
+                      <item.icon className="w-7 h-7 md:w-8 md:h-8 text-white" />
+                    </div>
+                    <h3 className="text-xl md:text-2xl font-heading font-black mb-3 md:mb-4 text-white group-hover:text-white/80 transition-colors leading-tight">
+                      {item.title}
+                    </h3>
+                    <p className="text-base md:text-lg text-white/70 font-body leading-relaxed mb-6 flex-grow">
+                      {item.description}
+                    </p>
+                    <div className="flex items-center text-white font-bold gap-2 group-hover:translate-x-2 transition-transform mt-auto">
+                      Saiba mais <ArrowRight className="w-4 h-4" />
+                    </div>
                   </div>
-                  <h3 className="text-2xl font-heading font-black mb-4 text-white group-hover:text-white/80 transition-colors leading-tight">
-                    {item.title}
-                  </h3>
-                  <p className="text-lg text-white/70 font-body leading-relaxed mb-6">
-                    {item.description}
-                  </p>
-                  <div className="flex items-center text-white font-bold gap-2 group-hover:translate-x-2 transition-transform">
-                    Saiba mais <ArrowRight className="w-4 h-4" />
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -473,7 +509,7 @@ const Index = () => {
           <img src="/bg-logo.png" alt="" className="w-[400px] h-[400px] object-contain" />
         </div>
         <div className="container mx-auto px-4 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               { icon: Users, value: String(inscritosCount), label: "Inscritos" },
               { icon: Mic, value: String(palestrantes.length), label: "Palestrantes" },
@@ -488,10 +524,10 @@ const Index = () => {
                 transition={{ delay: i * 0.1 }}
                 className="flex flex-col items-center text-center p-4 group transition-transform hover:-translate-y-2"
               >
-                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-6 group-hover:scale-110 transition-all duration-500 border border-white/20">
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-all duration-500 border border-white/20">
                   <stat.icon className="w-8 h-8 text-white" />
                 </div>
-                <div className="text-5xl md:text-6xl font-heading font-black text-white mb-2 drop-shadow-md">
+                <div className="text-4xl md:text-6xl font-heading font-black text-white mb-2 drop-shadow-md">
                   <StatCounter value={stat.value} />
                 </div>
                 <div className="text-xs md:text-sm font-bold text-white/70 uppercase tracking-widest">{stat.label}</div>
