@@ -1350,11 +1350,10 @@ const AdminDashboard = () => {
     const confirmDeleteInscricao = async () => {
         if (!inscricaoToDelete) return;
         try {
-            if (String(inscricaoToDelete.id).includes('-')) {
-                const { error } = await supabase.from('registrations').delete().eq('id', inscricaoToDelete.id);
-                if (error) throw error;
-            }
-            
+            // Sempre tentar deletar do Supabase (independente do formato do ID)
+            const { error } = await supabase.from('registrations').delete().eq('id', inscricaoToDelete.id);
+            if (error) throw error;
+
             const updated = inscricoes.filter((i: any) => i.id !== inscricaoToDelete.id);
             setInscricoes(updated);
             localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
