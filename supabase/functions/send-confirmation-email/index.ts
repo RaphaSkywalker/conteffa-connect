@@ -207,11 +207,24 @@ Deno.serve(async (req) => {
     const participanteSent = participanteResult.status === 'fulfilled' && !participanteResult.value.error;
     const adminSent = adminResult.status === 'fulfilled' && !adminResult.value.error;
 
-    if (!participanteSent) {
-      console.error('Email participante falhou:', participanteResult);
-    }
-    if (!adminSent) {
-      console.error('Email admin falhou:', adminResult);
+    if (!participanteSent || !adminSent) {
+      console.error('Falha no envio de email:', {
+        participante: participanteResult,
+        admin: adminResult
+      });
+
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          participanteSent, 
+          adminSent,
+          errors: {
+            participante: participanteResult.status === 'fulfilled' ? participanteResult.value.error : participanteResult.reason,
+            admin: adminResult.status === 'fulfilled' ? adminResult.value.error : adminResult.reason
+          }
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     return new Response(
