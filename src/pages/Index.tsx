@@ -46,11 +46,11 @@ const StatCounter = ({ value }: { value: string }) => {
   const [hasAnimated, setHasAnimated] = useState(false);
 
   useEffect(() => {
-    const numericPart = parseInt(value.replace(/\D/g, "")) || 0;
-    
-    // Trigger animation if visible and value > 0, but only start from 0 once
-    if (isInView && !hasAnimated && numericPart > 0) {
-      const suffix = value.replace(/[0-9]/g, "");
+    const stringValue = String(value);
+    const numericPart = parseInt(stringValue.replace(/\D/g, '')) || 0;
+    const suffix = stringValue.replace(/[0-9]/g, '');
+
+    if (isInView && !hasAnimated) {
       const controls = animate(0, numericPart, {
         duration: 2,
         ease: "easeOut",
@@ -60,8 +60,8 @@ const StatCounter = ({ value }: { value: string }) => {
       });
       setHasAnimated(true);
       return () => controls.stop();
-    } else if (!hasAnimated || !isInView) {
-      // If haven't animated yet, or not currently in view, just show the current value
+    } else {
+      // Sempre atualizar o valor se ele mudar, mesmo após a animação inicial
       setDisplayValue(value);
     }
   }, [value, isInView, hasAnimated]);
@@ -153,11 +153,11 @@ const Index = () => {
           }
         }
 
-        if (speakersData && speakersData.length > 0) {
+        if (speakersData) {
           setPalestrantes(speakersData);
         }
-
-        if (newsData && newsData.length > 0) {
+        
+        if (newsData) {
           setNoticias(newsData);
         }
 
@@ -174,7 +174,13 @@ const Index = () => {
           }
         }
 
-        setInscritosCount(finalCount);
+        // 6. Atualizar contagem final (Com proteção contra erro de RLS/Anon)
+        if (!regError && regs) {
+          setInscritosCount(finalCount);
+        } else if (!regs && regError) {
+          console.warn("Retrying with localStorage count due to direct select error");
+          setInscritosCount(finalCount); // finalCount already has the localStorage value
+        }
 
       } catch (err) {
         console.error("Failed to fetch home data", err);

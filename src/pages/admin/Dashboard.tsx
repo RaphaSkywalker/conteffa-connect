@@ -1479,16 +1479,29 @@ const AdminDashboard = () => {
 
         try {
             if (newPalestrante.id) {
+                // Atualizar palestrante existente
                 const { error } = await supabase.from('speakers').update(newPalestrante).eq('id', newPalestrante.id);
                 if (error) throw error;
                 const updated = palestrantes.map((p: any) => p.id === newPalestrante.id ? { ...p, ...newPalestrante } : p);
                 setPalestrantes(updated);
                 toast.success("Palestrante atualizado!");
             } else {
+                // Inserir novo palestrante (O banco cria o ID)
                 const { id, ...palestranteToSave } = newPalestrante;
-                const { data, error } = await supabase.from('speakers').insert([palestranteToSave]).select().single();
+                
+                // Limpar campos de rede social se estiverem vazios para evitar erros de constraint
+                const cleanPalestrante = {
+                    ...palestranteToSave,
+                    instagram: palestranteToSave.instagram || null,
+                    linkedin: palestranteToSave.linkedin || null,
+                    twitter: palestranteToSave.twitter || null,
+                    photo: palestranteToSave.photo || null
+                };
+
+                const { data, error } = await supabase.from('speakers').insert([cleanPalestrante]).select().single();
                 if (error) throw error;
-                const updated = [...palestrantes, { ...newPalestrante, id: data.id }];
+                
+                const updated = [...palestrantes, data]; // Usar o dado real que o banco criou
                 setPalestrantes(updated);
                 toast.success("Palestrante cadastrado!");
             }
