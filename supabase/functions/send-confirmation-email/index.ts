@@ -60,7 +60,6 @@ Deno.serve(async (req) => {
           <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#1a3a6e 0%,#0f2347 100%);border-radius:20px 20px 0 0;padding:40px 40px 30px;text-align:center;border-bottom:3px solid #c8a951;">
-              <p style="margin:0 0 8px;color:#c8a951;font-size:11px;font-weight:800;letter-spacing:6px;text-transform:uppercase;">CONGRESSO TRABALHISTA</p>
               <h1 style="margin:0;color:#ffffff;font-size:32px;font-weight:900;letter-spacing:-1px;">IX CONTEFFA</h1>
               <p style="margin:10px 0 0;color:#8faad4;font-size:13px;letter-spacing:2px;text-transform:uppercase;">Confirmação de Inscrição</p>
             </td>
