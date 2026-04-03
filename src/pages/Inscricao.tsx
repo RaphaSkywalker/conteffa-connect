@@ -117,6 +117,7 @@ const Inscricao = () => {
       
       const newInscricao = {
         ...form,
+        full_name: form.nomeCompleto, // Required by DB
         nomeAcompanhante: finalNomeAcompanhante,
         data: new Date().toLocaleDateString('pt-BR'),
         status: "Pendente"
@@ -147,7 +148,14 @@ const Inscricao = () => {
       console.error("Erro ao salvar inscrição:", err);
       // Fallback to local storage if DB fails
       const finalNomeAcompanhante = form.acompanhantesNames.filter(n => n.trim()).join(", ");
-      const newInscricao = { ...form, nomeAcompanhante: finalNomeAcompanhante, id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), status: "Pendente" };
+      const newInscricao = { 
+        ...form, 
+        full_name: form.nomeCompleto, 
+        nomeAcompanhante: finalNomeAcompanhante, 
+        id: Date.now(), 
+        data: new Date().toLocaleDateString('pt-BR'), 
+        status: "Pendente" 
+      };
       delete (newInscricao as any).acompanhantesNames;
       
       const saved = localStorage.getItem("conteffa_inscricoes");

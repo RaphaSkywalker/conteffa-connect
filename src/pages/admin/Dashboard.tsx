@@ -526,7 +526,10 @@ const AdminDashboard = () => {
             if (String(id).includes('-')) {
                 const { error } = await supabase
                     .from('registrations')
-                    .update(dataToUpdate)
+                    .update({
+                        ...dataToUpdate,
+                        full_name: dataToUpdate.nomeCompleto // Sync with required column
+                    })
                     .eq('id', id);
                 if (error) throw error;
             }
