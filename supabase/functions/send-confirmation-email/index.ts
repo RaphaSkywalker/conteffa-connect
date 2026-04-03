@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
               </div>
               <!-- Message -->
               <div style="background:#1a3358;border-radius:16px;padding:28px;margin-bottom:28px;border:1px solid #2a4a7a;">
-                <p style="color:#c8e0ff;font-size:15px;line-height:1.7;margin:0 0 14px;">Ficamos muito felizes em confirmar que você está oficialmente inscrito no <strong style="color:#c8a951;">IX Congresso dos Trabalhadores com Formação em Atividades do MAPA — CONTEFFA</strong>.</p>
+                <p style="color:#c8e0ff;font-size:15px;line-height:1.7;margin:0 0 14px;">Ficamos muito felizes em confirmar que você está oficialmente inscrito no <strong style="color:#c8a951;">IX CONTEFFA - 2026 - RECIFE - PE</strong>.</p>
                 <p style="color:#c8e0ff;font-size:15px;line-height:1.7;margin:0;">Prepare-se para um evento incrível repleto de aprendizados, networking e conquistas para a nossa categoria!</p>
                 <p style="margin:18px 0 0;text-align:center;font-size:20px;font-weight:900;color:#c8a951;letter-spacing:1px;">🚀 Te vejo no IX CONTEFFA!</p>
               </div>
