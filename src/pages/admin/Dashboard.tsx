@@ -1004,8 +1004,10 @@ const AdminDashboard = () => {
                     if (ad && ad.value) setAdImage(ad.value);
                 }
 
-                if (dbInscricoes && dbInscricoes.length > 0) {
+                if (dbInscricoes) {
+                    // Sempre sincronizar com o Supabase (inclui quando a lista fica vazia após deletar)
                     setInscricoes(dbInscricoes);
+                    localStorage.setItem("conteffa_inscricoes", JSON.stringify(dbInscricoes));
                 }
 
                 if (dbUsers && dbUsers.length > 0) {
