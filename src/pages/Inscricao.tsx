@@ -103,6 +103,28 @@ const Inscricao = () => {
     }
   };
 
+  const sendConfirmationEmail = async (data: typeof form & { data: string }) => {
+    try {
+      await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          nomeCompleto: data.nomeCompleto,
+          email: data.email,
+          ateffa: data.ateffa,
+          cargo: data.cargo,
+          cidade: data.cidade,
+          data: data.data,
+          hotel: data.hotel,
+          tamanhoCamiseta: data.tamanhoCamiseta,
+          acompanhantes: data.acompanhantes,
+          quantosAcompanhantes: data.quantosAcompanhantes,
+        },
+      });
+    } catch (err) {
+      // Não bloqueia o fluxo caso o email falhe
+      console.warn("Email de confirmação não pôde ser enviado:", err);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nomeCompleto || !form.email || !form.cpf || !form.dataNascimento) {
@@ -111,19 +133,17 @@ const Inscricao = () => {
     }
 
     try {
-      // Prepare data to save
-      // join companion names into the main string for storage
       const finalNomeAcompanhante = form.acompanhantesNames.filter(n => n.trim()).join(", ");
-      
+      const dataInscricao = new Date().toLocaleDateString('pt-BR');
+
       const newInscricao = {
         ...form,
-        full_name: form.nomeCompleto, // Required by DB
+        full_name: form.nomeCompleto,
         nomeAcompanhante: finalNomeAcompanhante,
-        data: new Date().toLocaleDateString('pt-BR'),
+        data: dataInscricao,
         status: "Pendente"
       };
 
-      // Ensure we don't save the extra UI array properties to DB if we want clean data
       delete (newInscricao as any).acompanhantesNames;
 
       // 1. Save to Supabase
@@ -135,38 +155,42 @@ const Inscricao = () => {
 
       if (error) throw error;
 
-      // Also save to localStorage for fallback/resilience
+      // 2. Save to localStorage as fallback
       const saved = localStorage.getItem("conteffa_inscricoes");
       const current = saved ? JSON.parse(saved) : [];
       const updated = [...current, { ...newInscricao, id: dbData?.id || Date.now() }];
       localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
 
-      // Trigger Success Modal
+      // 3. Send confirmation email (non-blocking)
+      sendConfirmationEmail({ ...form, data: dataInscricao });
+
       setSubmitted(true);
       toast.success("Inscrição realizada com sucesso!");
     } catch (err) {
       console.error("Erro ao salvar inscrição:", err);
-      // Fallback to local storage if DB fails
+
+      // Fallback: save locally and still try to send email
       const finalNomeAcompanhante = form.acompanhantesNames.filter(n => n.trim()).join(", ");
-      const newInscricao = { 
-        ...form, 
-        full_name: form.nomeCompleto, 
-        nomeAcompanhante: finalNomeAcompanhante, 
-        id: Date.now(), 
-        data: new Date().toLocaleDateString('pt-BR'), 
-        status: "Pendente" 
+      const dataInscricao = new Date().toLocaleDateString('pt-BR');
+      const newInscricao = {
+        ...form,
+        full_name: form.nomeCompleto,
+        nomeAcompanhante: finalNomeAcompanhante,
+        id: Date.now(),
+        data: dataInscricao,
+        status: "Pendente"
       };
       delete (newInscricao as any).acompanhantesNames;
-      
+
       const saved = localStorage.getItem("conteffa_inscricoes");
       const current = saved ? JSON.parse(saved) : [];
-      const updated = [...current, newInscricao];
-      localStorage.setItem("conteffa_inscricoes", JSON.stringify(updated));
+      localStorage.setItem("conteffa_inscricoes", JSON.stringify([...current, newInscricao]));
+
+      sendConfirmationEmail({ ...form, data: dataInscricao });
 
       setSubmitted(true);
       toast.success("Inscrito salvo no navegador.");
     }
-
   };
 
 
