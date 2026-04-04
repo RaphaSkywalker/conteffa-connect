@@ -1270,6 +1270,14 @@ const AdminDashboard = () => {
         }
     };
 
+    const removeAlbumPhoto = (index: number) => {
+        setNewAlbum(prev => ({
+            ...prev,
+            photos: prev.photos.filter((_, i) => i !== index)
+        }));
+        toast.info("Foto removida do álbum.");
+    };
+
     const handleSaveAlbum = async () => {
         if (!newAlbum.title || !newAlbum.date) {
             toast.error("Preencha o nome do evento e a data.");
@@ -3555,6 +3563,27 @@ const AdminDashboard = () => {
                                                             onChange={handleMultiPhotoUpload}
                                                         />
                                                     </div>
+
+                                                    {/* Existing Album Photos Grid */}
+                                                    {newAlbum.photos && newAlbum.photos.length > 0 && (
+                                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
+                                                            {newAlbum.photos.map((photo, idx) => (
+                                                                <div key={idx} className="aspect-square rounded-2xl bg-white/5 border border-white/10 relative group overflow-hidden shadow-lg selection:bg-transparent">
+                                                                    <img src={photo} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() => removeAlbumPhoto(idx)}
+                                                                            className="w-10 h-10 rounded-full bg-red-500 text-white hover:bg-red-600 transition-transform scale-75 group-hover:scale-100 duration-300"
+                                                                        >
+                                                                            <Trash2 className="w-5 h-5" />
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
 
                                                     {isUploading && (
                                                         <div className="bg-white/5 p-6 rounded-2xl border border-white/10 mb-6">
