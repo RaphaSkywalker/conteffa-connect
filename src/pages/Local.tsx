@@ -9,13 +9,23 @@ import { supabase } from "@/lib/supabase";
 
 const LocalPage = () => {
   const [config, setConfig] = useState({
-    name: "Mar Hotel Conventions",
-    address: "Rua Barão de Souza Leão, 451 - Boa Viagem, Recife - PE",
-    contact: "(81) 3302-4444",
-    website: "https://www.marhotel.com.br",
-    mapUrl: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3949.7004562243865!2d-34.906957524109!3d-8.13194718141222!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x7ab1fcb08ad1401%3A0xd24bd3d576e3012a!2sMar%20Hotel%20Conventions!5e0!3m2!1spt-BR!2sbr!4v1773178155045!5m2!1spt-BR!2sbr",
-    photos: [] as string[],
-    attractions: [] as string[]
+    hotel: {
+      name: "Mar Hotel Conventions",
+      address: "Rua Barão de Souza Leão, 451 - Boa Viagem, Recife - PE",
+      contact: "(81) 3302-4444",
+      website: "https://www.marhotel.com.br",
+      cover: "",
+      gallery: [] as string[]
+    },
+    maps: {
+      url: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3949.7004562243865!2d-34.906957524109!3d-8.13194718141222!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x7ab1fcb08ad1401%3A0xd24bd3d576e3012a!2sMar%20Hotel%20Conventions!5e0!3m2!1spt-BR!2sbr!4v1773178155045!5m2!1spt-BR!2sbr"
+    },
+    discovery: {
+      name: "Descubra Pernambuco",
+      description: "Recife e Olinda oferecem um mix inesquecível de história, praias paradisíacas e uma das gastronomias mais ricas do Brasil.",
+      cover: "",
+      gallery: [] as string[]
+    }
   });
 
   const [photoIndex, setPhotoIndex] = useState<{ type: 'hotel' | 'attraction', index: number } | null>(null);
@@ -23,14 +33,35 @@ const LocalPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data } = await supabase.from('config').select('value').eq('key', 'hotel_settings').maybeSingle();
+        const { data } = await supabase.from('config').select('value').eq('key', 'local_settings').maybeSingle();
         if (data && data.value) {
           const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-          // Merge with explicit mapUrl in case DB is outdated/incorrect
-          setConfig(prev => ({ ...prev, ...parsed, mapUrl: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3949.7004562243865!2d-34.906957524109!3d-8.13194718141222!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x7ab1fcb08ad1401%3A0xd24bd3d576e3012a!2sMar%20Hotel%20Conventions!5e0!3m2!1spt-BR!2sbr!4v1773178155045!5m2!1spt-BR!2sbr" }));
+          
+          // Ensure structure is correct
+          const merged = {
+            hotel: { ...config.hotel, ...(parsed.hotel || {}) },
+            maps: { ...config.maps, ...(parsed.maps || {}) },
+            discovery: { ...config.discovery, ...(parsed.discovery || {}) }
+          };
+          
+          setConfig(merged);
         } else {
-          const local = localStorage.getItem("conteffa_hotel");
-          if (local) setConfig(JSON.parse(local));
+          // Fallback legacy check
+          const { data: legacyData } = await supabase.from('config').select('value').eq('key', 'hotel_settings').maybeSingle();
+          if (legacyData && legacyData.value) {
+            const legacy = typeof legacyData.value === 'string' ? JSON.parse(legacyData.value) : legacyData.value;
+            setConfig(prev => ({
+              ...prev,
+              hotel: {
+                ...prev.hotel,
+                name: legacy.name || prev.hotel.name,
+                address: legacy.address || prev.hotel.address,
+                contact: legacy.contact || prev.hotel.contact,
+                website: legacy.website || prev.hotel.website,
+                gallery: legacy.photos || prev.hotel.gallery
+              }
+            }));
+          }
         }
       } catch (e) {
         console.error("Error fetching local config", e);
@@ -39,7 +70,7 @@ const LocalPage = () => {
     fetchData();
   }, []);
 
-  const currentGallery = photoIndex?.type === 'hotel' ? config.photos : config.attractions;
+  const currentGallery = photoIndex?.type === 'hotel' ? config.hotel.gallery : config.discovery.gallery;
 
   const handleNext = () => {
     if (photoIndex) {
@@ -80,10 +111,10 @@ const LocalPage = () => {
               <div className="bg-[#122442] rounded-[3rem] overflow-hidden shadow-2xl h-full flex flex-col">
                 <div
                   className="relative h-72 cursor-zoom-in overflow-hidden"
-                  onClick={() => config.photos.length > 0 && setPhotoIndex({ type: 'hotel', index: 0 })}
+                  onClick={() => config.hotel.gallery.length > 0 && setPhotoIndex({ type: 'hotel', index: 0 })}
                 >
-                  {config.photos.length > 0 ? (
-                    <img src={config.photos[0]} alt="Hotel" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                  {config.hotel.gallery.length > 0 ? (
+                    <img src={config.hotel.cover || config.hotel.gallery[0]} alt="Hotel" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                   ) : (
                     <div className="w-full h-full bg-white/5 flex items-center justify-center">
                       <Hotel className="w-16 h-16 text-white/10" />
@@ -97,17 +128,17 @@ const LocalPage = () => {
                   </div>
                 </div>
                 <div className="p-8 flex-1 flex flex-col">
-                  <h3 className="text-2xl font-heading font-black text-white mb-4 uppercase tracking-tighter">{config.name}</h3>
+                  <h3 className="text-2xl font-heading font-black text-white mb-4 uppercase tracking-tighter">{config.hotel.name}</h3>
                   <div className="space-y-4 mb-8 text-white/60 text-sm">
                     <p className="flex items-start gap-3">
-                      <MapPin className="w-5 h-5 text-primary shrink-0" /> {config.address}
+                      <MapPin className="w-5 h-5 text-primary shrink-0" /> {config.hotel.address}
                     </p>
                     <p className="flex items-center gap-3">
-                      <Phone className="w-5 h-5 text-primary shrink-0" /> {config.contact}
+                      <Phone className="w-5 h-5 text-primary shrink-0" /> {config.hotel.contact}
                     </p>
                   </div>
                   <div className="mt-auto pt-6 border-t border-white/5">
-                    <a href={config.website} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between group/link text-xs font-black uppercase tracking-widest text-primary hover:text-white transition-colors">
+                    <a href={config.hotel.website} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between group/link text-xs font-black uppercase tracking-widest text-primary hover:text-white transition-colors">
                       Visitar Site Oficial <ExternalLink className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
                     </a>
                   </div>
@@ -125,7 +156,7 @@ const LocalPage = () => {
               <div className="bg-[#122442] rounded-[3rem] overflow-hidden shadow-2xl h-full flex flex-col p-4">
                 <div className="flex-1 rounded-[2.5rem] overflow-hidden relative">
                   <iframe
-                    src={config.mapUrl}
+                    src={config.maps.url}
                     width="100%"
                     height="100%"
                     style={{ border: 0 }}
@@ -149,10 +180,10 @@ const LocalPage = () => {
               <div className="bg-[#122442] rounded-[3rem] overflow-hidden shadow-2xl h-full flex flex-col">
                 <div
                   className="relative h-72 cursor-zoom-in overflow-hidden"
-                  onClick={() => config.attractions.length > 0 && setPhotoIndex({ type: 'attraction', index: 0 })}
+                  onClick={() => config.discovery.gallery.length > 0 && setPhotoIndex({ type: 'attraction', index: 0 })}
                 >
-                  {config.attractions.length > 0 ? (
-                    <img src={config.attractions[0]} alt="Atrações" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                  {config.discovery.gallery.length > 0 ? (
+                    <img src={config.discovery.cover || config.discovery.gallery[0]} alt="Atrações" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                   ) : (
                     <div className="w-full h-full bg-white/5 flex items-center justify-center">
                       <Camera className="w-16 h-16 text-white/10" />
@@ -166,9 +197,9 @@ const LocalPage = () => {
                   </div>
                 </div>
                 <div className="p-8 flex-1 flex flex-col">
-                  <h3 className="text-2xl font-heading font-black text-white mb-4 uppercase tracking-tighter">Descubra Pernambuco</h3>
+                  <h3 className="text-2xl font-heading font-black text-white mb-4 uppercase tracking-tighter">{config.discovery.name}</h3>
                   <p className="text-white/50 text-sm leading-relaxed mb-8">
-                    Recife e Olinda oferecem um mix inesquecível de história, praias paradisíacas e uma das gastronomias mais ricas do Brasil.
+                    {config.discovery.description}
                   </p>
                   <div className="flex flex-wrap gap-2 mt-auto">
                     <span className="bg-white/5 text-[10px] font-bold text-white/40 px-3 py-1.5 rounded-full border border-white/5">Praia de Boa Viagem</span>

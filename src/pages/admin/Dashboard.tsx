@@ -44,7 +44,11 @@ import {
     Hotel,
     Upload,
     FileSpreadsheet,
-    BookOpen
+    BookOpen,
+    MapPin,
+    Globe,
+    ExternalLink,
+    Compass
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import {
@@ -306,6 +310,30 @@ const AdminDashboard = () => {
     const [newRegulamento, setNewRegulamento] = useState({ name: "", fileUrl: "", id: null as any });
     const [newCaderno, setNewCaderno] = useState({ name: "", items: [] as any[], id: null as any });
     const [newTese, setNewTese] = useState({ title: "", author: "", fileUrl: "" });
+    const [localSettings, setLocalSettings] = useState({
+        hotel: {
+            name: "Mar Hotel Conventions",
+            address: "Rua Barão de Souza Leão, 451 - Boa Viagem, Recife - PE",
+            contact: "(81) 3302-4444",
+            website: "https://www.marhotel.com.br",
+            cover: "",
+            gallery: [] as string[]
+        },
+        maps: {
+            url: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3949.7004562243865!2d-34.906957524109!3d-8.13194718141222!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x7ab1fcb08ad1401%3A0xd24bd3d576e3012a!2sMar%20Hotel%20Conventions!5e0!3m2!1spt-BR!2sbr!4v1773178155045!5m2!1spt-BR!2sbr"
+        },
+        discovery: {
+            name: "Descubra Pernambuco",
+            description: "Recife e Olinda oferecem um mix inesquecível de história, praias paradisíacas e uma das gastronomias mais ricas do Brasil.",
+            cover: "",
+            gallery: [] as string[]
+        }
+    });
+
+    const hotelCoverRef = useRef<HTMLInputElement>(null);
+    const hotelGalleryRef = useRef<HTMLInputElement>(null);
+    const discoveryCoverRef = useRef<HTMLInputElement>(null);
+    const discoveryGalleryRef = useRef<HTMLInputElement>(null);
 
     const saveRegulamento = async () => {
         if (!newRegulamento.name) return toast.error("Preencha o nome.");
@@ -1002,6 +1030,12 @@ const AdminDashboard = () => {
 
                     const ad = configData.find((c: any) => c.key === 'divulgacao');
                     if (ad && ad.value) setAdImage(ad.value);
+
+                    const local = configData.find((c: any) => c.key === 'local_settings');
+                    if (local && local.value) {
+                        const parsed = typeof local.value === 'string' ? JSON.parse(local.value) : local.value;
+                        setLocalSettings(prev => ({ ...prev, ...parsed }));
+                    }
                 }
 
                 if (dbInscricoes) {
@@ -1400,6 +1434,103 @@ const AdminDashboard = () => {
         }
     };
 
+    const handleSaveLocalSettings = async () => {
+        try {
+            const { error } = await supabase.from('config').upsert({
+                key: 'local_settings',
+                value: JSON.stringify(localSettings),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+
+            if (error) throw error;
+            toast.success("Configurações do Local salvas com sucesso!");
+        } catch (err) {
+            console.error("Erro ao salvar local_settings:", err);
+            toast.error("Erro ao salvar no banco de dados.");
+        }
+    };
+
+    const handleLocalPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, section: 'hotel' | 'discovery') => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        toast.loading("Enviando imagem...", { id: "upload-local" });
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+            const filePath = `admin/local/${section}/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from('media').getPublicUrl(filePath);
+            const publicUrl = data.publicUrl;
+
+            setLocalSettings(prev => ({
+                ...prev,
+                [section]: { ...prev[section], cover: publicUrl }
+            }));
+            toast.success("Capa atualizada!", { id: "upload-local" });
+        } catch (err) {
+            console.error("Erro no upload local:", err);
+            toast.error("Erro ao carregar imagem.", { id: "upload-local" });
+        }
+    };
+
+    const handleLocalGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>, section: 'hotel' | 'discovery') => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        setIsUploading(true);
+        setUploadProgress(0);
+        const fileArray = Array.from(files);
+        const totalFiles = fileArray.length;
+        let uploadedCount = 0;
+        const uploadedUrls: string[] = [];
+
+        try {
+            for (const file of fileArray) {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+                const filePath = `admin/local/${section}/gallery/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+                if (uploadError) throw uploadError;
+
+                const { data } = supabase.storage.from('media').getPublicUrl(filePath);
+                uploadedUrls.push(data.publicUrl);
+                
+                uploadedCount++;
+                setUploadProgress(Math.floor((uploadedCount / totalFiles) * 100));
+            }
+
+            setLocalSettings(prev => ({
+                ...prev,
+                [section]: { 
+                    ...prev[section], 
+                    gallery: [...(prev[section].gallery || []), ...uploadedUrls] 
+                }
+            }));
+            toast.success(`${totalFiles} fotos adicionadas à galeria!`);
+        } catch (err) {
+            console.error("Erro no upload da galeria:", err);
+            toast.error("Erro ao carregar uma ou mais imagens.");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const removeLocalGalleryImage = (section: 'hotel' | 'discovery', index: number) => {
+        setLocalSettings(prev => {
+            const newGallery = [...prev[section].gallery];
+            newGallery.splice(index, 1);
+            return {
+                ...prev,
+                [section]: { ...prev[section], gallery: newGallery }
+            };
+        });
+    };
+
     const handleUpdatePassword = async () => {
         if (!passwordData.newPassword || !passwordData.confirmPassword) {
             toast.error("Por favor, preencha os dois campos de senha.");
@@ -1719,6 +1850,7 @@ const AdminDashboard = () => {
         { id: "programacao", label: "Programação", icon: Calendar },
         { id: "galeria", label: "Galeria de Fotos", icon: ImageIcon },
         { id: "teses", label: "Gestão de Teses", icon: BookOpen },
+        { id: "local", label: "Local", icon: MapPin },
         { id: "inscricoes", label: "Inscrições", icon: FileText },
         ...(user.role === "admin" ? [{ id: "usuarios", label: "Usuários", icon: Shield }] : []),
         { id: "perfil", label: "Meu Perfil", icon: User },
@@ -4127,6 +4259,282 @@ const AdminDashboard = () => {
                                             </div>
                                         </DialogContent>
                                     </Dialog>
+                                </div>
+                            )}
+
+                            {/* Local Tab */}
+                            {activeTab === "local" && (
+                                <div className="space-y-8 pb-12">
+                                    <div className="flex justify-between items-center bg-[#122442] p-6 rounded-3xl shadow-xl border border-white/5">
+                                        <div>
+                                            <h3 className="font-heading font-black text-xl text-white uppercase tracking-tight">Onde Tudo Acontece</h3>
+                                            <p className="text-white/40 text-[13px] font-medium">Gerencie as informações da página Local do evento.</p>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <Button
+                                                onClick={handleSaveLocalSettings}
+                                                className="rounded-full gap-2 px-8 h-12 bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20"
+                                            >
+                                                <Check className="w-4 h-4" /> Salvar Alterações
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-8">
+                                        {/* Mar Hotel Conventions */}
+                                        <div className="bg-[#122442] rounded-[2.5rem] border border-white/5 shadow-xl overflow-hidden p-8 space-y-8">
+                                            <div className="flex items-center gap-4 border-b border-white/5 pb-6">
+                                                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                                                    <Hotel className="w-6 h-6 text-primary" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-heading font-black text-lg text-white">Mar Hotel Conventions</h4>
+                                                    <p className="text-white/30 text-xs font-bold uppercase tracking-widest">Informações da Sede do Evento</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                <div className="space-y-6">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Nome do Local</label>
+                                                        <Input
+                                                            value={localSettings.hotel.name}
+                                                            onChange={(e) => setLocalSettings({ ...localSettings, hotel: { ...localSettings.hotel, name: e.target.value } })}
+                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Endereço Completo</label>
+                                                        <Input
+                                                            value={localSettings.hotel.address}
+                                                            onChange={(e) => setLocalSettings({ ...localSettings, hotel: { ...localSettings.hotel, address: e.target.value } })}
+                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white"
+                                                        />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-2">
+                                                            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Contato/Telefone</label>
+                                                            <Input
+                                                                value={localSettings.hotel.contact}
+                                                                onChange={(e) => setLocalSettings({ ...localSettings, hotel: { ...localSettings.hotel, contact: e.target.value } })}
+                                                                className="rounded-xl h-12 bg-white/5 border-white/10 text-white"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Website</label>
+                                                            <div className="relative">
+                                                                <Input
+                                                                    value={localSettings.hotel.website}
+                                                                    onChange={(e) => setLocalSettings({ ...localSettings, hotel: { ...localSettings.hotel, website: e.target.value } })}
+                                                                    className="rounded-xl h-12 bg-white/5 border-white/10 text-white pr-10"
+                                                                />
+                                                                <Globe className="w-4 h-4 text-white/20 absolute right-3 top-1/2 -translate-y-1/2" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-6">
+                                                    <div className="space-y-4">
+                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Foto de Capa</label>
+                                                        <div 
+                                                            onClick={() => hotelCoverRef.current?.click()}
+                                                            className="aspect-[21/9] rounded-2xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all overflow-hidden group relative"
+                                                        >
+                                                            {localSettings.hotel.cover ? (
+                                                                <>
+                                                                    <img src={localSettings.hotel.cover} className="w-full h-full object-cover" />
+                                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                        <Camera className="w-8 h-8 text-white" />
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Camera className="w-8 h-8 text-white/10 mb-2" />
+                                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">Alterar Capa</span>
+                                                                </>
+                                                            )}
+                                                            <input type="file" ref={hotelCoverRef} className="hidden" accept="image/*" onChange={(e) => handleLocalPhotoUpload(e, 'hotel')} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4 border-t border-white/5 pt-8">
+                                                <div className="flex items-center justify-between">
+                                                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Galeria de Fotos do Hotel</label>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        onClick={() => hotelGalleryRef.current?.click()}
+                                                        className="text-primary hover:text-primary/80 text-[10px] font-black uppercase tracking-widest flex gap-2"
+                                                    >
+                                                        <Plus className="w-3 h-3" /> Adicionar Fotos
+                                                    </Button>
+                                                    <input type="file" ref={hotelGalleryRef} className="hidden" multiple accept="image/*" onChange={(e) => handleLocalGalleryUpload(e, 'hotel')} />
+                                                </div>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                                    {localSettings.hotel.gallery?.map((img, idx) => (
+                                                        <div key={idx} className="aspect-square rounded-xl bg-white/5 border border-white/10 relative group overflow-hidden">
+                                                            <img src={img} className="w-full h-full object-cover" />
+                                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="icon" 
+                                                                    onClick={() => removeLocalGalleryImage('hotel', idx)}
+                                                                    className="w-8 h-8 rounded-full bg-red-500 text-white hover:bg-red-600"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Google Maps */}
+                                        <div className="bg-[#122442] rounded-[2.5rem] border border-white/5 shadow-xl overflow-hidden p-8 space-y-6">
+                                            <div className="flex items-center gap-4 border-b border-white/5 pb-6">
+                                                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                                                    <MapPin className="w-6 h-6 text-emerald-500" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-heading font-black text-lg text-white">Google Maps</h4>
+                                                    <p className="text-white/30 text-xs font-bold uppercase tracking-widest">Link de Localização (Embed)</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">URL do Iframe (src)</label>
+                                                    <div className="relative">
+                                                        <Input
+                                                            value={localSettings.maps.url}
+                                                            onChange={(e) => setLocalSettings({ ...localSettings, maps: { url: e.target.value } })}
+                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white pr-10 font-mono text-[10px]"
+                                                            placeholder="https://www.google.com/maps/embed?..."
+                                                        />
+                                                        <ExternalLink className="w-4 h-4 text-white/20 absolute right-3 top-1/2 -translate-y-1/2" />
+                                                    </div>
+                                                    <p className="text-[9px] text-white/20 font-medium italic px-2">Copie apenas o valor do atributo 'src' do código de incorporação do Google Maps.</p>
+                                                </div>
+                                                <div className="aspect-[21/9] rounded-2xl bg-black/20 border border-white/5 overflow-hidden">
+                                                    <iframe 
+                                                        src={localSettings.maps.url} 
+                                                        className="w-full h-full border-none grayscale brightness-50 contrast-125 opacity-50 pointer-events-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Descubra Pernambuco */}
+                                        <div className="bg-[#122442] rounded-[2.5rem] border border-white/5 shadow-xl overflow-hidden p-8 space-y-8">
+                                            <div className="flex items-center gap-4 border-b border-white/5 pb-6">
+                                                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                                                    <Compass className="w-6 h-6 text-amber-500" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-heading font-black text-lg text-white">Descubra Pernambuco</h4>
+                                                    <p className="text-white/30 text-xs font-bold uppercase tracking-widest">Turismo e Atrações</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                <div className="space-y-6">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Título da Seção</label>
+                                                        <Input
+                                                            value={localSettings.discovery.name}
+                                                            onChange={(e) => setLocalSettings({ ...localSettings, discovery: { ...localSettings.discovery, name: e.target.value } })}
+                                                            className="rounded-xl h-12 bg-white/5 border-white/10 text-white"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Descrição Curta</label>
+                                                        <textarea
+                                                            value={localSettings.discovery.description}
+                                                            onChange={(e) => setLocalSettings({ ...localSettings, discovery: { ...localSettings.discovery, description: e.target.value } })}
+                                                            className="w-full rounded-xl p-4 bg-white/5 border border-white/10 text-white text-sm focus:border-primary/50 outline-none min-h-[140px] resize-none"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-6">
+                                                    <div className="space-y-4">
+                                                        <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Foto de Capa do Turismo</label>
+                                                        <div 
+                                                            onClick={() => discoveryCoverRef.current?.click()}
+                                                            className="aspect-[21/9] rounded-2xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all overflow-hidden group relative"
+                                                        >
+                                                            {localSettings.discovery.cover ? (
+                                                                <>
+                                                                    <img src={localSettings.discovery.cover} className="w-full h-full object-cover" />
+                                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                        <Camera className="w-8 h-8 text-white" />
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Camera className="w-8 h-8 text-white/10 mb-2" />
+                                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">Alterar Capa</span>
+                                                                </>
+                                                            )}
+                                                            <input type="file" ref={discoveryCoverRef} className="hidden" accept="image/*" onChange={(e) => handleLocalPhotoUpload(e, 'discovery')} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4 border-t border-white/5 pt-8">
+                                                <div className="flex items-center justify-between">
+                                                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-1">Galeria de Fotos do Turismo</label>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        onClick={() => discoveryGalleryRef.current?.click()}
+                                                        className="text-primary hover:text-primary/80 text-[10px] font-black uppercase tracking-widest flex gap-2"
+                                                    >
+                                                        <Plus className="w-3 h-3" /> Adicionar Fotos
+                                                    </Button>
+                                                    <input type="file" ref={discoveryGalleryRef} className="hidden" multiple accept="image/*" onChange={(e) => handleLocalGalleryUpload(e, 'discovery')} />
+                                                </div>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                                    {localSettings.discovery.gallery?.map((img, idx) => (
+                                                        <div key={idx} className="aspect-square rounded-xl bg-white/5 border border-white/10 relative group overflow-hidden">
+                                                            <img src={img} className="w-full h-full object-cover" />
+                                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="icon" 
+                                                                    onClick={() => removeLocalGalleryImage('discovery', idx)}
+                                                                    className="w-8 h-8 rounded-full bg-red-500 text-white hover:bg-red-600"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {isUploading && (
+                                        <div className="fixed bottom-8 right-8 w-80 bg-[#122442] border border-white/10 rounded-2xl shadow-2xl p-6 z-50">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Enviando Fotos...</span>
+                                                <span className="text-xs font-black text-white">{uploadProgress}%</span>
+                                            </div>
+                                            <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                                <motion.div 
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${uploadProgress}%` }}
+                                                    className="h-full bg-primary"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
