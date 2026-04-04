@@ -33,32 +33,29 @@ const LocalPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data } = await supabase.from('config').select('value').eq('key', 'local_settings').maybeSingle();
+        const { data } = await supabase.from('config').select('value').eq('key', 'hotel_settings').maybeSingle();
         if (data && data.value) {
           const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
           
-          // Ensure structure is correct
-          const merged = {
-            hotel: { ...config.hotel, ...(parsed.hotel || {}) },
-            maps: { ...config.maps, ...(parsed.maps || {}) },
-            discovery: { ...config.discovery, ...(parsed.discovery || {}) }
-          };
-          
-          setConfig(merged);
-        } else {
-          // Fallback legacy check
-          const { data: legacyData } = await supabase.from('config').select('value').eq('key', 'hotel_settings').maybeSingle();
-          if (legacyData && legacyData.value) {
-            const legacy = typeof legacyData.value === 'string' ? JSON.parse(legacyData.value) : legacyData.value;
+          if (parsed.hotel) {
+            // New structure found
+            const merged = {
+              hotel: { ...config.hotel, ...parsed.hotel },
+              maps: { ...config.maps, ...(parsed.maps || {}) },
+              discovery: { ...config.discovery, ...(parsed.discovery || {}) }
+            };
+            setConfig(merged);
+          } else {
+            // Legacy flat structure
             setConfig(prev => ({
               ...prev,
               hotel: {
                 ...prev.hotel,
-                name: legacy.name || prev.hotel.name,
-                address: legacy.address || prev.hotel.address,
-                contact: legacy.contact || prev.hotel.contact,
-                website: legacy.website || prev.hotel.website,
-                gallery: legacy.photos || prev.hotel.gallery
+                name: parsed.name || prev.hotel.name,
+                address: parsed.address || prev.hotel.address,
+                contact: parsed.contact || prev.hotel.contact,
+                website: parsed.website || prev.hotel.website,
+                gallery: parsed.photos || prev.hotel.gallery
               }
             }));
           }

@@ -1031,10 +1031,28 @@ const AdminDashboard = () => {
                     const ad = configData.find((c: any) => c.key === 'divulgacao');
                     if (ad && ad.value) setAdImage(ad.value);
 
-                    const local = configData.find((c: any) => c.key === 'local_settings');
+                    const local = configData.find((c: any) => c.key === 'hotel_settings');
                     if (local && local.value) {
-                        const parsed = typeof local.value === 'string' ? JSON.parse(local.value) : local.value;
-                        setLocalSettings(prev => ({ ...prev, ...parsed }));
+                        try {
+                            const parsed = typeof local.value === 'string' ? JSON.parse(local.value) : local.value;
+                            // Check if it's the new consolidated format or old flat format
+                            if (parsed.hotel) {
+                                setLocalSettings(prev => ({ ...prev, ...parsed }));
+                            } else {
+                                // Map legacy flat hotel_settings to the new structure
+                                setLocalSettings(prev => ({
+                                    ...prev,
+                                    hotel: {
+                                        ...prev.hotel,
+                                        name: parsed.name || prev.hotel.name,
+                                        address: parsed.address || prev.hotel.address,
+                                        contact: parsed.contact || prev.hotel.contact,
+                                        website: parsed.website || prev.hotel.website,
+                                        gallery: parsed.photos || prev.hotel.gallery
+                                    }
+                                }));
+                            }
+                        } catch (e) { console.error("Error parsing hotel_settings", e); }
                     }
                 }
 
@@ -1437,7 +1455,7 @@ const AdminDashboard = () => {
     const handleSaveLocalSettings = async () => {
         try {
             const { error } = await supabase.from('config').upsert({
-                key: 'local_settings',
+                key: 'hotel_settings',
                 value: JSON.stringify(localSettings),
                 updated_at: new Date().toISOString()
             }, { onConflict: 'key' });
