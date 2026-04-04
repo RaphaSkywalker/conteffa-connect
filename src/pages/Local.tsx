@@ -134,9 +134,9 @@ const LocalPage = () => {
               <div className="bg-[#122442] rounded-[3rem] overflow-hidden shadow-2xl h-full flex flex-col">
                 <div
                   className="relative h-72 cursor-zoom-in overflow-hidden"
-                  onClick={() => config.hotel.gallery.length > 0 && setPhotoIndex({ type: 'hotel', index: 0 })}
+                  onClick={() => (config.hotel.cover || config.hotel.gallery.length > 0) && setPhotoIndex({ type: 'hotel', index: 0 })}
                 >
-                  {config.hotel.gallery.length > 0 ? (
+                  {(config.hotel.cover || config.hotel.gallery.length > 0) ? (
                     <img src={config.hotel.cover || config.hotel.gallery[0]} alt="Hotel" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                   ) : (
                     <div className="w-full h-full bg-white/5 flex items-center justify-center">
@@ -203,9 +203,9 @@ const LocalPage = () => {
               <div className="bg-[#122442] rounded-[3rem] overflow-hidden shadow-2xl h-full flex flex-col">
                 <div
                   className="relative h-72 cursor-zoom-in overflow-hidden"
-                  onClick={() => config.discovery.gallery.length > 0 && setPhotoIndex({ type: 'attraction', index: 0 })}
+                  onClick={() => (config.discovery.cover || config.discovery.gallery.length > 0) && setPhotoIndex({ type: 'attraction', index: 0 })}
                 >
-                  {config.discovery.gallery.length > 0 ? (
+                  {(config.discovery.cover || config.discovery.gallery.length > 0) ? (
                     <img src={config.discovery.cover || config.discovery.gallery[0]} alt="Atrações" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                   ) : (
                     <div className="w-full h-full bg-white/5 flex items-center justify-center">
