@@ -1031,33 +1031,35 @@ const AdminDashboard = () => {
                     const ad = configData.find((c: any) => c.key === 'divulgacao');
                     if (ad && ad.value) setAdImage(ad.value);
 
-                    // Load Local Settings (try new key, fall back to old)
-                    const localNew = configData.find((c: any) => c.key === 'site_local_config');
-                    const localOld = configData.find((c: any) => c.key === 'hotel_settings');
-                    const localEntry = localNew || localOld;
-
-                    if (localEntry && localEntry.value) {
-                        try {
-                            const parsed = typeof localEntry.value === 'string' ? JSON.parse(localEntry.value) : localEntry.value;
-                            // Check if it's the new consolidated format or old flat format
-                            if (parsed.hotel) {
-                                setLocalSettings(prev => ({ ...prev, ...parsed }));
-                            } else {
-                                // Map legacy flat hotel_settings to the new structure
-                                setLocalSettings(prev => ({
-                                    ...prev,
-                                    hotel: {
-                                        ...prev.hotel,
-                                        name: parsed.name || prev.hotel.name,
-                                        address: parsed.address || prev.hotel.address,
-                                        contact: parsed.contact || prev.hotel.contact,
-                                        website: parsed.website || prev.hotel.website,
-                                        gallery: parsed.photos || prev.hotel.gallery
-                                    }
-                                }));
-                            }
-                        } catch (e) { console.error("Error parsing local settings", e); }
-                    }
+                    // Load Local Settings from system albums (fixed IDs 999001 and 999002)
+                    try {
+                        const { data: albumData } = await supabase.from('albums').select('*').in('id', [999001, 999002]);
+                        if (albumData && albumData.length > 0) {
+                            const hotelAlbum = albumData.find(a => a.id === 999001);
+                            const discoveryAlbum = albumData.find(a => a.id === 999002);
+                            
+                            setLocalSettings(prev => ({
+                                ...prev,
+                                hotel: hotelAlbum ? {
+                                    name: hotelAlbum.title || prev.hotel.name,
+                                    address: hotelAlbum.date || prev.hotel.address,
+                                    contact: hotelAlbum.location || prev.hotel.contact,
+                                    cover: hotelAlbum.cover || prev.hotel.cover,
+                                    gallery: hotelAlbum.photos || prev.hotel.gallery,
+                                    website: prev.hotel.website // Fallback if missing
+                                } : prev.hotel,
+                                discovery: discoveryAlbum ? {
+                                    name: discoveryAlbum.title || prev.discovery.name,
+                                    description: discoveryAlbum.date || prev.discovery.description,
+                                    cover: discoveryAlbum.cover || prev.discovery.cover,
+                                    gallery: discoveryAlbum.photos || prev.discovery.gallery
+                                } : prev.discovery,
+                                maps: discoveryAlbum ? {
+                                    url: discoveryAlbum.location || prev.maps.url
+                                } : prev.maps
+                            }));
+                        }
+                    } catch (e) { console.error("Error fetching local settings from albums", e); }
                 }
 
                 if (dbInscricoes) {
@@ -1460,41 +1462,41 @@ const AdminDashboard = () => {
         try {
             toast.loading("Salvando configurações...", { id: "save-local" });
             
-            // Revised Strategy: Omit updated_at and pass raw object in array format
-            // Some RLS policies block explicit updated_at changes
-            const { error: upsertError } = await supabase
-                .from('config')
-                .upsert([
-                    { 
-                        key: 'site_local_config',
-                        value: localSettings
-                    }
-                ], { onConflict: 'key' });
+            // We migrate to the 'albums' table because the user confirmed they have RLS permission there
+            // IDs 999001 and 999002 are system-reserved for Mar Hotel and Discovery Pernambuco
+            const albumPayloads = [
+                {
+                    id: 999001,
+                    title: localSettings.hotel.name,
+                    date: localSettings.hotel.address,
+                    location: localSettings.hotel.contact,
+                    cover: localSettings.hotel.cover,
+                    photos: localSettings.hotel.gallery
+                },
+                {
+                    id: 999002,
+                    title: localSettings.discovery.name,
+                    date: localSettings.discovery.description,
+                    location: localSettings.maps.url,
+                    cover: localSettings.discovery.cover,
+                    photos: localSettings.discovery.gallery
+                }
+            ];
 
-            if (upsertError) throw upsertError;
+            const { error: saveError } = await supabase
+                .from('albums')
+                .upsert(albumPayloads, { onConflict: 'id' });
+
+            if (saveError) throw saveError;
 
             toast.success("Configurações do Local salvas com sucesso!", { id: "save-local" });
         } catch (err: any) {
-            console.error("ERRO DETALHADO AO SALVAR:", err);
+            console.error("ERRO AO SALVAR NA TABELA ALBUMS:", err);
             const detail = err?.message || "Erro de permissão ou rede";
-            toast.error(`Falha ao salvar: ${detail}`, { id: "save-local" });
+            toast.error(`Falha ao salvar: ${detail}. Informe ao suporte.`, { id: "save-local" });
         }
     };
 
-    const handleDiagnosticTest = async () => {
-        const tests = ['hotel_test', 'settings_test', 'site_local_config'];
-        toast.loading("Iniciando diagnóstico...", { id: "diag" });
-        
-        let results = [];
-        for (const key of tests) {
-            const { error } = await supabase.from('config').upsert([{ key, value: { test: true } }], { onConflict: 'key' });
-            results.push(`${key}: ${error ? '❌ Falhou' : '✅ Funcionou'}`);
-        }
-        
-        toast.dismiss("diag");
-        const summary = results.join('\n');
-        alert("Resultado do Diagnóstico:\n\n" + summary + "\n\nSe todos falharem com 'RLS policy', o suporte precisa liberar a tabela 'config'.");
-    };
 
     const handleLocalPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, section: 'hotel' | 'discovery') => {
         const file = e.target.files?.[0];
@@ -4317,13 +4319,6 @@ const AdminDashboard = () => {
                                             <p className="text-white/40 text-[13px] font-medium">Gerencie as informações da página Local do evento.</p>
                                         </div>
                                         <div className="flex gap-3">
-                                            <Button
-                                                variant="outline"
-                                                onClick={handleDiagnosticTest}
-                                                className="rounded-full border-white/10 text-white/60 hover:text-white"
-                                            >
-                                                Testar Banco
-                                            </Button>
                                             <Button
                                                 onClick={handleSaveLocalSettings}
                                                 className="rounded-full gap-2 px-8 h-12 bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20"

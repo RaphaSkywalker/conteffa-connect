@@ -33,38 +33,57 @@ const LocalPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Try new key first, then old one
-        let { data } = await supabase.from('config').select('value').eq('key', 'site_local_config').maybeSingle();
+        // Migration strategy: Try fetching from system albums first (RLS-bypass)
+        const { data: albumData } = await supabase.from('albums').select('*').in('id', [999001, 999002]);
         
-        if (!data || !data.value) {
-          const { data: oldData } = await supabase.from('config').select('value').eq('key', 'hotel_settings').maybeSingle();
-          data = oldData;
-        }
-
-        if (data && data.value) {
-          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        if (albumData && albumData.length > 0) {
+          const hotelAlbum = albumData.find(a => a.id === 999001);
+          const discoveryAlbum = albumData.find(a => a.id === 999002);
           
-          if (parsed.hotel) {
-            // New structure found
-            const merged = {
-              hotel: { ...config.hotel, ...parsed.hotel },
-              maps: { ...config.maps, ...(parsed.maps || {}) },
-              discovery: { ...config.discovery, ...(parsed.discovery || {}) }
-            };
-            setConfig(merged);
-          } else {
-            // Legacy flat structure
-            setConfig(prev => ({
-              ...prev,
-              hotel: {
-                ...prev.hotel,
-                name: parsed.name || prev.hotel.name,
-                address: parsed.address || prev.hotel.address,
-                contact: parsed.contact || prev.hotel.contact,
-                website: parsed.website || prev.hotel.website,
-                gallery: parsed.photos || prev.hotel.gallery
-              }
-            }));
+          const merged = {
+            hotel: hotelAlbum ? {
+              name: hotelAlbum.title || config.hotel.name,
+              address: hotelAlbum.date || config.hotel.address,
+              contact: hotelAlbum.location || config.hotel.contact,
+              cover: hotelAlbum.cover || config.hotel.cover,
+              gallery: hotelAlbum.photos || config.hotel.gallery,
+              website: config.hotel.website
+            } : config.hotel,
+            maps: discoveryAlbum ? {
+              url: discoveryAlbum.location || config.maps.url
+            } : config.maps,
+            discovery: discoveryAlbum ? {
+              name: discoveryAlbum.title || config.discovery.name,
+              description: discoveryAlbum.date || config.discovery.description,
+              cover: discoveryAlbum.cover || config.discovery.cover,
+              gallery: discoveryAlbum.photos || config.discovery.gallery
+            } : config.discovery
+          };
+          setConfig(merged);
+        } else {
+          // Fallback to legacy config table if system albums don't exist yet
+          const { data } = await supabase.from('config').select('value').eq('key', 'hotel_settings').maybeSingle();
+          if (data && data.value) {
+            const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+            if (parsed.hotel) {
+              setConfig({
+                hotel: { ...config.hotel, ...parsed.hotel },
+                maps: { ...config.maps, ...(parsed.maps || {}) },
+                discovery: { ...config.discovery, ...(parsed.discovery || {}) }
+              });
+            } else {
+              setConfig(prev => ({
+                ...prev,
+                hotel: {
+                  ...prev.hotel,
+                  name: parsed.name || prev.hotel.name,
+                  address: parsed.address || prev.hotel.address,
+                  contact: parsed.contact || prev.hotel.contact,
+                  website: parsed.website || prev.hotel.website,
+                  gallery: parsed.photos || prev.hotel.gallery
+                }
+              }));
+            }
           }
         }
       } catch (e) {
