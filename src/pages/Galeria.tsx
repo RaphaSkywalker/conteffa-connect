@@ -24,7 +24,9 @@ const Galeria = () => {
       try {
         const { data, error } = await supabase.from('albums').select('*').order('id', { ascending: false });
         if (data && data.length > 0) {
-          const formatted = data.map(album => {
+          const formatted = data
+            .filter(album => !album.shares || album.shares < 99000) // Exclude system albums
+            .map(album => {
             let enriched = { ...album };
             if (album.date && typeof album.date === 'string' && album.date.includes('-') && !album.date.includes('/')) {
               const parts = album.date.split('-');
