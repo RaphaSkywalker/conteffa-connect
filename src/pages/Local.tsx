@@ -33,7 +33,14 @@ const LocalPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data } = await supabase.from('config').select('value').eq('key', 'hotel_settings').maybeSingle();
+        // Try new key first, then old one
+        let { data } = await supabase.from('config').select('value').eq('key', 'site_local_config').maybeSingle();
+        
+        if (!data || !data.value) {
+          const { data: oldData } = await supabase.from('config').select('value').eq('key', 'hotel_settings').maybeSingle();
+          data = oldData;
+        }
+
         if (data && data.value) {
           const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
           

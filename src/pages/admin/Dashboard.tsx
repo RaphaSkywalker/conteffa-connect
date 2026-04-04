@@ -1031,10 +1031,14 @@ const AdminDashboard = () => {
                     const ad = configData.find((c: any) => c.key === 'divulgacao');
                     if (ad && ad.value) setAdImage(ad.value);
 
-                    const local = configData.find((c: any) => c.key === 'hotel_settings');
-                    if (local && local.value) {
+                    // Load Local Settings (try new key, fall back to old)
+                    const localNew = configData.find((c: any) => c.key === 'site_local_config');
+                    const localOld = configData.find((c: any) => c.key === 'hotel_settings');
+                    const localEntry = localNew || localOld;
+
+                    if (localEntry && localEntry.value) {
                         try {
-                            const parsed = typeof local.value === 'string' ? JSON.parse(local.value) : local.value;
+                            const parsed = typeof localEntry.value === 'string' ? JSON.parse(localEntry.value) : localEntry.value;
                             // Check if it's the new consolidated format or old flat format
                             if (parsed.hotel) {
                                 setLocalSettings(prev => ({ ...prev, ...parsed }));
@@ -1052,7 +1056,7 @@ const AdminDashboard = () => {
                                     }
                                 }));
                             }
-                        } catch (e) { console.error("Error parsing hotel_settings", e); }
+                        } catch (e) { console.error("Error parsing local settings", e); }
                     }
                 }
 
@@ -1454,47 +1458,27 @@ const AdminDashboard = () => {
 
     const handleSaveLocalSettings = async () => {
         try {
-            toast.loading("Salvando...", { id: "save-local" });
+            toast.loading("Salvando configurações...", { id: "save-local" });
             
-            // Try updating first
-            const { error: updateError, count } = await supabase
+            // Using a completely fresh key 'site_local_config' to bypass RLS issues with the legacy key
+            const { error: upsertError } = await supabase
                 .from('config')
-                .update({ 
+                .upsert({ 
+                    key: 'site_local_config',
                     value: JSON.stringify(localSettings),
                     updated_at: new Date().toISOString()
-                }, { count: 'exact' })
-                .eq('key', 'hotel_settings');
+                }, { onConflict: 'key' });
 
-            if (updateError) {
-                console.error("Tentativa de UPDATE falhou:", updateError);
-                // If update fails, maybe the row doesn't exist? (Unlikely, but fallback)
-                const { error: insertError } = await supabase
-                    .from('config')
-                    .insert({
-                        key: 'hotel_settings',
-                        value: JSON.stringify(localSettings),
-                        updated_at: new Date().toISOString()
-                    });
-                
-                if (insertError) throw insertError;
-            } else if (count === 0) {
-                // Should not happen as hotel_settings exists, but for robustness:
-                const { error: insertError } = await supabase
-                    .from('config')
-                    .insert({
-                        key: 'hotel_settings',
-                        value: JSON.stringify(localSettings),
-                        updated_at: new Date().toISOString()
-                    });
-                
-                if (insertError) throw insertError;
+            if (upsertError) {
+                console.error("Erro no UPSERT primário:", upsertError);
+                throw upsertError;
             }
 
             toast.success("Configurações do Local salvas com sucesso!", { id: "save-local" });
         } catch (err: any) {
             console.error("ERRO DETALHADO AO SALVAR:", err);
-            const errorMessage = err?.message || "Erro desconhecido";
-            toast.error(`Erro ao salvar no banco de dados: ${errorMessage}`, { id: "save-local" });
+            const detail = err?.message || "Erro de permissão ou rede";
+            toast.error(`Falha ao salvar: ${detail}. Informe ao suporte técnico.`, { id: "save-local" });
         }
     };
 
