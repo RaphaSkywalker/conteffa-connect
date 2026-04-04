@@ -1454,17 +1454,47 @@ const AdminDashboard = () => {
 
     const handleSaveLocalSettings = async () => {
         try {
-            const { error } = await supabase.from('config').upsert({
-                key: 'hotel_settings',
-                value: JSON.stringify(localSettings),
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'key' });
+            toast.loading("Salvando...", { id: "save-local" });
+            
+            // Try updating first
+            const { error: updateError, count } = await supabase
+                .from('config')
+                .update({ 
+                    value: JSON.stringify(localSettings),
+                    updated_at: new Date().toISOString()
+                }, { count: 'exact' })
+                .eq('key', 'hotel_settings');
 
-            if (error) throw error;
-            toast.success("Configurações do Local salvas com sucesso!");
-        } catch (err) {
-            console.error("Erro ao salvar local_settings:", err);
-            toast.error("Erro ao salvar no banco de dados.");
+            if (updateError) {
+                console.error("Tentativa de UPDATE falhou:", updateError);
+                // If update fails, maybe the row doesn't exist? (Unlikely, but fallback)
+                const { error: insertError } = await supabase
+                    .from('config')
+                    .insert({
+                        key: 'hotel_settings',
+                        value: JSON.stringify(localSettings),
+                        updated_at: new Date().toISOString()
+                    });
+                
+                if (insertError) throw insertError;
+            } else if (count === 0) {
+                // Should not happen as hotel_settings exists, but for robustness:
+                const { error: insertError } = await supabase
+                    .from('config')
+                    .insert({
+                        key: 'hotel_settings',
+                        value: JSON.stringify(localSettings),
+                        updated_at: new Date().toISOString()
+                    });
+                
+                if (insertError) throw insertError;
+            }
+
+            toast.success("Configurações do Local salvas com sucesso!", { id: "save-local" });
+        } catch (err: any) {
+            console.error("ERRO DETALHADO AO SALVAR:", err);
+            const errorMessage = err?.message || "Erro desconhecido";
+            toast.error(`Erro ao salvar no banco de dados: ${errorMessage}`, { id: "save-local" });
         }
     };
 
