@@ -1460,26 +1460,40 @@ const AdminDashboard = () => {
         try {
             toast.loading("Salvando configurações...", { id: "save-local" });
             
-            // Using a completely fresh key 'site_local_config' to bypass RLS issues with the legacy key
+            // Revised Strategy: Omit updated_at and pass raw object in array format
+            // Some RLS policies block explicit updated_at changes
             const { error: upsertError } = await supabase
                 .from('config')
-                .upsert({ 
-                    key: 'site_local_config',
-                    value: JSON.stringify(localSettings),
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'key' });
+                .upsert([
+                    { 
+                        key: 'site_local_config',
+                        value: localSettings
+                    }
+                ], { onConflict: 'key' });
 
-            if (upsertError) {
-                console.error("Erro no UPSERT primário:", upsertError);
-                throw upsertError;
-            }
+            if (upsertError) throw upsertError;
 
             toast.success("Configurações do Local salvas com sucesso!", { id: "save-local" });
         } catch (err: any) {
             console.error("ERRO DETALHADO AO SALVAR:", err);
             const detail = err?.message || "Erro de permissão ou rede";
-            toast.error(`Falha ao salvar: ${detail}. Informe ao suporte técnico.`, { id: "save-local" });
+            toast.error(`Falha ao salvar: ${detail}`, { id: "save-local" });
         }
+    };
+
+    const handleDiagnosticTest = async () => {
+        const tests = ['hotel_test', 'settings_test', 'site_local_config'];
+        toast.loading("Iniciando diagnóstico...", { id: "diag" });
+        
+        let results = [];
+        for (const key of tests) {
+            const { error } = await supabase.from('config').upsert([{ key, value: { test: true } }], { onConflict: 'key' });
+            results.push(`${key}: ${error ? '❌ Falhou' : '✅ Funcionou'}`);
+        }
+        
+        toast.dismiss("diag");
+        const summary = results.join('\n');
+        alert("Resultado do Diagnóstico:\n\n" + summary + "\n\nSe todos falharem com 'RLS policy', o suporte precisa liberar a tabela 'config'.");
     };
 
     const handleLocalPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, section: 'hotel' | 'discovery') => {
@@ -4303,6 +4317,13 @@ const AdminDashboard = () => {
                                             <p className="text-white/40 text-[13px] font-medium">Gerencie as informações da página Local do evento.</p>
                                         </div>
                                         <div className="flex gap-3">
+                                            <Button
+                                                variant="outline"
+                                                onClick={handleDiagnosticTest}
+                                                className="rounded-full border-white/10 text-white/60 hover:text-white"
+                                            >
+                                                Testar Banco
+                                            </Button>
                                             <Button
                                                 onClick={handleSaveLocalSettings}
                                                 className="rounded-full gap-2 px-8 h-12 bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20"
