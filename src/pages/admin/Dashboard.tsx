@@ -1031,12 +1031,12 @@ const AdminDashboard = () => {
                     const ad = configData.find((c: any) => c.key === 'divulgacao');
                     if (ad && ad.value) setAdImage(ad.value);
 
-                    // Load Local Settings from system albums (fixed IDs 999001 and 999002)
+                    // Load Local Settings from system albums (shares=99001 for hotel, shares=99002 for discovery)
                     try {
-                        const { data: albumData } = await supabase.from('albums').select('*').in('id', [999001, 999002]);
+                        const { data: albumData } = await supabase.from('albums').select('*').in('shares', [99001, 99002]);
                         if (albumData && albumData.length > 0) {
-                            const hotelAlbum = albumData.find(a => a.id === 999001);
-                            const discoveryAlbum = albumData.find(a => a.id === 999002);
+                            const hotelAlbum = albumData.find((a: any) => a.shares === 99001);
+                            const discoveryAlbum = albumData.find((a: any) => a.shares === 99002);
                             
                             setLocalSettings(prev => ({
                                 ...prev,
@@ -1046,7 +1046,7 @@ const AdminDashboard = () => {
                                     contact: hotelAlbum.location || prev.hotel.contact,
                                     cover: hotelAlbum.cover || prev.hotel.cover,
                                     gallery: hotelAlbum.photos || prev.hotel.gallery,
-                                    website: prev.hotel.website // Fallback if missing
+                                    website: prev.hotel.website
                                 } : prev.hotel,
                                 discovery: discoveryAlbum ? {
                                     name: discoveryAlbum.title || prev.discovery.name,
@@ -1080,7 +1080,7 @@ const AdminDashboard = () => {
                 if (dbSpeakers) setPalestrantes(dbSpeakers);
                 if (dbProg) setProgramacao(dbProg);
                 if (dbGuests) setConvidados(dbGuests);
-                if (dbAlbums) setAlbuns(dbAlbums);
+                if (dbAlbums) setAlbuns(dbAlbums.filter((a: any) => !a.shares || a.shares < 99000));
 
             } catch (err) {
                 console.error("Failed to load data from Supabase", err);
@@ -1462,38 +1462,51 @@ const AdminDashboard = () => {
         try {
             toast.loading("Salvando configurações...", { id: "save-local" });
             
-            // We migrate to the 'albums' table because the user confirmed they have RLS permission there
-            // IDs 999001 and 999002 are system-reserved for Mar Hotel and Discovery Pernambuco
-            const albumPayloads = [
-                {
-                    id: 999001,
-                    title: localSettings.hotel.name,
-                    date: localSettings.hotel.address,
-                    location: localSettings.hotel.contact,
-                    cover: localSettings.hotel.cover,
-                    photos: localSettings.hotel.gallery
-                },
-                {
-                    id: 999002,
-                    title: localSettings.discovery.name,
-                    date: localSettings.discovery.description,
-                    location: localSettings.maps.url,
-                    cover: localSettings.discovery.cover,
-                    photos: localSettings.discovery.gallery
-                }
-            ];
+            // System albums use 'shares' as marker: 99001=hotel, 99002=discovery
+            // We lookup existing records first, then update or insert accordingly
+            const { data: existing } = await supabase.from('albums').select('id, shares').in('shares', [99001, 99002]);
+            const hotelExisting = existing?.find((a: any) => a.shares === 99001);
+            const discoveryExisting = existing?.find((a: any) => a.shares === 99002);
 
-            const { error: saveError } = await supabase
-                .from('albums')
-                .upsert(albumPayloads, { onConflict: 'id' });
+            // --- Save Hotel ---
+            const hotelPayload = {
+                title: localSettings.hotel.name,
+                date: localSettings.hotel.address,
+                location: localSettings.hotel.contact,
+                cover: localSettings.hotel.cover,
+                photos: localSettings.hotel.gallery,
+                shares: 99001
+            };
+            if (hotelExisting) {
+                const { error } = await supabase.from('albums').update(hotelPayload).eq('id', hotelExisting.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.from('albums').insert([hotelPayload]);
+                if (error) throw error;
+            }
 
-            if (saveError) throw saveError;
+            // --- Save Discovery ---
+            const discoveryPayload = {
+                title: localSettings.discovery.name,
+                date: localSettings.discovery.description,
+                location: localSettings.maps.url,
+                cover: localSettings.discovery.cover,
+                photos: localSettings.discovery.gallery,
+                shares: 99002
+            };
+            if (discoveryExisting) {
+                const { error } = await supabase.from('albums').update(discoveryPayload).eq('id', discoveryExisting.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.from('albums').insert([discoveryPayload]);
+                if (error) throw error;
+            }
 
             toast.success("Configurações do Local salvas com sucesso!", { id: "save-local" });
         } catch (err: any) {
             console.error("ERRO AO SALVAR NA TABELA ALBUMS:", err);
             const detail = err?.message || "Erro de permissão ou rede";
-            toast.error(`Falha ao salvar: ${detail}. Informe ao suporte.`, { id: "save-local" });
+            toast.error(`Falha ao salvar: ${detail}`, { id: "save-local" });
         }
     };
 

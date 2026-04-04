@@ -33,12 +33,12 @@ const LocalPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Migration strategy: Try fetching from system albums first (RLS-bypass)
-        const { data: albumData } = await supabase.from('albums').select('*').in('id', [999001, 999002]);
+        // Fetch from system albums (shares=99001 for hotel, shares=99002 for discovery)
+        const { data: albumData } = await supabase.from('albums').select('*').in('shares', [99001, 99002]);
         
         if (albumData && albumData.length > 0) {
-          const hotelAlbum = albumData.find(a => a.id === 999001);
-          const discoveryAlbum = albumData.find(a => a.id === 999002);
+          const hotelAlbum = albumData.find((a: any) => a.shares === 99001);
+          const discoveryAlbum = albumData.find((a: any) => a.shares === 99002);
           
           const merged = {
             hotel: hotelAlbum ? {
