@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 
 const CartaPresidente = () => (
   <PageLayout>
-    <PageBanner title="CARTA GERAL" />
+    <PageBanner title="EDITORIAL" />
     <section className="relative py-24 md:py-32 overflow-hidden bg-[#0B1B32]">
       {/* Decorative background logo */}
       <div className="absolute top-0 right-0 w-[600px] h-[600px] opacity-[0.03] pointer-events-none -mr-48 -mt-24">
@@ -18,7 +18,7 @@ const CartaPresidente = () => (
 
       <div className="container mx-auto px-4 relative z-10">
         <SectionTitle
-          title="Carta do Presidente"
+          title="EDITORIAL IX CONTEFFA"
           subtitle="Uma mensagem de boas-vindas do representante nacional aos participantes do IX CONTEFFA 2026."
           light={true}
         />
@@ -60,13 +60,25 @@ const CartaPresidente = () => (
             <div className="flex-1 p-10 md:p-16 relative">
               <div className="prose prose-invert max-w-none">
                 <p className="text-white/70 text-lg md:text-xl font-body leading-relaxed mb-8">
-                  Prezados colegas e participantes, é com imensa satisfação que convido todos para o <span className="text-white font-bold">IX CONTEFFA 2026</span>. Este congresso representa um marco na nossa história, reunindo os melhores profissionais para debates, teses e discussões que moldarão o futuro da nossa categoria.
+                  É com grande satisfação que me dirijo a todos os participantes, colaboradores e parceiros do <span className="text-white font-bold">IX Congresso Nacional dos Técnicos de Fiscalização Federal Agropecuária – IX CONTEFFA</span>.
                 </p>
                 <p className="text-white/70 text-lg md:text-xl font-body leading-relaxed mb-8">
-                  Ao longo de cinco dias intensos de programação, teremos a oportunidade de trocar experiências, apresentar trabalhos e construir caminhos para os desafios que se apresentam no cenário da defesa agropecuária nacional. Recife nos recebe com braços abertos para este momento de união e fortalecimento técnico-acadêmico.
+                  Este Congresso representa um espaço fundamental de diálogo, construção coletiva e fortalecimento institucional da nossa categoria. Em um cenário cada vez mais desafiador para o serviço público e, em especial, para a defesa agropecuária brasileira, reunir profissionais comprometidos com a excelência da fiscalização é não apenas oportuno, mas essencial.
+                </p>
+                <p className="text-white/70 text-lg md:text-xl font-body leading-relaxed mb-8">
+                  Ao longo desta edição, teremos a oportunidade de debater temas estratégicos, compartilhar experiências, alinhar perspectivas e construir propostas que contribuam para o aprimoramento das atividades desempenhadas pelos Técnicos de Fiscalização Federal Agropecuária em todo o país. Trata-se de um momento de reflexão, mas também de ação, voltado ao fortalecimento da nossa carreira e à valorização do serviço público de qualidade.
+                </p>
+                <p className="text-white/70 text-lg md:text-xl font-body leading-relaxed mb-8">
+                  A relevância do trabalho desempenhado por nossos profissionais impacta diretamente a segurança dos alimentos e bebidas, a sanidade agropecuária e a credibilidade do Brasil nos mercados nacional e internacional. Por isso, este Congresso reafirma o nosso compromisso com a ética, a responsabilidade e a busca contínua por melhorias nas condições de trabalho e na estrutura da fiscalização agropecuária.
+                </p>
+                <p className="text-white/70 text-lg md:text-xl font-body leading-relaxed mb-8">
+                  Convido cada integrante do PCTAF e associado da ANTEFFA a aproveitar intensamente este espaço de conhecimento e integração.
+                </p>
+                <p className="text-white/70 text-lg md:text-xl font-body leading-relaxed mb-8">
+                  Desejo a todos um excelente Congresso, repleto de debates produtivos e avanços significativos para a nossa categoria.
                 </p>
                 <p className="text-white/70 text-lg md:text-xl font-body leading-relaxed mb-12 italic">
-                  "Sua presença é fundamental para o fortalecimento da nossa representação e para o sucesso deste evento que é de todos nós."
+                  Atenciosamente,
                 </p>
 
                 {/* Assinatura Simbolizada */}
@@ -75,7 +87,8 @@ const CartaPresidente = () => (
                     José Bezerra da Rocha
                   </div>
                   <div className="h-px w-48 bg-gradient-to-r from-primary/50 to-transparent mb-4" />
-                  <p className="text-white/40 text-xs font-black uppercase tracking-widest">COMISSÃO ORGANIZADORA — IX CONTEFFA</p>
+                  <p className="text-white/40 text-xs font-black uppercase tracking-widest mb-1">Presidente da ANTEFFA</p>
+                  <p className="text-white/40 text-xs font-black uppercase tracking-widest">Comissão Organizadora - IX CONTEFFA</p>
                 </div>
               </div>
             </div>

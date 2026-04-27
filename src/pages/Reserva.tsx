@@ -1,0 +1,229 @@
+import { useState, useEffect } from "react";
+import PageLayout from "@/components/PageLayout";
+import PageBanner from "@/components/PageBanner";
+import SectionTitle from "@/components/SectionTitle";
+import { motion } from "framer-motion";
+import { Hotel, Ticket, Calendar, CreditCard, Users, Globe, List } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+const Reserva = () => {
+  const [config, setConfig] = useState({
+    hotel: {
+      name: "Mar Hotel Conventions",
+      address: "Rua Barão de Souza Leão, 451 - Boa Viagem, Recife - PE",
+      contact: "(81) 3302-4444",
+      website: "https://www.marhotel.com.br",
+    }
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { data: albumData } = await supabase.from('albums').select('*').eq('shares', 99001).maybeSingle();
+        
+        if (albumData) {
+          setConfig({
+            hotel: {
+              name: albumData.title || config.hotel.name,
+              address: albumData.date || config.hotel.address,
+              contact: albumData.location || config.hotel.contact,
+              website: config.hotel.website
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Error fetching local config", e);
+      }
+    };
+    fetchData();
+  }, []);
+
+  return (
+    <PageLayout>
+      <PageBanner title="RESERVA DE HOSPEDAGEM" />
+      <section className="section-padding bg-background relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full opacity-[0.02] pointer-events-none">
+          <img src="/bg-logo.png" alt="" className="w-full h-full object-contain scale-150 rotate-12" />
+        </div>
+
+        <div className="container mx-auto px-4 max-w-7xl relative z-10">
+          <SectionTitle
+            label="ACOMODAÇÕES"
+            title="Hospedagem"
+            subtitle={config.hotel.name}
+            centered={true}
+          />
+
+          {/* Informações de Hospedagem */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="bg-white rounded-[3rem] border border-border/50 card-shadow overflow-hidden max-w-5xl mx-auto mt-8"
+          >
+            <div className="bg-navy p-8 md:p-12 text-white">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                  <span className="bg-primary/20 text-primary text-[10px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-full border border-primary/30 inline-block mb-4">
+                    Tarifa Especial IX CONTEFFA
+                  </span>
+                  <h4 className="text-2xl md:text-4xl font-heading font-black leading-tight uppercase">
+                    Orientações para Hospedagem
+                  </h4>
+                </div>
+                <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10 flex items-center gap-4 group hover:bg-primary/20 transition-colors">
+                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shrink-0">
+                    <Ticket className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest leading-none mb-1">Valor por Apartamento</p>
+                    <p className="text-2xl font-black text-white leading-none">R$ 500,00</p>
+                    <p className="text-[10px] font-bold text-white/40 mt-1 uppercase">+ 5% de taxa de serviço</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-8 md:p-12 space-y-12 text-foreground">
+              {/* 1. Acomodações */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Hotel className="w-5 h-5 text-primary" />
+                    </div>
+                    <h5 className="text-xl font-heading font-black text-navy uppercase tracking-tight">Acomodações Disponíveis</h5>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-primary/30 transition-colors">
+                      <p className="font-heading font-bold text-navy">Classic (Duas camas de solteiro)</p>
+                      <p className="text-sm text-muted-foreground mt-1">Valor: R$ 500,00 + R$ 25,00 (5% taxa)</p>
+                    </div>
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-primary/30 transition-colors">
+                      <p className="font-heading font-bold text-navy">Classic (Casal)</p>
+                      <p className="text-sm text-muted-foreground mt-1">Valor: R$ 500,00 + 5% de taxa de serviço</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-primary bg-primary/5 p-4 rounded-xl">
+                      <CreditCard className="w-4 h-4" />
+                      <p className="text-xs font-bold uppercase tracking-wide">Parcelamento em até 6x no cartão de crédito</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Calendar className="w-5 h-5 text-primary" />
+                    </div>
+                    <h5 className="text-xl font-heading font-black text-navy uppercase tracking-tight">Datas de Validade</h5>
+                  </div>
+                  <div className="bg-navy p-6 rounded-2xl text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-bl-full opacity-50" />
+                    <p className="text-sm text-white/70 mb-4 leading-relaxed relative z-10">
+                      Tarifas promocionais disponíveis de <strong className="text-white">12 a 15 de novembro de 2026</strong>.
+                    </p>
+                    <div className="p-4 bg-white/5 rounded-xl border border-white/10 text-[11px] leading-relaxed relative z-10">
+                      <p className="font-black text-primary uppercase mb-1 tracking-widest">Extensão da Estadia:</p>
+                      Para quem desejar ampliar a estadia, o valor especial poderá ser aplicado entre <strong className="text-white">11 e 17 de novembro de 2026</strong>.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-border/30" />
+
+              {/* 2. Como realizar a reserva */}
+              <div className="space-y-8">
+                <div className="text-center max-w-2xl mx-auto space-y-3">
+                  <h5 className="text-2xl font-heading font-black text-navy uppercase">Como realizar a reserva</h5>
+                  <p className="text-muted-foreground text-sm font-medium">Escolha uma das duas formas oficiais abaixo para garantir sua vaga.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-slate-50 border border-border/50 p-8 rounded-[2.5rem] flex flex-col items-center text-center group hover:bg-white hover:border-primary/30 transition-all duration-300">
+                    <div className="w-16 h-16 rounded-2xl bg-white shadow-md flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                      <Users className="w-8 h-8 text-primary" />
+                    </div>
+                    <h6 className="text-lg font-heading font-black text-navy uppercase mb-3 text-center">1. Reserva em Grupo (via ATEFFA)</h6>
+                    <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                      Organizadas pelas ATEFFAs Estaduais. O associado deve procurar sua representação estadual vinculada para solicitar a inclusão na reserva.
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-border/50 p-8 rounded-[2.5rem] flex flex-col items-center text-center group hover:bg-white hover:border-primary/30 transition-all duration-300">
+                    <div className="w-16 h-16 rounded-2xl bg-white shadow-md flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                      <Globe className="w-8 h-8 text-primary" />
+                    </div>
+                    <h6 className="text-lg font-heading font-black text-navy uppercase mb-3 text-center">2. Reserva Individual (via Hotel)</h6>
+                    <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                      Utilize o código promocional disponibilizado pela ANTEFFA diretamente no site oficial do Mar Hotel Conventions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Passo a Passo */}
+              <div className="bg-slate-50 rounded-[3rem] p-8 md:p-10 border border-border/30">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shrink-0">
+                      <List className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h6 className="text-xl font-heading font-black text-navy uppercase tracking-tight">Passo a passo - Booking Individual</h6>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Siga as instruções exatas abaixo</p>
+                    </div>
+                  </div>
+                  <div className="bg-white px-6 py-4 rounded-2xl border border-primary/20 shadow-sm flex flex-col items-center text-center">
+                    <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1">Código Promocional</span>
+                    <span className="text-2xl font-heading font-black text-navy tracking-widest lowercase">anteffa2026</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 md:grid-flow-col md:grid-rows-5 gap-x-12 gap-y-4 text-navy/80">
+                  {[
+                    { step: <>Acesse: <a href="https://marhotel.com.br" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-bold">marhotel.com.br</a></>, id: 1 },
+                    { step: "No rodapé procure “Faça sua Reserva”", id: 2 },
+                    { step: "Informe o período e hóspedes", id: 3 },
+                    { step: "Clique em Buscar", id: 4 },
+                    { step: "No espaço TENHO UM CÓDIGO, insira anteffa2026", id: 5 },
+                    { step: "Clique em BUSCAR novamente", id: 6 },
+                    { step: "Acesse as opções Classic (Cama de Solteiro ou Casal)", id: 7 },
+                    { step: "Clique em “ESCOLHER”", id: 8 },
+                    { step: "Clique em “RESERVA AGORA”", id: 9 },
+                    { step: "Escolha o pagamento e finalize a RESERVA", id: 10 }
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex items-start gap-4 p-3 hover:bg-white rounded-xl transition-colors">
+                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-[10px] font-black flex items-center justify-center shrink-0 font-heading">
+                        {item.id}
+                      </span>
+                      <p className="text-sm font-medium">
+                        {typeof item.step === 'string' 
+                          ? item.step.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} className="text-navy">{part}</strong> : part)
+                          : item.step
+                        }
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-10 pt-8 border-t border-border/20 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <p className="text-xs text-muted-foreground font-medium text-center md:text-left italic">
+                    "TFFAs de todo o Brasil: reservem a data e preparem-se para este encontro histórico!"
+                  </p>
+                  <div className="flex gap-2">
+                    <span className="text-[9px] font-bold bg-navy/5 text-navy/40 px-3 py-1 rounded-full">#ANTEFFA</span>
+                    <span className="text-[9px] font-bold bg-navy/5 text-navy/40 px-3 py-1 rounded-full">#IXCONTEFFA</span>
+                    <span className="text-[9px] font-bold bg-navy/5 text-navy/40 px-3 py-1 rounded-full">#TFFA</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+    </PageLayout>
+  );
+};
+
+export default Reserva;

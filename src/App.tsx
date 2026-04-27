@@ -9,6 +9,7 @@ import { CartaPresidente, Historico, Evento, Regimento } from "./pages/Apresenta
 import Programacao from "./pages/Programacao";
 import Inscricao from "./pages/Inscricao";
 import Noticias from "./pages/Noticias";
+import Reserva from "./pages/Reserva";
 import { LocalPage, Atracoes, ComoChegar, Transfer, Hospedagem, Passagem, Apoio } from "./pages/Local";
 import Teses from "./pages/Teses";
 import Indicativos from "./pages/Indicativos";
@@ -41,6 +42,7 @@ const App = () => (
           <Route path="/comissao" element={<Comissao />} />
           <Route path="/inscricao" element={<Inscricao />} />
           <Route path="/noticias" element={<Noticias />} />
+          <Route path="/reserva" element={<Reserva />} />
           <Route path="/local" element={<LocalPage />} />
           <Route path="/local/atracoes" element={<Atracoes />} />
           <Route path="/local/como-chegar" element={<ComoChegar />} />

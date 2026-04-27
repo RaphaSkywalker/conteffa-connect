@@ -1159,25 +1159,50 @@ const AdminDashboard = () => {
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'user' | 'profile' | 'noticia' | 'palestrante' | 'convidado' | 'albumCover' | 'albumPhotos' | 'instagramPhotos' | 'ad' = 'user') => {
         const file = e.target.files?.[0];
         if (file) {
-            toast.loading("Enviando foto...", { id: "upload" });
+            toast.loading("Processando foto...", { id: "upload" });
             try {
-                // 1. Upload para o Supabase Storage (para nuvem)
+                // 1. Ler e comprimir a imagem antes do upload
+                const reader = new FileReader();
+                const base64 = await new Promise<string>((resolve) => {
+                    reader.onload = (e) => resolve(e.target?.result as string);
+                    reader.readAsDataURL(file);
+                });
+
+                // Comprimir para garantir que não exceda limites e carregue rápido
+                // Perfil usa resolução menor, notícias/banners usam maior
+                const compressedBase64 = await compressImage(
+                    base64, 
+                    (type === 'profile' || type === 'user') ? 400 : 1200, 
+                    0.7
+                );
+                
+                // Converter Base64 comprimido de volta para Blob para o upload
+                const res = await fetch(compressedBase64);
+                const blob = await res.blob();
+                const compressedFile = new File([blob], file.name, { type: 'image/jpeg' });
+
+                // 2. Upload para o Supabase Storage (tentativa principal)
                 const fileExt = file.name.split('.').pop();
                 const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
                 const filePath = `admin/${type}/${fileName}`;
 
                 const { error: uploadError } = await supabase.storage
                     .from('media')
-                    .upload(filePath, file);
+                    .upload(filePath, compressedFile);
 
-                let publicUrl = "";
+                let finalUrl = "";
                 if (!uploadError) {
                     const { data } = supabase.storage.from('media').getPublicUrl(filePath);
-                    publicUrl = data.publicUrl;
+                    finalUrl = data.publicUrl;
+                } else {
+                    console.warn("Storage upload failed, falling back to Base64:", uploadError);
+                    // Fallback para Base64 se o Storage falhar (comum em falta de permissão ou bucket offline)
+                    // Para fotos de perfil, o Base64 é pequeno o suficiente para o Banco de Dados
+                    finalUrl = compressedBase64;
+                    toast.info("Foto processada localmente (Cloud Storage indisponível).", { id: "upload", duration: 3000 });
                 }
 
-                const finalUrl = publicUrl;
-                if (!finalUrl) throw new Error("Falha no upload");
+                if (!finalUrl) throw new Error("Falha no processamento da imagem");
 
                 // 3. Atualizar o estado correspondente
                 if (type === 'profile') {
@@ -1523,21 +1548,43 @@ const AdminDashboard = () => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        toast.loading("Enviando imagem...", { id: "upload-local" });
+        toast.loading("Processando imagem...", { id: "upload-local" });
         try {
+            // 1. Ler e comprimir a imagem
+            const reader = new FileReader();
+            const base64 = await new Promise<string>((resolve) => {
+                reader.onload = (e) => resolve(e.target?.result as string);
+                reader.readAsDataURL(file);
+            });
+
+            const compressedBase64 = await compressImage(base64, 1200, 0.7);
+            
+            const res = await fetch(compressedBase64);
+            const blob = await res.blob();
+            const compressedFile = new File([blob], file.name, { type: 'image/jpeg' });
+
+            // 2. Upload para o Storage
             const fileExt = file.name.split('.').pop();
             const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
             const filePath = `admin/local/${section}/${fileName}`;
 
-            const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
-            if (uploadError) throw uploadError;
+            const { error: uploadError } = await supabase.storage.from('media').upload(filePath, compressedFile);
+            
+            let finalUrl = "";
+            if (!uploadError) {
+                const { data } = supabase.storage.from('media').getPublicUrl(filePath);
+                finalUrl = data.publicUrl;
+            } else {
+                console.warn("Storage upload failed for local settings, using Base64 fallback:", uploadError);
+                finalUrl = compressedBase64;
+                toast.info("Imagem processada localmente.", { id: "upload-local", duration: 3000 });
+            }
 
-            const { data } = supabase.storage.from('media').getPublicUrl(filePath);
-            const publicUrl = data.publicUrl;
+            if (!finalUrl) throw new Error("Falha no processamento");
 
             setLocalSettings(prev => ({
                 ...prev,
-                [section]: { ...prev[section], cover: publicUrl }
+                [section]: { ...prev[section], cover: finalUrl }
             }));
             toast.success("Capa atualizada!", { id: "upload-local" });
         } catch (err) {
@@ -1559,11 +1606,24 @@ const AdminDashboard = () => {
 
         try {
             for (const file of fileArray) {
+                // 1. Comprimir imagem
+                const reader = new FileReader();
+                const base64 = await new Promise<string>((resolve) => {
+                    reader.onload = (e) => resolve(e.target?.result as string);
+                    reader.readAsDataURL(file);
+                });
+
+                const compressedBase64 = await compressImage(base64, 1200, 0.7);
+                const res = await fetch(compressedBase64);
+                const blob = await res.blob();
+                const compressedFile = new File([blob], file.name, { type: 'image/jpeg' });
+
+                // 2. Upload
                 const fileExt = file.name.split('.').pop();
                 const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
                 const filePath = `admin/local/${section}/gallery/${fileName}`;
 
-                const { error: uploadError } = await supabase.storage.from('media').upload(filePath, file);
+                const { error: uploadError } = await supabase.storage.from('media').upload(filePath, compressedFile);
                 if (uploadError) throw uploadError;
 
                 const { data } = supabase.storage.from('media').getPublicUrl(filePath);

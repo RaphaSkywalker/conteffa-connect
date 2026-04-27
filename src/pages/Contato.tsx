@@ -8,20 +8,39 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Send, CheckCircle, Mail, Phone, MapPin } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 const Contato = () => {
   const [sent, setSent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({ nome: "", email: "", assunto: "", mensagem: "" });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nome || !form.email || !form.mensagem) {
       toast.error("Preencha os campos obrigatórios.");
       return;
     }
-    setSent(true);
-    toast.success("Mensagem enviada com sucesso!");
+
+    setIsSubmitting(true);
+    const toastId = toast.loading("Enviando sua mensagem...");
+
+    try {
+      const { error } = await supabase.functions.invoke('send-contact-email', {
+        body: form
+      });
+
+      if (error) throw error;
+
+      setSent(true);
+      toast.success("Mensagem enviada com sucesso!", { id: toastId });
+    } catch (err) {
+      console.error("Erro ao enviar mensagem:", err);
+      toast.error("Erro ao enviar mensagem. Tente novamente mais tarde.", { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (sent) {
@@ -97,8 +116,14 @@ const Contato = () => {
                   <Label htmlFor="mensagem">Mensagem <span className="text-destructive">*</span></Label>
                   <Textarea id="mensagem" rows={5} value={form.mensagem} onChange={(e) => setForm({ ...form, mensagem: e.target.value })} required />
                 </div>
-                <Button type="submit" size="lg" className="w-full rounded-xl">
-                  <Send className="w-4 h-4 mr-2" /> Enviar Mensagem
+                <Button type="submit" size="lg" className="w-full rounded-xl" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    "Enviando..."
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" /> Enviar Mensagem
+                    </>
+                  )}
                 </Button>
               </motion.form>
             </div>

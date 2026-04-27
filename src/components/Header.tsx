@@ -9,7 +9,7 @@ const menuItems = [
     label: "Apresentação",
     path: "#",
     children: [
-      { label: "Carta do Presidente", path: "/apresentacao/carta-presidente" },
+      { label: "EDITORIAL", path: "/apresentacao/carta-presidente" },
       { label: "Histórico", path: "/apresentacao/historico" },
       { label: "O Evento", path: "/apresentacao/evento" },
       { label: "Regimento do Congresso", path: "/apresentacao/regimento" },
@@ -31,6 +31,7 @@ const menuItems = [
       { label: "Galeria", path: "/galeria" },
     ],
   },
+  { label: "RESERVA", path: "/reserva" },
   { label: "Notícias", path: "/noticias" },
   { label: "Contato", path: "/contato" },
 ];
