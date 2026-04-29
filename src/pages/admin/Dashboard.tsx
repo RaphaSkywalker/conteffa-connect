@@ -596,7 +596,7 @@ const AdminDashboard = () => {
     });
 
     const handleExportPDF = () => {
-        if (inscricoes.length === 0) {
+        if (filteredInscricoes.length === 0) {
             toast.error("Nenhuma inscrição encontrada para exportar.");
             return;
         }
@@ -642,7 +642,7 @@ const AdminDashboard = () => {
 
             if (type === "simples") {
                 const head = [["NOME COMPLETO", "CPF", "ATEFFA", "TAMANHO", "HOTEL"]];
-                const body = inscricoes.map(insc => [
+                const body = filteredInscricoes.map(insc => [
                     insc.nomeCompleto,
                     insc.cpf || "-",
                     insc.ateffa,
@@ -661,7 +661,7 @@ const AdminDashboard = () => {
                 });
             } else if (type === "medio") {
                 const head = [["DADOS PESSOAIS", "LOCALIZAÇÃO & INSCR.", "LOGÍSTICA & HOTEL"]];
-                const body = inscricoes.map(insc => [
+                const body = filteredInscricoes.map(insc => [
                     `Nome: ${insc.nomeCompleto}\nCPF: ${insc.cpf || "-"}\nNasc: ${insc.dataNascimento || "-"}\nCargo: ${insc.cargo}`,
                     `Ateffa: ${insc.ateffa}\nCel: ${insc.celularWhatsapp || "-"}\nEmail: ${insc.email}\nEnd: ${insc.endereco}`,
                     `Tamanho: ${insc.tamanhoCamiseta || "-"}\nHotel: ${insc.hotel || "MarHotel"}\nAcomp: ${insc.nomeAcompanhante || "-"}`
@@ -678,7 +678,7 @@ const AdminDashboard = () => {
                 });
             } else if (type === "completo") {
                 const head = [["PESSOAL / CONTATO", "ATEFFA / LOGÍSTICA", "HOSPEDAGEM", "ACOMPANHANTE"]];
-                const body = inscricoes.map(insc => [
+                const body = filteredInscricoes.map(insc => [
                     `${insc.nomeCompleto}\nCPF: ${insc.cpf || "-"}\n${insc.email}\n${insc.celularWhatsapp || "-"}`,
                     `ATEFFA: ${insc.ateffa}\nCargo: ${insc.cargo || "-"}\nTam: ${insc.tamanhoCamiseta || "-"}\nDesloc: ${insc.formaDeslocamento}`,
                     `Hotel: ${insc.hotel === 'Outros...' ? (insc.qualHotel || 'Outros') : (insc.hotel || "MarHotel")}\nCidade: ${insc.cidade || "-"}\nCEP: ${insc.cep || "-"}`,
@@ -715,7 +715,7 @@ const AdminDashboard = () => {
     };
 
     const handleExportExcel = () => {
-        if (inscricoes.length === 0) {
+        if (filteredInscricoes.length === 0) {
             toast.error("Nenhuma inscrição encontrada para exportar.");
             return;
         }
@@ -725,7 +725,7 @@ const AdminDashboard = () => {
         // Usamos um pequeno timeout para garantir que o toast de carregamento apareça antes do trabalho pesado bloquear a thread principal
         setTimeout(() => {
             try {
-                const dataToExport = inscricoes.map((insc: any) => ({
+                const dataToExport = filteredInscricoes.map((insc: any) => ({
                     "NOME COMPLETO": insc.nomeCompleto,
                     "CPF": insc.cpf,
                     "DATA NASCIMENTO": insc.dataNascimento,
