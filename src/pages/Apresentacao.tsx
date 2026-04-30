@@ -6,6 +6,7 @@ import PageBanner from "@/components/PageBanner";
 import { motion } from "framer-motion";
 import { User, Quote, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import regimentoPdf from "@/assets/REGIMENTO_INTERNO_CONTEFFA_V_17_03_2026.pdf";
 
 const CartaPresidente = () => (
   <PageLayout>
@@ -283,10 +284,12 @@ const Regimento = () => (
       <div className="container mx-auto max-w-4xl">
         <SectionTitle title="Regimento do Congresso" subtitle="Normas e regulamentos do IX CONTEFFA 2026" />
         <motion.div initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} className="bg-navy rounded-[3rem] p-12 text-white/80 leading-relaxed text-xl shadow-2xl flex flex-col items-center text-center space-y-8">
-          <p>O regimento completo do IX CONTEFFA 2026 será disponibilizado em breve. Fique atento às atualizações.</p>
-          <Button className="gap-2 font-bold px-8 h-14 text-base rounded-full shadow-lg hover:-translate-y-1 transition-transform">
-            <Download className="w-5 h-5" />
-            Baixar Regimento em PDF
+          <p>O regimento completo do IX CONTEFFA 2026 já está disponível para consulta. Faça o download abaixo.</p>
+          <Button asChild className="gap-2 font-bold px-8 h-14 text-base rounded-full shadow-lg hover:-translate-y-1 transition-transform">
+            <a href={regimentoPdf} download="REGIMENTO_INTERNO_CONTEFFA_V_17_03_2026.pdf" target="_blank" rel="noopener noreferrer">
+              <Download className="w-5 h-5" />
+              Baixar Regimento em PDF
+            </a>
           </Button>
         </motion.div>
       </div>
