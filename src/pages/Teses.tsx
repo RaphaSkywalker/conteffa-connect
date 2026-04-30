@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import modeloTesePdf from "@/assets/Formulário_Modelo_TESES.pdf";
+import modeloTeseDocx from "@/assets/Formulário_Modelo_TESES.docx";
 
 const defaultConteffas = [
   { id: "9", name: "IX CONTEFFA" },
@@ -128,6 +130,65 @@ const Teses = () => {
                   </motion.div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Formulário Modelo de Teses Section */}
+          <div>
+            <SectionTitle title="Modelo de Formulário" subtitle="Faça o download do modelo oficial para submissão de teses" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }} 
+                whileInView={{ opacity: 1, scale: 1 }} 
+                viewport={{ once: true }} 
+                transition={{ delay: 0.1 }}
+                className="bg-card rounded-2xl p-8 border border-border shadow-lg flex flex-col items-center text-center transition-all group hover:-translate-y-2 border-primary/20 bg-primary/5"
+              >
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors bg-primary text-white">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-heading font-black text-foreground mb-2">Modelo Word (.DOCX)</h3>
+                
+                <div className="space-y-4">
+                  <p className="text-primary font-bold text-sm flex items-center justify-center gap-1">
+                    <Download className="w-4 h-4" /> Arquivo Editável
+                  </p>
+                  <a 
+                    href={modeloTeseDocx} 
+                    download="Formulário_Modelo_TESES.docx"
+                    className="inline-flex items-center gap-2 bg-primary text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-primary/90 transition-colors shadow-lg"
+                  >
+                    Baixar DOCX <Download className="w-4 h-4" />
+                  </a>
+                </div>
+              </motion.div>
+
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }} 
+                whileInView={{ opacity: 1, scale: 1 }} 
+                viewport={{ once: true }} 
+                transition={{ delay: 0.2 }}
+                className="bg-card rounded-2xl p-8 border border-border shadow-lg flex flex-col items-center text-center transition-all group hover:-translate-y-2 border-red-500/20 bg-red-500/5"
+              >
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors bg-red-500 text-white">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-heading font-black text-foreground mb-2">Modelo PDF</h3>
+                
+                <div className="space-y-4">
+                  <p className="text-red-500 font-bold text-sm flex items-center justify-center gap-1">
+                    <Download className="w-4 h-4" /> Versão para Impressão
+                  </p>
+                  <a 
+                    href={modeloTesePdf} 
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-red-500 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-red-600 transition-colors shadow-lg"
+                  >
+                    Abrir PDF <ExternalLink className="w-4 h-4" />
+                  </a>
+                </div>
+              </motion.div>
             </div>
           </div>
 
