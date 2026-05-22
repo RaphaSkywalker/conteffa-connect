@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 const stats = [
   { icon: Users, value: "320+", label: "Inscritos" },
   { icon: Mic, value: "45", label: "Palestrantes" },
-  { icon: CalendarDays, value: "5", label: "Dias de Evento" },
+  { icon: CalendarDays, value: "3", label: "Dias de Evento" },
   { icon: FileText, value: "80+", label: "Teses" },
 ];
 
@@ -540,7 +540,7 @@ const Index = () => {
             {[
               { icon: Users, value: String(inscritosCount), label: "Inscritos" },
               { icon: Mic, value: String(palestrantes.length), label: "Palestrantes" },
-              { icon: CalendarDays, value: "5", label: "Dias de Evento" },
+              { icon: CalendarDays, value: "3", label: "Dias de Evento" },
               { icon: FileText, value: String(tesesCount), label: "Teses" },
             ].map((stat, i) => (
               <motion.div
