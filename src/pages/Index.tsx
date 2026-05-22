@@ -158,7 +158,17 @@ const Index = () => {
         }
         
         if (newsData) {
-          setNoticias(newsData);
+          const formattedNews = newsData.map((n: any) => ({
+            ...n,
+            date: n.date ? (() => {
+              if (/^\d{4}-\d{2}-\d{2}$/.test(n.date)) {
+                const [year, month, day] = n.date.split('-');
+                return `${day}/${month}/${year}`;
+              }
+              return n.date;
+            })() : ""
+          }));
+          setNoticias(formattedNews);
         }
 
         let finalCount = regCount;

@@ -1076,7 +1076,19 @@ const AdminDashboard = () => {
                     }
                 }
 
-                if (dbNews) setNoticias(dbNews);
+                if (dbNews) {
+                    const formattedNews = dbNews.map((n: any) => ({
+                        ...n,
+                        date: n.date ? (() => {
+                            if (/^\d{4}-\d{2}-\d{2}$/.test(n.date)) {
+                                const [year, month, day] = n.date.split('-');
+                                return `${day}/${month}/${year}`;
+                            }
+                            return n.date;
+                        })() : ""
+                    }));
+                    setNoticias(formattedNews);
+                }
                 if (dbSpeakers) setPalestrantes(dbSpeakers);
                 if (dbProg) setProgramacao(dbProg);
                 if (dbGuests) setConvidados(dbGuests);
@@ -1693,15 +1705,31 @@ const AdminDashboard = () => {
         }
 
         try {
+            // Helper to convert DD/MM/YYYY to YYYY-MM-DD for database storage
+            const toISO = (dateStr: string) => {
+                if (!dateStr) return new Date().toISOString().split('T')[0];
+                if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+                    const [day, month, year] = dateStr.split('/');
+                    return `${year}-${month}-${day}`;
+                }
+                return dateStr;
+            };
+
+            const noticiaToSave = {
+                ...newNoticia,
+                date: toISO(newNoticia.date)
+            };
+
+            const { id: noticiaId, ...payloadToSave } = noticiaToSave;
+
             if (newNoticia.id) {
-                const { error } = await supabase.from('news').update(newNoticia).eq('id', newNoticia.id);
+                const { error } = await supabase.from('news').update(payloadToSave).eq('id', newNoticia.id);
                 if (error) throw error;
                 const updated = noticias.map((n: any) => n.id === newNoticia.id ? { ...n, ...newNoticia } : n);
                 setNoticias(updated);
                 toast.success("Notícia atualizada!");
             } else {
-                const { id, ...noticiaToSave } = newNoticia;
-                const { data, error } = await supabase.from('news').insert([{ ...noticiaToSave, status: "Publicado" }]).select().single();
+                const { data, error } = await supabase.from('news').insert([{ ...payloadToSave, status: "Publicado" }]).select().single();
                 if (error) throw error;
                 const updated = [{ ...newNoticia, id: data.id, status: "Publicado" }, ...noticias];
                 setNoticias(updated);
@@ -1711,7 +1739,8 @@ const AdminDashboard = () => {
             setIsAddingNoticia(false);
             setNewNoticia({ title: "", summary: "", tags: "", date: new Date().toLocaleDateString('pt-BR'), status: "Rascunho", photo: null, id: null });
         } catch (err: any) {
-            toast.error("Erro ao salvar notícia no Supabase.");
+            console.error("Erro ao salvar notícia no Supabase:", err);
+            toast.error(`Erro ao salvar notícia no Supabase: ${err.message || 'Desconhecido'}`);
         }
     };
 
