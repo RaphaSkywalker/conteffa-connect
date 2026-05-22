@@ -176,10 +176,9 @@ const Noticias = () => {
       const { data: currentClicks } = await supabase.from('config').select('value').eq('key', 'ad_clicks').maybeSingle();
       const nextValue = currentClicks ? Number(JSON.parse(currentClicks.value)) + 1 : 1;
 
-      await supabase.from('config').upsert({
-        key: 'ad_clicks',
+      await supabase.from('config').update({
         value: JSON.stringify(nextValue)
-      });
+      }).eq('key', 'ad_clicks');
     } catch (err) {
       console.error("Erro ao registrar clique na nuvem:", err);
     }

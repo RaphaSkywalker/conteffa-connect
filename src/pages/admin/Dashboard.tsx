@@ -350,11 +350,10 @@ const AdminDashboard = () => {
             setRegulamentos(updatedList);
             
             // Persistir no Supabase Config
-            const { error } = await supabase.from('config').upsert({
-                key: 'regulamentos_data',
+            const { error } = await supabase.from('config').update({
                 value: JSON.stringify(updatedList),
                 updated_at: new Date().toISOString()
-            }, { onConflict: 'key' });
+            }).eq('key', 'regulamentos_data');
 
             if (error) throw error;
             
@@ -371,11 +370,10 @@ const AdminDashboard = () => {
             const updatedList = regulamentos.filter(r => r.id !== id);
             setRegulamentos(updatedList);
             
-            await supabase.from('config').upsert({
-                key: 'regulamentos_data',
+            await supabase.from('config').update({
                 value: JSON.stringify(updatedList),
                 updated_at: new Date().toISOString()
-            }, { onConflict: 'key' });
+            }).eq('key', 'regulamentos_data');
 
             toast.success("Regulamento removido.");
         } catch (err) {
@@ -396,11 +394,10 @@ const AdminDashboard = () => {
             
             setCadernos(updatedList);
             
-            const { error } = await supabase.from('config').upsert({
-                key: 'cadernos_data',
+            const { error } = await supabase.from('config').update({
                 value: JSON.stringify(updatedList),
                 updated_at: new Date().toISOString()
-            }, { onConflict: 'key' });
+            }).eq('key', 'cadernos_data');
 
             if (error) throw error;
 
@@ -418,11 +415,10 @@ const AdminDashboard = () => {
             const updatedList = cadernos.filter(c => c.id !== id);
             setCadernos(updatedList);
             
-            await supabase.from('config').upsert({
-                key: 'cadernos_data',
+            await supabase.from('config').update({
                 value: JSON.stringify(updatedList),
                 updated_at: new Date().toISOString()
-            }, { onConflict: 'key' });
+            }).eq('key', 'cadernos_data');
 
             toast.success("Caderno removido.");
         } catch (err) {
@@ -1472,11 +1468,10 @@ const AdminDashboard = () => {
 
     const handleUpdateGoal = async () => {
         try {
-            const { error } = await supabase.from('config').upsert({
-                key: 'registration_goal',
+            const { error } = await supabase.from('config').update({
                 value: tempGoal.toString(),
                 updated_at: new Date().toISOString()
-            }, { onConflict: 'key' });
+            }).eq('key', 'registration_goal');
             
             if (error) throw error;
             
@@ -1963,11 +1958,10 @@ const AdminDashboard = () => {
 
     const handleSaveInstagram = async () => {
         try {
-            const { error } = await supabase.from('config').upsert({
-                key: 'instagram',
+            const { error } = await supabase.from('config').update({
                 value: JSON.stringify(instagramConfig),
                 updated_at: new Date().toISOString()
-            }, { onConflict: 'key' });
+            }).eq('key', 'instagram');
 
             if (error) throw error;
 
@@ -1980,11 +1974,10 @@ const AdminDashboard = () => {
 
     const handleSaveAd = async () => {
         try {
-            const { error } = await supabase.from('config').upsert({
-                key: 'divulgacao',
+            const { error } = await supabase.from('config').update({
                 value: adImage,
                 updated_at: new Date().toISOString()
-            }, { onConflict: 'key' });
+            }).eq('key', 'divulgacao');
 
             if (error) throw error;
 
