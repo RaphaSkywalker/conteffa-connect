@@ -60,7 +60,7 @@ const Teses = () => {
   // Lista de Regulamentos: Padrões + Novos do Banco
   const allRegConteffas = [...defaultConteffas];
   regulamentos.forEach(r => {
-    if (!allRegConteffas.find(def => def.name === r.name || (r.name.includes(def.name) && def.name.length > 5))) {
+    if (!allRegConteffas.find(def => def.name === r.name)) {
       allRegConteffas.unshift({ id: r.id?.toString() || Date.now().toString(), name: r.name });
     }
   });
@@ -68,17 +68,17 @@ const Teses = () => {
   // Lista de Cadernos: Padrões + Novos do Banco
   const allCadConteffas = [...defaultConteffas];
   cadernos.forEach(c => {
-    if (!allCadConteffas.find(def => def.name === c.name || (c.name.includes(def.name) && def.name.length > 5))) {
+    if (!allCadConteffas.find(def => def.name === c.name)) {
       allCadConteffas.unshift({ id: c.id?.toString() || Date.now().toString(), name: c.name });
     }
   });
 
   const getRegulamento = (name: string) => {
-    return regulamentos.find(r => r.name === name || (r.name.includes(name) && name.length > 5));
+    return regulamentos.find(r => r.name === name);
   };
 
   const getCaderno = (name: string) => {
-    return cadernos.find(c => c.name === name || (c.name.includes(name) && name.length > 5));
+    return cadernos.find(c => c.name === name);
   };
 
   return (
