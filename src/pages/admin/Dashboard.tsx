@@ -2165,13 +2165,60 @@ const AdminDashboard = () => {
                     </h1>
 
                     <div className="flex items-center gap-4">
-                        <div className="relative">
-                            <Search className="w-4 h-4 text-white/30 absolute left-3 top-1/2 -translate-y-1/2" />
-                            <Input
-                                className="pl-10 w-64 bg-white/5 border-white/10 text-white placeholder:text-white/20 rounded-full focus:ring-primary/50 focus:border-primary/50"
-                                placeholder="Buscar no sistema..."
-                            />
-                        </div>
+                        {activeTab === "inscricoes" ? (
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2.5 bg-primary/10 border border-primary/20 rounded-full px-5 py-2.5">
+                                    <Users className="w-5 h-5 text-primary" />
+                                    <span className="text-primary font-black text-base">{filteredInscricoes.length}</span>
+                                    <span className="text-primary/70 font-bold text-xs uppercase tracking-widest">
+                                        {filteredInscricoes.length === 1 ? "inscrito" : "inscritos"}
+                                    </span>
+                                </div>
+                                {ateffaFilter !== "TODAS" && (
+                                    <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-5 py-2.5">
+                                        <Filter className="w-4 h-4 text-white/40" />
+                                        <span className="text-xs font-black uppercase tracking-widest text-white/30">ATEFFA:</span>
+                                        <span className="text-sm font-black text-white">{ateffaFilter}</span>
+                                    </div>
+                                )}
+                                {statusFilter !== "TODAS" && (
+                                    <div className={`flex items-center gap-2 border rounded-full px-5 py-2.5 ${
+                                        statusFilter === "APROVADO" ? "bg-emerald-500/10 border-emerald-500/20" :
+                                        statusFilter === "REPROVADO" ? "bg-red-500/10 border-red-500/20" :
+                                        "bg-amber-500/10 border-amber-500/20"
+                                    }`}>
+                                        <Filter className="w-4 h-4 text-white/40" />
+                                        <span className="text-xs font-black uppercase tracking-widest text-white/30">STATUS:</span>
+                                        <span className={`text-sm font-black ${
+                                            statusFilter === "APROVADO" ? "text-emerald-400" :
+                                            statusFilter === "REPROVADO" ? "text-red-400" :
+                                            "text-amber-400"
+                                        }`}>{statusFilter}</span>
+                                    </div>
+                                )}
+                                {searchInscricao && (
+                                    <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-5 py-2.5">
+                                        <Search className="w-4 h-4 text-white/40" />
+                                        <span className="text-sm font-black text-white">"{searchInscricao}"</span>
+                                    </div>
+                                )}
+                                {dateFilter && (
+                                    <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-5 py-2.5">
+                                        <Filter className="w-4 h-4 text-white/40" />
+                                        <span className="text-xs font-black uppercase tracking-widest text-white/30">DATA:</span>
+                                        <span className="text-sm font-black text-white">{dateFilter}</span>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="relative">
+                                <Search className="w-4 h-4 text-white/30 absolute left-3 top-1/2 -translate-y-1/2" />
+                                <Input
+                                    className="pl-10 w-64 bg-white/5 border-white/10 text-white placeholder:text-white/20 rounded-full focus:ring-primary/50 focus:border-primary/50"
+                                    placeholder="Buscar no sistema..."
+                                />
+                            </div>
+                        )}
 
                         {/* Notification Bell */}
                         <div className="relative" ref={notificationRef}>
