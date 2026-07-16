@@ -74,7 +74,7 @@ const Programacao = () => {
               </p>
             </motion.div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="flex flex-col gap-8 max-w-4xl mx-auto">
               {days.map((day, di) => (
                 <motion.div
                   key={day.id || day.date}

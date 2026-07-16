@@ -633,8 +633,9 @@ const AdminDashboard = () => {
             doc.setFontSize(10);
             doc.setTextColor(100);
             doc.text(`TIPO DE RELATÓRIO: ${type.toUpperCase()}`, 14, 38);
-            doc.text(`GERADO EM: ${new Date().toLocaleString('pt-BR')}`, 14, 43);
-            doc.line(14, 48, 196, 48);
+            doc.text(`TOTAL DE INSCRITOS NESTE RELATÓRIO: ${filteredInscricoes.length}`, 14, 43);
+            doc.text(`GERADO EM: ${new Date().toLocaleString('pt-BR')}`, 14, 48);
+            doc.line(14, 53, 196, 53);
 
             if (type === "simples") {
                 const head = [["NOME COMPLETO", "CPF", "ATEFFA", "TAMANHO", "HOTEL"]];
@@ -707,6 +708,93 @@ const AdminDashboard = () => {
         img.onerror = () => {
             setIsExportingPDF(false);
             toast.error("Erro ao carregar logomarca.", { id: "pdf-export" });
+        };
+    };
+
+    const handleExportAcompanhantesPDF = () => {
+        const inscritosComAcompanhantes = filteredInscricoes.filter(
+            (insc: any) => insc.acompanhantes === "SIM" && insc.nomeAcompanhante
+        );
+
+        if (inscritosComAcompanhantes.length === 0) {
+            toast.error("Nenhum inscrito com acompanhante encontrado.");
+            return;
+        }
+
+        const img = new Image();
+        img.src = "/logo-evento.png?t=" + Date.now();
+        toast.loading("Gerando relatório de acompanhantes...", { id: "pdf-acomp" });
+
+        img.onload = () => {
+            const doc = new jsPDF();
+
+            try {
+                const maxWidth = 40;
+                const maxHeight = 35;
+                let finalWidth = maxWidth;
+                let finalHeight = (img.height * maxWidth) / img.width;
+                if (finalHeight > maxHeight) {
+                    finalHeight = maxHeight;
+                    finalWidth = (img.width * maxHeight) / img.height;
+                }
+                doc.addImage(img, 'PNG', 196 - finalWidth, 8, finalWidth, finalHeight);
+            } catch (err) {
+                console.error("Erro ao adicionar imagem ao PDF", err);
+            }
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.setTextColor(11, 27, 50);
+            doc.text("Relatório de Acompanhantes", 14, 22);
+            doc.setFontSize(18);
+            doc.text("IX CONTEFFA", 14, 30);
+
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`TOTAL DE INSCRITOS COM ACOMPANHANTE: ${inscritosComAcompanhantes.length}`, 14, 38);
+            doc.text(`GERADO EM: ${new Date().toLocaleString('pt-BR')}`, 14, 43);
+            doc.line(14, 48, 196, 48);
+
+            const head = [["NOME DO INSCRITO", "ATEFFA", "NOME DO(S) ACOMPANHANTE(S)", "PARENTESCO", "QTD"]];
+            const body = inscritosComAcompanhantes.map((insc: any) => [
+                insc.nomeCompleto || "-",
+                insc.ateffa || "-",
+                insc.nomeAcompanhante || "-",
+                insc.parentesco || "-",
+                insc.quantosAcompanhantes || "1"
+            ]);
+
+            autoTable(doc, {
+                head: head,
+                body: body,
+                startY: 55,
+                theme: 'grid',
+                headStyles: { fillColor: [11, 27, 50], textColor: [255, 255, 255], fontStyle: 'bold' },
+                styles: { fontSize: 9, cellPadding: 3 },
+                alternateRowStyles: { fillColor: [245, 245, 245] },
+                columnStyles: {
+                    0: { cellWidth: 50 },
+                    1: { cellWidth: 35 },
+                    2: { cellWidth: 60 },
+                    3: { cellWidth: 30 },
+                    4: { cellWidth: 15 }
+                }
+            });
+
+            const pageCount = (doc as any).internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.setTextColor(150);
+                doc.text(`Página ${i} de ${pageCount}`, 196, 285, { align: 'right' });
+            }
+
+            doc.save(`relatorio_acompanhantes_conteffa_${Date.now()}.pdf`);
+            toast.success("Download iniciado!", { id: "pdf-acomp" });
+        };
+
+        img.onerror = () => {
+            toast.error("Erro ao carregar logomarca.", { id: "pdf-acomp" });
         };
     };
 
@@ -2186,9 +2274,10 @@ const AdminDashboard = () => {
                                     </div>
 
                                     {/* Métricas Robustas */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4">
                                         {[
                                             { label: "Inscritos", value: String(inscricoes.length), trend: "+12%", icon: Users, color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20" },
+                                            { label: "Acompanhantes", value: String(inscricoes.filter((i: any) => i.acompanhantes === "SIM" && i.nomeAcompanhante).length), trend: "Total", icon: Heart, color: "text-cyan-400", bg: "bg-cyan-400/10", border: "border-cyan-400/20" },
                                             { label: "Palestrantes", value: String(palestrantes.length), trend: "OK", icon: Mic, color: "text-purple-400", bg: "bg-purple-400/10", border: "border-purple-400/20" },
                                             { label: "Comissão", value: String(convidados.length), trend: "OK", icon: Users, color: "text-pink-400", bg: "bg-pink-400/10", border: "border-pink-400/20" },
                                             { label: "Álbuns", value: String(albuns.length), trend: "Ativos", icon: ImageIcon, color: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20" },
@@ -2219,36 +2308,10 @@ const AdminDashboard = () => {
                                         ))}
                                     </div>
 
-                                    {/* Gráfico de Andamento - Compacto e Escuro */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                        {/* Progresso Radial */}
-                                        <div className="lg:col-span-1 bg-white/5 p-6 rounded-2xl border border-white/10 shadow-xl flex flex-col items-center justify-center text-center relative overflow-hidden group h-[400px]">
-                                            <h4 className="font-bold text-white text-[13px] uppercase tracking-wider mb-4">Status Geral</h4>
-
-                                            <div className="relative w-64 h-64 mb-6 flex items-center justify-center">
-                                                <svg className="w-full h-full -rotate-90" viewBox="0 0 256 256">
-                                                    <circle cx="128" cy="128" r="110" className="stroke-white/5" strokeWidth="12" fill="none" />
-                                                    <motion.circle
-                                                        cx="128" cy="128" r="110" className="stroke-primary" strokeWidth="12" fill="none"
-                                                        strokeDasharray="691"
-                                                        initial={{ strokeDashoffset: 691 }}
-                                                        animate={{ strokeDashoffset: 691 * (1 - 0.65) }}
-                                                        transition={{ duration: 1.5, ease: "easeOut" }}
-                                                        strokeLinecap="round"
-                                                    />
-                                                </svg>
-                                                <div className="absolute flex flex-col items-center">
-                                                    <span className="text-5xl font-black text-white">65%</span>
-                                                </div>
-                                            </div>
-
-                                            <p className="text-[13px] text-white/50 font-medium px-4">
-                                                Faltam <span className="text-primary font-black">2 atividades</span> pendentes.
-                                            </p>
-                                        </div>
-
+                                    {/* Cronograma Real - Largura Completa */}
+                                    <div>
                                         {/* Journey Timeline Dark */}
-                                        <div className="lg:col-span-2 bg-[#0B1B32] p-6 rounded-2xl border border-white/10 shadow-2xl relative flex flex-col h-[400px]">
+                                        <div className="bg-[#0B1B32] p-6 rounded-2xl border border-white/10 shadow-2xl relative flex flex-col h-[400px]">
                                             <div className="flex items-center justify-between mb-6 shrink-0">
                                                 <div className="flex items-center gap-3 px-3 py-1.5 bg-white/5 rounded-xl border border-white/10">
                                                     <Clock className="w-3.5 h-3.5 text-primary" />
@@ -3874,6 +3937,12 @@ const AdminDashboard = () => {
                                                 className="rounded-full gap-2 px-6 bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 font-black transition-all"
                                             >
                                                 <Download className="w-4 h-4" /> Exportar PDF
+                                            </Button>
+                                            <Button
+                                                onClick={handleExportAcompanhantesPDF}
+                                                className="rounded-full gap-2 px-6 bg-sky-600 hover:bg-sky-700 shadow-lg shadow-sky-500/20 font-black transition-all"
+                                            >
+                                                <Users className="w-4 h-4" /> Acompanhantes PDF
                                             </Button>
                                         </div>
                                     </div>
