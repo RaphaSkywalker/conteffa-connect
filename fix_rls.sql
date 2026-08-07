@@ -24,6 +24,13 @@ ALTER TABLE registrations DISABLE ROW LEVEL SECURITY;
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 
 -- =====================================================================
+-- COLUNAS DE ANEXOS PARA A TABELA DE NOTÍCIAS (NEWS)
+-- =====================================================================
+ALTER TABLE news ADD COLUMN IF NOT EXISTS attachment_url text;
+ALTER TABLE news ADD COLUMN IF NOT EXISTS attachment_name text;
+ALTER TABLE news ADD COLUMN IF NOT EXISTS attachments text;
+
+-- =====================================================================
 -- Caso prefira manter o RLS ativo por algum motivo, você precisaria criar 
 -- políticas explícitas permitindo ALL (todas as operações) para public:
 --

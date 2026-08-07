@@ -48,7 +48,8 @@ import {
     MapPin,
     Globe,
     ExternalLink,
-    Compass
+    Compass,
+    Paperclip
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import {
@@ -261,6 +262,9 @@ const AdminDashboard = () => {
         date: new Date().toLocaleDateString('pt-BR'),
         status: "Rascunho",
         photo: null as string | null,
+        attachments: [] as Array<{ id: string; name: string; url: string; size?: string }>,
+        attachment_url: null as string | null,
+        attachment_name: null as string | null,
         id: null as number | null
     });
 
@@ -1225,10 +1229,119 @@ const AdminDashboard = () => {
     }, [convidados]);
 
     const noticiaFileInputRef = useRef<HTMLInputElement>(null);
+    const noticiaAttachmentInputRef = useRef<HTMLInputElement>(null);
     const palestranteFileInputRef = useRef<HTMLInputElement>(null);
     const convidadoFileInputRef = useRef<HTMLInputElement>(null);
     const albumCoverInputRef = useRef<HTMLInputElement>(null);
     const albumPhotosInputRef = useRef<HTMLInputElement>(null);
+
+    const normalizeAttachments = (n: any): Array<{ id: string; name: string; url: string; size?: string }> => {
+        if (!n) return [];
+        if (n.attachments) {
+            if (Array.isArray(n.attachments)) return n.attachments;
+            try {
+                const parsed = typeof n.attachments === 'string' ? JSON.parse(n.attachments) : n.attachments;
+                if (Array.isArray(parsed)) return parsed;
+            } catch (e) {
+                console.warn("Error parsing attachments JSON", e);
+            }
+        }
+        if (n.attachment_url || n.anexo_url) {
+            return [{
+                id: 'legacy-1',
+                name: n.attachment_name || n.anexo_nome || "Documento Anexo",
+                url: n.attachment_url || n.anexo_url
+            }];
+        }
+        return [];
+    };
+
+    const handleNoticiaAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        const maxSizeBytes = 15 * 1024 * 1024; // 15MB
+        const uploadedAttachments: Array<{ id: string; name: string; url: string; size?: string }> = [];
+
+        toast.loading(`Enviando ${files.length} documento(s)...`, { id: "upload-attachment" });
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (file.size > maxSizeBytes) {
+                toast.error(`O arquivo "${file.name}" excede o limite de 15MB.`, { id: "upload-attachment" });
+                continue;
+            }
+
+            try {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+                const filePath = `admin/noticias/attachments/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('media')
+                    .upload(filePath, file);
+
+                let publicUrl = "";
+                if (!uploadError) {
+                    const { data } = supabase.storage.from('media').getPublicUrl(filePath);
+                    publicUrl = data.publicUrl;
+                } else {
+                    console.warn("Storage upload failed, falling back to Base64:", uploadError);
+                    const base64String = await new Promise<string>((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.readAsDataURL(file);
+                    });
+                    publicUrl = base64String;
+                }
+
+                const sizeStr = file.size > 1024 * 1024 
+                    ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` 
+                    : `${Math.round(file.size / 1024)} KB`;
+
+                uploadedAttachments.push({
+                    id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                    name: file.name,
+                    url: publicUrl,
+                    size: sizeStr
+                });
+            } catch (error) {
+                console.error("Attachment upload error:", error);
+            }
+        }
+
+        if (uploadedAttachments.length > 0) {
+            setNewNoticia(prev => {
+                const updatedList = [...(prev.attachments || []), ...uploadedAttachments];
+                return {
+                    ...prev,
+                    attachments: updatedList,
+                    attachment_url: updatedList[0]?.url || null,
+                    attachment_name: updatedList[0]?.name || null
+                };
+            });
+            toast.success(`${uploadedAttachments.length} anexo(s) adicionado(s) com sucesso!`, { id: "upload-attachment" });
+        } else {
+            toast.error("Nenhum anexo foi processado.", { id: "upload-attachment" });
+        }
+
+        if (noticiaAttachmentInputRef.current) {
+            noticiaAttachmentInputRef.current.value = "";
+        }
+    };
+
+    const handleRemoveNoticiaAttachment = (idToRemove: string) => {
+        setNewNoticia(prev => {
+            const updatedList = (prev.attachments || []).filter(item => item.id !== idToRemove);
+            return {
+                ...prev,
+                attachments: updatedList,
+                attachment_url: updatedList[0]?.url || null,
+                attachment_name: updatedList[0]?.name || null
+            };
+        });
+        toast.info("Anexo removido da matéria.");
+    };
     const compressImage = (base64Str: string, maxWidth = 1200, quality = 0.8): Promise<string> => {
         return new Promise((resolve) => {
             const img = new Image();
@@ -1800,27 +1913,45 @@ const AdminDashboard = () => {
 
             const noticiaToSave = {
                 ...newNoticia,
-                date: toISO(newNoticia.date)
+                date: toISO(newNoticia.date),
+                attachments: newNoticia.attachments && newNoticia.attachments.length > 0 ? JSON.stringify(newNoticia.attachments) : null,
+                attachment_url: newNoticia.attachments?.[0]?.url || newNoticia.attachment_url || null,
+                attachment_name: newNoticia.attachments?.[0]?.name || newNoticia.attachment_name || null
             };
 
             const { id: noticiaId, ...payloadToSave } = noticiaToSave;
 
             if (newNoticia.id) {
-                const { error } = await supabase.from('news').update(payloadToSave).eq('id', newNoticia.id);
-                if (error) throw error;
+                let { error } = await supabase.from('news').update(payloadToSave).eq('id', newNoticia.id);
+                if (error && error.message?.includes('column')) {
+                    console.warn("Retrying update without new attachment columns if schema not yet updated:", error);
+                    const { attachments, attachment_url, attachment_name, ...legacyPayload } = payloadToSave as any;
+                    const res = await supabase.from('news').update(legacyPayload).eq('id', newNoticia.id);
+                    if (res.error) throw res.error;
+                } else if (error) {
+                    throw error;
+                }
                 const updated = noticias.map((n: any) => n.id === newNoticia.id ? { ...n, ...newNoticia } : n);
                 setNoticias(updated);
                 toast.success("Notícia atualizada!");
             } else {
-                const { data, error } = await supabase.from('news').insert([{ ...payloadToSave, status: "Publicado" }]).select().single();
-                if (error) throw error;
+                let { data, error } = await supabase.from('news').insert([{ ...payloadToSave, status: "Publicado" }]).select().single();
+                if (error && error.message?.includes('column')) {
+                    console.warn("Retrying insert without new attachment columns if schema not yet updated:", error);
+                    const { attachments, attachment_url, attachment_name, ...legacyPayload } = payloadToSave as any;
+                    const res = await supabase.from('news').insert([{ ...legacyPayload, status: "Publicado" }]).select().single();
+                    if (res.error) throw res.error;
+                    data = res.data;
+                } else if (error) {
+                    throw error;
+                }
                 const updated = [{ ...newNoticia, id: data.id, status: "Publicado" }, ...noticias];
                 setNoticias(updated);
                 toast.success("Notícia publicada!");
             }
 
             setIsAddingNoticia(false);
-            setNewNoticia({ title: "", summary: "", tags: "", date: new Date().toLocaleDateString('pt-BR'), status: "Rascunho", photo: null, id: null });
+            setNewNoticia({ title: "", summary: "", tags: "", date: new Date().toLocaleDateString('pt-BR'), status: "Rascunho", photo: null, attachments: [], attachment_url: null, attachment_name: null, id: null });
         } catch (err: any) {
             console.error("Erro ao salvar notícia no Supabase:", err);
             toast.error(`Erro ao salvar notícia no Supabase: ${err.message || 'Desconhecido'}`);
@@ -1828,7 +1959,19 @@ const AdminDashboard = () => {
     };
 
     const handleEditNoticia = (n: any) => {
-        setNewNoticia(n);
+        const initialAttachments = normalizeAttachments(n);
+        setNewNoticia({
+            title: n.title || "",
+            summary: n.summary || "",
+            tags: n.tags || "",
+            date: n.date || new Date().toLocaleDateString('pt-BR'),
+            status: n.status || "Publicado",
+            photo: n.photo || null,
+            attachments: initialAttachments,
+            attachment_url: initialAttachments[0]?.url || n.attachment_url || n.anexo_url || null,
+            attachment_name: initialAttachments[0]?.name || n.attachment_name || n.anexo_nome || null,
+            id: n.id || null
+        });
         setIsAddingNoticia(true);
     };
 
@@ -2750,6 +2893,9 @@ const AdminDashboard = () => {
                                                     date: new Date().toLocaleDateString('pt-BR'),
                                                     status: "Rascunho",
                                                     photo: null,
+                                                    attachments: [],
+                                                    attachment_url: null,
+                                                    attachment_name: null,
                                                     id: null
                                                 });
                                                 setIsAddingNoticia(true);
@@ -2843,6 +2989,104 @@ const AdminDashboard = () => {
                                                                         </div>
                                                                     </div>
                                                                 </div>
+
+                                                                {/* Anexos / Documentos Complementares (Múltiplos com limite de 15MB) */}
+                                                                <div className="p-6 bg-white/5 rounded-[2rem] border border-white/5 space-y-4">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div>
+                                                                            <label className="text-[9px] font-black uppercase tracking-widest text-white/40 block mb-0.5">
+                                                                                Anexos / Documentos Complementares
+                                                                            </label>
+                                                                            <p className="text-[11px] text-white/40 font-medium">
+                                                                                Disponibilize PDFs, portarias, manuais ou documentos (até 15MB cada) para download no final da matéria.
+                                                                            </p>
+                                                                        </div>
+                                                                        <input
+                                                                            type="file"
+                                                                            ref={noticiaAttachmentInputRef}
+                                                                            className="hidden"
+                                                                            multiple
+                                                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                                                            onChange={handleNoticiaAttachmentUpload}
+                                                                        />
+                                                                    </div>
+
+                                                                    {newNoticia.attachments && newNoticia.attachments.length > 0 ? (
+                                                                        <div className="space-y-2.5">
+                                                                            {newNoticia.attachments.map((att) => (
+                                                                                <div key={att.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-primary/10 rounded-2xl border border-primary/20">
+                                                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                                                        <div className="w-9 h-9 rounded-xl bg-primary/20 text-primary flex items-center justify-center shrink-0">
+                                                                                            <FileText className="w-4 h-4" />
+                                                                                        </div>
+                                                                                        <div className="truncate">
+                                                                                            <p className="text-xs font-bold text-white truncate max-w-xs">
+                                                                                                {att.name || "Documento Anexo"}
+                                                                                            </p>
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className="text-[9px] font-bold text-primary uppercase tracking-widest">
+                                                                                                    Disponível para Download
+                                                                                                </span>
+                                                                                                {att.size && (
+                                                                                                    <span className="text-[9px] text-white/30 font-medium">
+                                                                                                        • {att.size}
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+
+                                                                                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                                                                                        <a
+                                                                                            href={att.url}
+                                                                                            target="_blank"
+                                                                                            rel="noopener noreferrer"
+                                                                                            className="inline-flex"
+                                                                                        >
+                                                                                            <Button
+                                                                                                type="button"
+                                                                                                variant="ghost"
+                                                                                                size="sm"
+                                                                                                className="h-8 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-[10px] font-bold uppercase tracking-wider gap-1"
+                                                                                            >
+                                                                                                <Eye className="w-3 h-3" /> Ver
+                                                                                            </Button>
+                                                                                        </a>
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            variant="ghost"
+                                                                                            size="sm"
+                                                                                            className="h-8 px-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
+                                                                                            onClick={() => handleRemoveNoticiaAttachment(att.id)}
+                                                                                        >
+                                                                                            <Trash2 className="w-3.5 h-3.5" /> Remover
+                                                                                        </Button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="outline"
+                                                                                onClick={() => noticiaAttachmentInputRef.current?.click()}
+                                                                                className="w-full h-11 rounded-xl border-dashed border-white/15 hover:border-primary/50 bg-white/[0.02] hover:bg-white/[0.05] text-white/60 hover:text-white transition-all flex items-center justify-center gap-2 text-xs font-bold"
+                                                                            >
+                                                                                <Plus className="w-4 h-4 text-primary" />
+                                                                                <span>Adicionar Mais Anexos (PDF, DOC, etc.)</span>
+                                                                            </Button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            onClick={() => noticiaAttachmentInputRef.current?.click()}
+                                                                            className="w-full h-14 rounded-2xl border-dashed border-white/15 hover:border-primary/50 bg-white/[0.02] hover:bg-white/[0.05] text-white/60 hover:text-white transition-all flex items-center justify-center gap-3 text-xs font-bold"
+                                                                        >
+                                                                            <Paperclip className="w-4 h-4 text-primary" />
+                                                                            <span>Adicionar Anexos para Download (PDF, DOC, etc. - até 15MB)</span>
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
                                                             </div>
 
                                                             <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
@@ -2886,7 +3130,14 @@ const AdminDashboard = () => {
                                                                 <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">{n.date}</span>
                                                             </div>
                                                             <h4 className="font-heading font-bold text-base text-white mb-1 leading-tight group-hover:text-primary transition-colors line-clamp-2">{n.title}</h4>
-                                                            <p className="text-[11px] text-white/40 mb-4 line-clamp-2 leading-relaxed">{n.summary}</p>
+                                                            <p className="text-[11px] text-white/40 mb-3 line-clamp-2 leading-relaxed">{n.summary}</p>
+
+                                                            {(n.attachment_url || n.anexo_url) && (
+                                                                <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400 bg-emerald-400/10 px-2.5 py-1 rounded-lg border border-emerald-400/20 w-fit mb-3">
+                                                                    <Paperclip className="w-3 h-3" />
+                                                                    <span className="truncate max-w-[180px]">{n.attachment_name || n.anexo_nome || "Com documento anexo"}</span>
+                                                                </div>
+                                                            )}
 
                                                             <div className="flex gap-2 w-full mt-auto">
                                                                 <Button

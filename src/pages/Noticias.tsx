@@ -4,9 +4,30 @@ import PageLayout from "@/components/PageLayout";
 import PageBanner from "@/components/PageBanner";
 import SectionTitle from "@/components/SectionTitle";
 import { motion, AnimatePresence } from "framer-motion";
-import { Calendar, Newspaper, Image as ImageIcon, Instagram, Megaphone, User, ChevronLeft, ChevronRight, Heart, Share2, ThumbsUp } from "lucide-react";
+import { Calendar, Newspaper, Image as ImageIcon, Instagram, Megaphone, User, ChevronLeft, ChevronRight, Heart, Share2, ThumbsUp, FileText, Download, Paperclip, Eye, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+
+const normalizeAttachments = (n: any): Array<{ id: string; name: string; url: string; size?: string }> => {
+  if (!n) return [];
+  if (n.attachments) {
+    if (Array.isArray(n.attachments)) return n.attachments;
+    try {
+      const parsed = typeof n.attachments === 'string' ? JSON.parse(n.attachments) : n.attachments;
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      console.warn("Error parsing attachments JSON in Noticias page", e);
+    }
+  }
+  if (n.attachment_url || n.anexo_url) {
+    return [{
+      id: 'legacy-1',
+      name: n.attachment_name || n.anexo_nome || "Documento Anexo",
+      url: n.attachment_url || n.anexo_url
+    }];
+  }
+  return [];
+};
 
 const Noticias = () => {
   const [noticias, setNoticias] = useState<any[]>([]);
@@ -262,9 +283,71 @@ const Noticias = () => {
                           {n.title}
                         </h3>
 
-                        <p className="text-slate-600 font-body text-lg leading-relaxed mb-12 whitespace-pre-line text-justify">
+                        <p className="text-slate-600 font-body text-lg leading-relaxed mb-8 whitespace-pre-line text-justify">
                           {n.summary}
                         </p>
+
+                        {/* Bloco de Anexos / Documentos Complementares para Download */}
+                        {(() => {
+                          const articleAttachments = normalizeAttachments(n);
+                          if (articleAttachments.length === 0) return null;
+
+                          return (
+                            <div className="mb-10 p-6 sm:p-8 rounded-[2rem] bg-gradient-to-br from-slate-50 to-primary/[0.04] border border-primary/20 shadow-sm">
+                              <div className="flex items-center gap-2 mb-4">
+                                <div className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                                  <Paperclip className="w-3.5 h-3.5" />
+                                </div>
+                                <span className="text-xs font-black uppercase tracking-widest text-primary">
+                                  {articleAttachments.length > 1 ? `Documentos Anexos (${articleAttachments.length})` : "Documento Complementar / Anexo"}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-3">
+                                {articleAttachments.map((att, idx) => (
+                                  <div
+                                    key={att.id || idx}
+                                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:border-primary/40 hover:shadow-md transition-all group/att"
+                                  >
+                                    <div className="flex items-center gap-4 min-w-0">
+                                      <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary group-hover/att:bg-primary group-hover/att:text-white transition-all flex items-center justify-center shrink-0">
+                                        <FileText className="w-6 h-6" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <h4 className="font-heading font-black text-slate-800 text-sm sm:text-base truncate group-hover/att:text-primary transition-colors">
+                                          {att.name || `Documento Anexo ${idx + 1}`}
+                                        </h4>
+                                        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                                          <span>Arquivo disponível para consulta</span>
+                                          {att.size && (
+                                            <>
+                                              <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                              <span>{att.size}</span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0 self-stretch sm:self-auto">
+                                      <a
+                                        href={att.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        download={att.name || true}
+                                        className="w-full sm:w-auto"
+                                      >
+                                        <Button className="w-full sm:w-auto rounded-xl gap-2 h-11 px-6 bg-primary hover:bg-primary/90 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-primary/20 transition-all hover:scale-[1.02]">
+                                          <Download className="w-4 h-4" /> Baixar Anexo
+                                        </Button>
+                                      </a>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         <div className="flex flex-col md:flex-row items-center justify-between py-6 border-t border-slate-100 mb-4 gap-6">
                           <div className="flex items-center gap-6">
