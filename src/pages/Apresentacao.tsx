@@ -277,24 +277,69 @@ const Evento = () => (
   </PageLayout>
 );
 
-const Regimento = () => (
-  <PageLayout>
-    <PageBanner title="REGIMENTO" />
-    <section className="section-padding">
-      <div className="container mx-auto max-w-4xl">
-        <SectionTitle title="Regimento do Congresso" subtitle="Normas e regulamentos do IX CONTEFFA 2026" />
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} className="bg-navy rounded-[3rem] p-12 text-white/80 leading-relaxed text-xl shadow-2xl flex flex-col items-center text-center space-y-8">
-          <p>O regimento completo do IX CONTEFFA 2026 já está disponível para consulta. Faça o download abaixo.</p>
-          <Button asChild className="gap-2 font-bold px-8 h-14 text-base rounded-full shadow-lg hover:-translate-y-1 transition-transform">
-            <a href={regimentoPdf} download="REGIMENTO_INTERNO_CONTEFFA_V_17_03_2026.pdf" target="_blank" rel="noopener noreferrer">
-              <Download className="w-5 h-5" />
-              Baixar Regimento em PDF
-            </a>
-          </Button>
-        </motion.div>
-      </div>
-    </section>
-  </PageLayout>
-);
+const Regimento = () => {
+  const [docUrl, setDocUrl] = useState<string>(regimentoPdf);
+  const [docName, setDocName] = useState<string>("REGIMENTO_INTERNO_CONTEFFA_V_17_03_2026.pdf");
+
+  useEffect(() => {
+    const fetchRegimento = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('config')
+          .select('value')
+          .eq('key', 'regimento_interno')
+          .maybeSingle();
+
+        if (!error && data && data.value) {
+          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+          if (parsed) {
+            if (Array.isArray(parsed.items) && parsed.active_id) {
+              const activeItem = parsed.items.find((it: any) => it.id === parsed.active_id);
+              if (activeItem) {
+                if (activeItem.url) {
+                  setDocUrl(activeItem.url);
+                } else {
+                  setDocUrl(regimentoPdf);
+                }
+                if (activeItem.name) {
+                  setDocName(activeItem.name);
+                }
+              }
+            } else if (parsed.url) {
+              setDocUrl(parsed.url);
+              if (parsed.name) {
+                setDocName(parsed.name);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao carregar regimento do Supabase:", err);
+      }
+    };
+
+    fetchRegimento();
+  }, []);
+
+  return (
+    <PageLayout>
+      <PageBanner title="REGIMENTO" />
+      <section className="section-padding">
+        <div className="container mx-auto max-w-4xl">
+          <SectionTitle title="Regimento do Congresso" subtitle="Normas e regulamentos do IX CONTEFFA 2026" />
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} className="bg-navy rounded-[3rem] p-12 text-white/80 leading-relaxed text-xl shadow-2xl flex flex-col items-center text-center space-y-8">
+            <p>O regimento completo do IX CONTEFFA 2026 já está disponível para consulta. Faça o download abaixo.</p>
+            <Button asChild className="gap-2 font-bold px-8 h-14 text-base rounded-full shadow-lg hover:-translate-y-1 transition-transform">
+              <a href={docUrl} download={docName} target="_blank" rel="noopener noreferrer">
+                <Download className="w-5 h-5" />
+                Baixar Regimento em PDF
+              </a>
+            </Button>
+          </motion.div>
+        </div>
+      </section>
+    </PageLayout>
+  );
+};
 
 export { CartaPresidente, Historico, Evento, Regimento };

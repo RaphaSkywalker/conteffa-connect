@@ -49,7 +49,9 @@ import {
     Globe,
     ExternalLink,
     Compass,
-    Paperclip
+    Paperclip,
+    ScrollText,
+    FileCheck
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import {
@@ -72,6 +74,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import regimentoPdf from "@/assets/REGIMENTO_INTERNO_CONTEFFA_V_17_03_2026.pdf";
 
 
 
@@ -518,6 +521,19 @@ const AdminDashboard = () => {
         items: [] as any[],
         id: null as number | null
     });
+
+    const DEFAULT_REGIMENTO = {
+        id: "default",
+        name: "REGIMENTO_INTERNO_CONTEFFA_V_17_03_2026.pdf",
+        url: "",
+        size: "Original",
+        uploaded_at: "Original do Sistema",
+        is_default: true
+    };
+
+    const [regimentos, setRegimentos] = useState<any[]>([DEFAULT_REGIMENTO]);
+    const [activeRegimentoId, setActiveRegimentoId] = useState<string>("default");
+    const regimentoFileInputRef = useRef<HTMLInputElement>(null);
 
     // Load registrations
     const [inscricoes, setInscricoes] = useState<any[]>(() => {
@@ -1118,6 +1134,35 @@ const AdminDashboard = () => {
 
                     const ad = configData.find((c: any) => c.key === 'divulgacao');
                     if (ad && ad.value) setAdImage(ad.value);
+
+                    const regInterno = configData.find((c: any) => c.key === 'regimento_interno');
+                    if (regInterno && regInterno.value) {
+                        try {
+                            const parsed = typeof regInterno.value === 'string' ? JSON.parse(regInterno.value) : regInterno.value;
+                            if (parsed && typeof parsed === 'object') {
+                                if (Array.isArray(parsed.items)) {
+                                    setRegimentos(parsed.items);
+                                    setActiveRegimentoId(parsed.active_id || (parsed.items.length > 0 ? parsed.items[0].id : ""));
+                                } else if (parsed.url) {
+                                    const customItem = {
+                                        id: String(Date.now()),
+                                        name: parsed.name || "Regimento Personalizado.pdf",
+                                        url: parsed.url,
+                                        size: parsed.size || "",
+                                        uploaded_at: parsed.updated_at || "Anterior",
+                                        is_default: false
+                                    };
+                                    setRegimentos([customItem, DEFAULT_REGIMENTO]);
+                                    setActiveRegimentoId(customItem.id);
+                                } else {
+                                    setRegimentos([DEFAULT_REGIMENTO]);
+                                    setActiveRegimentoId("default");
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Erro ao carregar regimento_interno:", e);
+                        }
+                    }
 
                     // Load Local Settings from system albums (shares=99001 for hotel, shares=99002 for discovery)
                     try {
@@ -2318,6 +2363,131 @@ const AdminDashboard = () => {
         }
     };
 
+    const saveRegimentosToSupabase = async (updatedList: any[], newActiveId: string) => {
+        const activeItem = updatedList.find(it => it.id === newActiveId) || (updatedList.length > 0 ? updatedList[0] : null);
+        const payload = {
+            active_id: newActiveId,
+            items: updatedList,
+            url: activeItem?.url || "",
+            name: activeItem?.name || (updatedList.length === 0 ? "" : "REGIMENTO_INTERNO_CONTEFFA_V_17_03_2026.pdf")
+        };
+
+        const { error } = await supabase.from('config').upsert({
+            key: 'regimento_interno',
+            value: JSON.stringify(payload),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+
+        if (error) {
+            await supabase.from('config').update({
+                value: JSON.stringify(payload),
+                updated_at: new Date().toISOString()
+            }).eq('key', 'regimento_interno');
+        }
+    };
+
+    const handleRegimentoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 25 * 1024 * 1024) {
+            toast.error("O arquivo excede o limite máximo de 25MB.");
+            return;
+        }
+
+        const sizeFormatted = file.size < 1024 * 1024 
+            ? `${(file.size / 1024).toFixed(1)} KB` 
+            : `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+
+        toast.loading("Enviando arquivo do Regimento...", { id: "upload-regimento" });
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `regimento-${Date.now()}.${fileExt}`;
+            const filePath = `admin/regimento/${fileName}`;
+
+            let finalUrl = "";
+            const { error: uploadError } = await supabase.storage
+                .from('media')
+                .upload(filePath, file, { upsert: true });
+
+            if (!uploadError) {
+                const { data } = supabase.storage.from('media').getPublicUrl(filePath);
+                finalUrl = data.publicUrl;
+            } else {
+                console.warn("Storage upload failed, falling back to Base64:", uploadError);
+                const reader = new FileReader();
+                finalUrl = await new Promise<string>((resolve) => {
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            
+            const newItem = {
+                id: String(Date.now()),
+                name: file.name,
+                url: finalUrl,
+                size: sizeFormatted,
+                uploaded_at: dateStr,
+                is_default: false
+            };
+
+            // O mais novo sempre no topo da lista
+            const updatedList = [newItem, ...regimentos];
+            setRegimentos(updatedList);
+
+            await saveRegimentosToSupabase(updatedList, activeRegimentoId);
+            toast.success("Arquivo enviado com sucesso para o topo da lista! Você pode conferir e clicar em 'Publicar' para ativá-lo.", { id: "upload-regimento" });
+        } catch (err: any) {
+            console.error("Erro no upload do regimento:", err);
+            toast.error("Erro ao salvar o arquivo do regimento.", { id: "upload-regimento" });
+        } finally {
+            if (e.target) e.target.value = '';
+        }
+    };
+
+    const handlePublishRegimento = async (id: string) => {
+        const itemToPublish = regimentos.find(r => r.id === id);
+        if (!itemToPublish) return;
+
+        toast.loading("Publicando regimento no site...", { id: "publish-regimento" });
+        try {
+            setActiveRegimentoId(id);
+            await saveRegimentosToSupabase(regimentos, id);
+            toast.success(`"${itemToPublish.name}" agora está publicado e ativo para download no site!`, { id: "publish-regimento" });
+        } catch (err) {
+            console.error("Erro ao publicar regimento:", err);
+            toast.error("Erro ao publicar regimento.", { id: "publish-regimento" });
+        }
+    };
+
+    const handleDeleteRegimento = async (id: string) => {
+        const itemToDelete = regimentos.find(r => r.id === id);
+        if (!itemToDelete) return;
+
+        if (!window.confirm(`Tem certeza que deseja excluir "${itemToDelete.name}" da lista?`)) return;
+
+        toast.loading("Excluindo arquivo...", { id: "delete-regimento" });
+        try {
+            const updatedList = regimentos.filter(r => r.id !== id);
+            let nextActiveId = activeRegimentoId;
+            if (activeRegimentoId === id) {
+                nextActiveId = updatedList.length > 0 ? updatedList[0].id : "";
+            }
+
+            setRegimentos(updatedList);
+            setActiveRegimentoId(nextActiveId);
+
+            await saveRegimentosToSupabase(updatedList, nextActiveId);
+            toast.success("Arquivo excluído com sucesso!", { id: "delete-regimento" });
+        } catch (err) {
+            console.error("Erro ao excluir regimento:", err);
+            toast.error("Erro ao excluir arquivo do Supabase.", { id: "delete-regimento" });
+        }
+    };
+
     const handleLogout = () => {
         navigate("/admin");
     };
@@ -2329,6 +2499,7 @@ const AdminDashboard = () => {
         { id: "palestrantes", label: "Palestrantes", icon: Mic },
         { id: "convidados", label: "Comissão", icon: Users },
         { id: "programacao", label: "Programação", icon: Calendar },
+        { id: "regimento", label: "Regimento", icon: ScrollText },
         { id: "galeria", label: "Galeria de Fotos", icon: ImageIcon },
         { id: "teses", label: "Gestão de Teses", icon: BookOpen },
         { id: "local", label: "Local", icon: MapPin },
@@ -3991,6 +4162,196 @@ const AdminDashboard = () => {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Regimento Tab */}
+                            {activeTab === "regimento" && (() => {
+                                const activeItem = regimentos.find(r => r.id === activeRegimentoId) || (regimentos.length > 0 ? regimentos[0] : null);
+                                return (
+                                    <div className="space-y-8 pb-12">
+                                        {/* Header */}
+                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-[#122442] p-6 rounded-3xl shadow-xl border border-white/5 gap-4">
+                                            <div>
+                                                <h3 className="font-heading font-black text-xl text-white">Regimento do Congresso</h3>
+                                                <p className="text-white/40 text-[13px] font-medium">Faça upload de versões do regimento, visualize e publique o documento oficial para download no site.</p>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="file"
+                                                    ref={regimentoFileInputRef}
+                                                    className="hidden"
+                                                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                                    onChange={handleRegimentoUpload}
+                                                />
+                                                <Button
+                                                    onClick={() => regimentoFileInputRef.current?.click()}
+                                                    className="rounded-full gap-2 px-6 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 text-white font-bold"
+                                                >
+                                                    <Upload className="w-4 h-4" /> Fazer Upload do Regimento
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {/* Active Document Highlight Card */}
+                                        <div className="bg-[#122442] rounded-3xl border border-primary/30 shadow-2xl p-8 relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+
+                                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
+                                                <div className="flex items-start md:items-center gap-5">
+                                                    <div className="w-16 h-16 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shadow-inner shrink-0">
+                                                        <ScrollText className="w-8 h-8" />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <div className="flex items-center gap-2.5 flex-wrap">
+                                                            <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                                                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                                                Documento Oficial Publicado no Site
+                                                            </span>
+                                                            {activeItem?.size && (
+                                                                <span className="text-white/40 text-[11px] font-bold bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+                                                                    {activeItem.size}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <h4 className="text-lg md:text-xl font-heading font-black text-white break-all">
+                                                            {activeItem?.name || "Nenhum documento ativo no momento"}
+                                                        </h4>
+                                                        <p className="text-white/40 text-xs font-medium">
+                                                            {activeItem?.uploaded_at ? `Atualizado em: ${activeItem.uploaded_at}` : (activeItem ? "Documento original do congresso" : "Envie um arquivo para publicar")}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {activeItem && (
+                                                    <div className="flex gap-3 w-full lg:w-auto justify-end">
+                                                        <Button
+                                                            asChild
+                                                            variant="secondary"
+                                                            className="rounded-2xl gap-2 h-12 px-6 bg-white/10 text-white hover:bg-white/20 border border-white/10 font-bold w-full sm:w-auto"
+                                                        >
+                                                            <a href={activeItem.url || regimentoPdf} target="_blank" rel="noopener noreferrer" download={activeItem.name}>
+                                                                <Download className="w-4 h-4 text-primary" /> Visualizar / Baixar Publicado
+                                                            </a>
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Document List Table */}
+                                        <div className="bg-[#122442] rounded-3xl border border-white/5 shadow-xl overflow-hidden">
+                                            <div className="p-6 border-b border-white/5 flex justify-between items-center">
+                                                <div>
+                                                    <h4 className="font-black text-white/50 text-xs uppercase tracking-[0.2em]">Arquivos de Regimento Cadastrados</h4>
+                                                    <p className="text-white/30 text-xs mt-0.5">Clique em "Publicar" para ativar qualquer arquivo para download no site.</p>
+                                                </div>
+                                                <span className="text-xs font-bold text-white/40 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                                                    {regimentos.length} {regimentos.length === 1 ? 'arquivo' : 'arquivos'}
+                                                </span>
+                                            </div>
+
+                                            {regimentos.length === 0 ? (
+                                                <div className="p-12 text-center text-white/40 space-y-3">
+                                                    <ScrollText className="w-10 h-10 mx-auto opacity-30" />
+                                                    <p className="font-bold text-sm text-white/60">Nenhum arquivo de regimento cadastrado na lista.</p>
+                                                    <p className="text-xs">Utilize o botão superior "Fazer Upload do Regimento" para enviar um documento.</p>
+                                                </div>
+                                            ) : (
+                                                <div className="divide-y divide-white/5">
+                                                    {regimentos.map((item) => {
+                                                        const isPublished = item.id === activeRegimentoId;
+                                                        const isDefault = item.id === "default" || item.is_default;
+
+                                                        return (
+                                                            <div
+                                                                key={item.id}
+                                                                className={`p-6 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${isPublished ? 'bg-primary/5' : 'hover:bg-white/[0.02]'}`}
+                                                            >
+                                                                <div className="flex items-start md:items-center gap-4 min-w-0">
+                                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border ${isPublished ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-white/40'}`}>
+                                                                        <ScrollText className="w-6 h-6" />
+                                                                    </div>
+                                                                    <div className="min-w-0 space-y-1">
+                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                            <h5 className="font-bold text-white text-base truncate max-w-md">
+                                                                                {item.name}
+                                                                            </h5>
+                                                                            {isPublished ? (
+                                                                                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                                                    Publicado
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-white/5 text-white/40 border border-white/10">
+                                                                                    Disponível
+                                                                                </span>
+                                                                            )}
+                                                                            {isDefault && (
+                                                                                <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                                                                                    Original
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="flex items-center gap-3 text-xs text-white/30 font-medium">
+                                                                            {item.size && <span>Tamanho: {item.size}</span>}
+                                                                            <span>•</span>
+                                                                            <span>Enviado: {item.uploaded_at || "Original do Sistema"}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Actions for this item */}
+                                                                <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
+                                                                    {/* Visualizar / Baixar */}
+                                                                    <Button
+                                                                        asChild
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="rounded-xl text-white/70 hover:text-white hover:bg-white/10 text-xs font-bold gap-1.5 h-10 px-3"
+                                                                    >
+                                                                        <a href={item.url || regimentoPdf} target="_blank" rel="noopener noreferrer" download={item.name}>
+                                                                            <Download className="w-3.5 h-3.5" /> Visualizar
+                                                                        </a>
+                                                                    </Button>
+
+                                                                    {/* Publicar */}
+                                                                    {isPublished ? (
+                                                                        <Button
+                                                                            disabled
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-black gap-1.5 h-10 px-4 opacity-100 cursor-default"
+                                                                        >
+                                                                            <Check className="w-3.5 h-3.5" /> Publicado
+                                                                        </Button>
+                                                                    ) : (
+                                                                        <Button
+                                                                            onClick={() => handlePublishRegimento(item.id)}
+                                                                            variant="secondary"
+                                                                            size="sm"
+                                                                            className="rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-black uppercase tracking-wider gap-1.5 h-10 px-4 shadow-lg shadow-primary/20"
+                                                                        >
+                                                                            <Check className="w-3.5 h-3.5" /> Publicar
+                                                                        </Button>
+                                                                    )}
+
+                                                                    {/* Excluir (disponível para todos os itens da lista) */}
+                                                                    <Button
+                                                                        onClick={() => handleDeleteRegimento(item.id)}
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 text-xs font-bold gap-1.5 h-10 px-3"
+                                                                    >
+                                                                        <Trash2 className="w-3.5 h-3.5" /> Excluir
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* Galeria Tab */}
                             {activeTab === "galeria" && (

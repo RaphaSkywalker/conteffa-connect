@@ -23,6 +23,9 @@ ALTER TABLE guests DISABLE ROW LEVEL SECURITY;
 ALTER TABLE registrations DISABLE ROW LEVEL SECURITY;
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 
+-- Garantir que a tabela config possui a chave de regimento (opcional)
+INSERT INTO config (key, value) VALUES ('regimento_interno', '{}') ON CONFLICT (key) DO NOTHING;
+
 -- =====================================================================
 -- COLUNAS DE ANEXOS PARA A TABELA DE NOTÍCIAS (NEWS)
 -- =====================================================================
