@@ -317,12 +317,17 @@ export const encerrarVotacaoTese = async (teseId: string | number): Promise<Tese
 export const checkUserAlreadyVoted = async (teseId: string | number, rawCpf: string): Promise<boolean> => {
     const cleanCpf = normalizeCPF(rawCpf);
     if (!cleanCpf) return false;
+    const numericId = Number(teseId);
 
     try {
-        const { data, error } = await supabase
-            .from('votos')
-            .select('id, cpf')
-            .eq('tese_id', teseId);
+        let query = supabase.from('votos').select('id, cpf');
+        if (!isNaN(numericId)) {
+            query = query.eq('tese_id', numericId);
+        } else {
+            query = query.eq('tese_id', teseId);
+        }
+
+        const { data, error } = await query;
 
         if (!error && data) {
             const hasVoted = data.some((v: any) => normalizeCPF(v.cpf) === cleanCpf);
@@ -344,14 +349,23 @@ export const checkUserAlreadyVoted = async (teseId: string | number, rawCpf: str
 };
 
 export const getVotosByTese = async (teseId: string | number): Promise<Voto[]> => {
+    const numericId = Number(teseId);
+
     try {
-        const { data, error } = await supabase
-            .from('votos')
-            .select('*')
-            .eq('tese_id', teseId);
+        let query = supabase.from('votos').select('*');
+        if (!isNaN(numericId)) {
+            query = query.eq('tese_id', numericId);
+        } else {
+            query = query.eq('tese_id', teseId);
+        }
+
+        const { data, error } = await query;
 
         if (!error && data) {
             return data;
+        }
+        if (error) {
+            console.error("Erro ao buscar votos no Supabase:", error);
         }
     } catch (err) {
         console.warn("Erro ao buscar votos no Supabase:", err);
@@ -377,6 +391,7 @@ export const submitVoto = async (payload: {
     userAgent?: string;
 }): Promise<{ success: boolean; message: string; voto?: Voto }> => {
     const cleanCpf = normalizeCPF(payload.cpf);
+    const numericTeseId = !isNaN(Number(payload.teseId)) ? Number(payload.teseId) : payload.teseId;
 
     // 1. Validar Tese e Status
     const tese = await getTeseById(payload.teseId);
@@ -389,13 +404,12 @@ export const submitVoto = async (payload: {
             success: false, 
             message: tese.status === 'Encerrada' 
                 ? "A votação desta tese já foi encerrada." 
-                : "A votação desta tese ainda não foi iniciada." 
+                : "A votação desta tese ainda não foi iniciada pela coordenação." 
         };
     }
 
     // Verificar expiração do tempo se houver data_fim
     if (tese.data_fim && new Date(tese.data_fim).getTime() < Date.now()) {
-        // Atualiza status para encerrada
         await encerrarVotacaoTese(tese.id);
         return { success: false, message: "O tempo para votação desta tese encerrou." };
     }
@@ -412,9 +426,9 @@ export const submitVoto = async (payload: {
         return { success: false, message: "Você já registrou seu voto nesta tese." };
     }
 
-    const newVoto: Voto = {
-        tese_id: payload.teseId,
-        inscrito_id: payload.inscritoId || inscrito.id || null,
+    const newVoto: any = {
+        tese_id: numericTeseId,
+        inscrito_id: payload.inscritoId ? String(payload.inscritoId) : (inscrito?.id ? String(inscrito.id) : null),
         cpf: cleanCpf,
         voto: payload.voto,
         ip: payload.ip || "127.0.0.1",
@@ -430,22 +444,29 @@ export const submitVoto = async (payload: {
             .single();
 
         if (error) {
+            console.error("Erro ao inserir voto no Supabase:", error);
             // Caso caia na constraint UNIQUE
-            if (error.code === '23505' || error.message.includes('unique')) {
+            if (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate')) {
                 return { success: false, message: "Você já registrou seu voto nesta tese." };
             }
-            throw error;
+            return { 
+                success: false, 
+                message: `Erro ao salvar voto no banco: ${error.message || 'Verifique o schema das tabelas'}` 
+            };
         }
 
         if (data) {
             newVoto.id = data.id;
         }
     } catch (err: any) {
-        console.warn("Erro ao salvar voto no Supabase, salvando localmente:", err);
-        newVoto.id = Date.now();
+        console.error("Exceção ao salvar voto no Supabase:", err);
+        return { 
+            success: false, 
+            message: `Falha na conexão com o banco de dados: ${err.message || 'Tente novamente'}` 
+        };
     }
 
-    // Salva no LocalStorage
+    // Salva no LocalStorage como cópia de segurança
     try {
         const saved = localStorage.getItem(LS_VOTOS_KEY);
         const list: Voto[] = saved ? JSON.parse(saved) : [];

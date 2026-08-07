@@ -1,8 +1,8 @@
 -- ==============================================================================
--- MIGRAÇÃO: MÓDULO DE VOTAÇÃO ONLINE POR QR CODE (CONTEFFA)
+-- MIGRAÇÃO & AJUSTE: MÓDULO DE VOTAÇÃO ONLINE POR QR CODE (CONTEFFA)
 -- ==============================================================================
 
--- 1. Criar Tabela de Teses
+-- 1. Criar Tabela de Teses (se não existir)
 CREATE TABLE IF NOT EXISTS public.teses (
     id BIGSERIAL PRIMARY KEY,
     numero INTEGER NOT NULL,
@@ -18,11 +18,11 @@ CREATE TABLE IF NOT EXISTS public.teses (
     atualizado_em TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 2. Criar Tabela de Votos
+-- 2. Criar Tabela de Votos (se não existir)
 CREATE TABLE IF NOT EXISTS public.votos (
     id BIGSERIAL PRIMARY KEY,
     tese_id BIGINT NOT NULL REFERENCES public.teses(id) ON DELETE CASCADE,
-    inscrito_id BIGINT,
+    inscrito_id TEXT,
     cpf TEXT NOT NULL,
     voto TEXT NOT NULL CHECK (voto IN ('SIM', 'NAO', 'ABSTER')),
     ip TEXT,
@@ -31,17 +31,28 @@ CREATE TABLE IF NOT EXISTS public.votos (
     CONSTRAINT votos_tese_cpf_unique UNIQUE (tese_id, cpf)
 );
 
--- 3. Índices de Otimização
+-- 3. Atualizar coluna 'inscrito_id' para TEXT caso a tabela já tenha sido criada como BIGINT
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'votos' AND column_name = 'inscrito_id' AND data_type != 'text'
+    ) THEN
+        ALTER TABLE public.votos ALTER COLUMN inscrito_id TYPE TEXT USING inscrito_id::text;
+    END IF;
+END $$;
+
+-- 4. Índices de Otimização
 CREATE INDEX IF NOT EXISTS idx_teses_numero ON public.teses(numero);
 CREATE INDEX IF NOT EXISTS idx_teses_status ON public.teses(status);
 CREATE INDEX IF NOT EXISTS idx_votos_tese_id ON public.votos(tese_id);
 CREATE INDEX IF NOT EXISTS idx_votos_cpf ON public.votos(cpf);
 
--- 4. Habilitar Segurança por Linha (RLS)
+-- 5. Habilitar Segurança por Linha (RLS)
 ALTER TABLE public.teses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.votos ENABLE ROW LEVEL SECURITY;
 
--- 5. Políticas de Segurança (RLS) para 'teses'
+-- 6. Políticas de Segurança (RLS) para 'teses'
 DROP POLICY IF EXISTS "Permitir leitura pública de teses" ON public.teses;
 CREATE POLICY "Permitir leitura pública de teses" 
 ON public.teses FOR SELECT 
@@ -53,7 +64,7 @@ ON public.teses FOR ALL
 USING (true) 
 WITH CHECK (true);
 
--- 6. Políticas de Segurança (RLS) para 'votos'
+-- 7. Políticas de Segurança (RLS) para 'votos'
 DROP POLICY IF EXISTS "Permitir leitura de votos para contagem" ON public.votos;
 CREATE POLICY "Permitir leitura de votos para contagem" 
 ON public.votos FOR SELECT 
@@ -64,7 +75,21 @@ CREATE POLICY "Permitir inserção de voto único"
 ON public.votos FOR INSERT 
 WITH CHECK (true);
 
--- 7. Publicação em Tempo Real (Supabase Realtime)
+DROP POLICY IF EXISTS "Permitir deleção de votos" ON public.votos;
+CREATE POLICY "Permitir deleção de votos" 
+ON public.votos FOR DELETE 
+USING (true);
+
+-- 8. Conceder Permissões para os Papeis Públicos e Autenticados
+GRANT ALL ON TABLE public.teses TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.votos TO anon, authenticated, service_role;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+
+-- 9. Configurar Replica Identity para Supabase Realtime
+ALTER TABLE public.teses REPLICA IDENTITY FULL;
+ALTER TABLE public.votos REPLICA IDENTITY FULL;
+
+-- 10. Publicação em Tempo Real (Supabase Realtime)
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -82,5 +107,5 @@ BEGIN
     END IF;
 EXCEPTION
     WHEN OTHERS THEN
-        NULL; -- Caso a publicação já contenha as tabelas
+        NULL;
 END $$;
