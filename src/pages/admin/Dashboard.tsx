@@ -51,8 +51,10 @@ import {
     Compass,
     Paperclip,
     ScrollText,
-    FileCheck
+    FileCheck,
+    Vote
 } from "lucide-react";
+import PainelVotacaoAdmin from "@/components/admin/votacao/PainelVotacaoAdmin";
 import * as XLSX from 'xlsx';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -2494,6 +2496,7 @@ const AdminDashboard = () => {
 
     const tabs = [
         { id: "painel", label: "Visão Geral", icon: LayoutDashboard },
+        { id: "painel_votacao", label: "Painel de Votação", icon: Vote },
         { id: "trafego", label: "Tráfego & Métricas", icon: BarChart3 },
         { id: "noticias", label: "Notícias", icon: Newspaper },
         { id: "palestrantes", label: "Palestrantes", icon: Mic },
@@ -5829,6 +5832,11 @@ const AdminDashboard = () => {
                                         </div>
                                     </div>
                                 </div>
+                            )}
+
+                            {/* Painel de Votação Tab */}
+                            {activeTab === "painel_votacao" && (
+                                <PainelVotacaoAdmin />
                             )}
                         </motion.div>
                     </AnimatePresence>

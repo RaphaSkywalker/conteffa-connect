@@ -21,6 +21,10 @@ import Comissao from "./pages/Comissao";
 import AdminLogin from "./pages/admin/Login";
 import AdminDashboard from "./pages/admin/Dashboard";
 
+// Votação Online Pages
+import TesePublica from "./pages/TesePublica";
+import VotarTese from "./pages/VotarTese";
+
 import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
@@ -54,6 +58,10 @@ const App = () => (
           <Route path="/indicativos" element={<Indicativos />} />
           <Route path="/galeria" element={<Galeria />} />
           <Route path="/contato" element={<Contato />} />
+
+          {/* Votação Online */}
+          <Route path="/tese/:id" element={<TesePublica />} />
+          <Route path="/votar/:id" element={<VotarTese />} />
 
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminLogin />} />
