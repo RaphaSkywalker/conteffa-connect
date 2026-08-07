@@ -51,6 +51,13 @@ ALTER TABLE guests ADD COLUMN IF NOT EXISTS bio text;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS photo text;
 
 -- =====================================================================
+-- COLUNAS PARA A TABELA DE PROGRAMAÇÃO (PROGRAMMING)
+-- =====================================================================
+ALTER TABLE programming ADD COLUMN IF NOT EXISTS date text;
+ALTER TABLE programming ADD COLUMN IF NOT EXISTS label text;
+ALTER TABLE programming ADD COLUMN IF NOT EXISTS items text;
+
+-- =====================================================================
 -- Caso prefira manter o RLS ativo por algum motivo, você precisaria criar 
 -- políticas explícitas permitindo ALL (todas as operações) para public:
 --

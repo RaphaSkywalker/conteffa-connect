@@ -27,7 +27,17 @@ const Programacao = () => {
         // 2. Carregar Programação do Supabase
         const { data: progData } = await supabase.from('programming').select('*').order('id');
         if (progData && progData.length > 0) {
-          setDays(progData);
+          const parsedProg = progData.map((p: any) => {
+            let itemsArr = p.items;
+            if (typeof itemsArr === 'string') {
+              try { itemsArr = JSON.parse(itemsArr); } catch { itemsArr = []; }
+            }
+            return {
+              ...p,
+              items: Array.isArray(itemsArr) ? itemsArr : []
+            };
+          });
+          setDays(parsedProg);
         } else {
           loadDefaults();
         }

@@ -1178,7 +1178,19 @@ const AdminDashboard = () => {
                     setNoticias(formattedNews);
                 }
                 if (dbSpeakers) setPalestrantes(dbSpeakers);
-                if (dbProg) setProgramacao(dbProg);
+                if (dbProg) {
+                    const parsedProg = dbProg.map((p: any) => {
+                        let itemsArr = p.items;
+                        if (typeof itemsArr === 'string') {
+                            try { itemsArr = JSON.parse(itemsArr); } catch { itemsArr = []; }
+                        }
+                        return {
+                            ...p,
+                            items: Array.isArray(itemsArr) ? itemsArr : []
+                        };
+                    });
+                    setProgramacao(parsedProg);
+                }
                 if (dbGuests) setConvidados(dbGuests);
                 if (dbAlbums) setAlbuns(dbAlbums.filter((a: any) => !a.shares || a.shares < 99000));
 
@@ -2155,17 +2167,39 @@ const AdminDashboard = () => {
         }
 
         try {
+            const cleanProg = {
+                date: newProgramacao.date,
+                label: newProgramacao.label || "",
+                items: Array.isArray(newProgramacao.items) ? newProgramacao.items : []
+            };
+
             if (newProgramacao.id) {
-                const { error } = await supabase.from('programming').update(newProgramacao).eq('id', newProgramacao.id);
-                if (error) throw error;
-                const updated = programacao.map((p: any) => p.id === newProgramacao.id ? { ...p, ...newProgramacao } : p);
+                // Atualizar dia existente (sem 'id' no body) com fallback para JSON string caso a coluna seja TEXT
+                let { error } = await supabase.from('programming').update(cleanProg).eq('id', newProgramacao.id);
+                if (error && (error.message?.includes('text') || error.message?.includes('type') || error.message?.includes('column') || error.code === '22P02')) {
+                    console.warn("Retrying programming update with stringified items:", error);
+                    const stringifiedProg = { ...cleanProg, items: JSON.stringify(cleanProg.items) };
+                    const res = await supabase.from('programming').update(stringifiedProg).eq('id', newProgramacao.id);
+                    if (res.error) throw res.error;
+                } else if (error) {
+                    throw error;
+                }
+                const updated = programacao.map((p: any) => p.id === newProgramacao.id ? { ...p, ...cleanProg, id: newProgramacao.id } : p);
                 setProgramacao(updated);
                 toast.success("Agenda atualizada!");
             } else {
-                const { id, ...progToSave } = newProgramacao;
-                const { data, error } = await supabase.from('programming').insert([progToSave]).select().single();
-                if (error) throw error;
-                const updated = [...programacao, { ...newProgramacao, id: data.id }];
+                // Inserir novo dia
+                let { data, error } = await supabase.from('programming').insert([cleanProg]).select().single();
+                if (error && (error.message?.includes('text') || error.message?.includes('type') || error.message?.includes('column') || error.code === '22P02')) {
+                    console.warn("Retrying programming insert with stringified items:", error);
+                    const stringifiedProg = { ...cleanProg, items: JSON.stringify(cleanProg.items) };
+                    const res = await supabase.from('programming').insert([stringifiedProg]).select().single();
+                    if (res.error) throw res.error;
+                    data = res.data;
+                } else if (error) {
+                    throw error;
+                }
+                const updated = [...programacao, data ? { ...data, items: cleanProg.items } : { ...cleanProg, id: Date.now() }];
                 setProgramacao(updated);
                 toast.success("Dia cadastrado!");
             }
@@ -2173,12 +2207,22 @@ const AdminDashboard = () => {
             setIsAddingProgramacao(false);
             setNewProgramacao({ date: "", label: "", items: [], id: null });
         } catch (err: any) {
-            toast.error("Erro ao salvar programação no Supabase.");
+            console.error("Erro ao salvar programação no Supabase:", err);
+            toast.error(`Erro ao salvar programação: ${err.message || 'Desconhecido'}`);
         }
     };
 
     const handleEditProgramacao = (p: any) => {
-        setNewProgramacao(p);
+        let rawItems = p.items;
+        if (typeof rawItems === 'string') {
+            try { rawItems = JSON.parse(rawItems); } catch { rawItems = []; }
+        }
+        setNewProgramacao({
+            date: p.date || "",
+            label: p.label || "",
+            items: Array.isArray(rawItems) ? rawItems : [],
+            id: p.id || null
+        });
         setIsAddingProgramacao(true);
     };
 
