@@ -31,6 +31,26 @@ ALTER TABLE news ADD COLUMN IF NOT EXISTS attachment_name text;
 ALTER TABLE news ADD COLUMN IF NOT EXISTS attachments text;
 
 -- =====================================================================
+-- COLUNAS PARA A TABELA DE PALESTRANTES (SPEAKERS)
+-- =====================================================================
+ALTER TABLE speakers ADD COLUMN IF NOT EXISTS name text;
+ALTER TABLE speakers ADD COLUMN IF NOT EXISTS cargo text;
+ALTER TABLE speakers ADD COLUMN IF NOT EXISTS bio text;
+ALTER TABLE speakers ADD COLUMN IF NOT EXISTS photo text;
+ALTER TABLE speakers ADD COLUMN IF NOT EXISTS instagram text;
+ALTER TABLE speakers ADD COLUMN IF NOT EXISTS linkedin text;
+ALTER TABLE speakers ADD COLUMN IF NOT EXISTS twitter text;
+
+-- =====================================================================
+-- COLUNAS PARA A TABELA DE COMISSÃO / CONVIDADOS (GUESTS)
+-- =====================================================================
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS name text;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS cargo text;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS category text;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS bio text;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS photo text;
+
+-- =====================================================================
 -- Caso prefira manter o RLS ativo por algum motivo, você precisaria criar 
 -- políticas explícitas permitindo ALL (todas as operações) para public:
 --

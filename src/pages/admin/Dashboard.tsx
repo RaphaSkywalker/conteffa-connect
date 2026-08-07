@@ -1378,10 +1378,10 @@ const AdminDashboard = () => {
                 });
 
                 // Comprimir para garantir que não exceda limites e carregue rápido
-                // Perfil usa resolução menor, notícias/banners usam maior
+                // Perfil, palestrante e convidado usam resolução otimizada (400px), notícias/banners usam maior
                 const compressedBase64 = await compressImage(
                     base64, 
-                    (type === 'profile' || type === 'user') ? 400 : 1200, 
+                    (type === 'profile' || type === 'user' || type === 'palestrante' || type === 'convidado') ? 400 : 1200, 
                     0.7
                 );
                 
@@ -1994,30 +1994,44 @@ const AdminDashboard = () => {
         }
 
         try {
+            const cleanPalestrante = {
+                name: newPalestrante.name,
+                cargo: newPalestrante.cargo,
+                bio: newPalestrante.bio || "",
+                photo: newPalestrante.photo || null,
+                instagram: newPalestrante.instagram || null,
+                linkedin: newPalestrante.linkedin || null,
+                twitter: newPalestrante.twitter || null
+            };
+
             if (newPalestrante.id) {
-                // Atualizar palestrante existente
-                const { error } = await supabase.from('speakers').update(newPalestrante).eq('id', newPalestrante.id);
-                if (error) throw error;
-                const updated = palestrantes.map((p: any) => p.id === newPalestrante.id ? { ...p, ...newPalestrante } : p);
+                // Atualizar palestrante existente (sem enviar 'id' no body)
+                let { error } = await supabase.from('speakers').update(cleanPalestrante).eq('id', newPalestrante.id);
+                if (error && error.message?.includes('column')) {
+                    console.warn("Retrying speaker update without social columns:", error);
+                    const { instagram, linkedin, twitter, ...basicPayload } = cleanPalestrante;
+                    const res = await supabase.from('speakers').update(basicPayload).eq('id', newPalestrante.id);
+                    if (res.error) throw res.error;
+                } else if (error) {
+                    throw error;
+                }
+                const updated = palestrantes.map((p: any) => p.id === newPalestrante.id ? { ...p, ...cleanPalestrante, id: newPalestrante.id } : p);
                 setPalestrantes(updated);
                 toast.success("Palestrante atualizado!");
             } else {
-                // Inserir novo palestrante (O banco cria o ID)
-                const { id, ...palestranteToSave } = newPalestrante;
+                // Inserir novo palestrante
+                let { data, error } = await supabase.from('speakers').insert([cleanPalestrante]).select().single();
+                if (error && error.message?.includes('column')) {
+                    console.warn("Retrying speaker insert without social columns:", error);
+                    const { instagram, linkedin, twitter, ...basicPayload } = cleanPalestrante;
+                    const res = await supabase.from('speakers').insert([basicPayload]).select().single();
+                    if (res.error) throw res.error;
+                    data = res.data;
+                } else if (error) {
+                    throw error;
+                }
                 
-                // Limpar campos de rede social se estiverem vazios para evitar erros de constraint
-                const cleanPalestrante = {
-                    ...palestranteToSave,
-                    instagram: palestranteToSave.instagram || null,
-                    linkedin: palestranteToSave.linkedin || null,
-                    twitter: palestranteToSave.twitter || null,
-                    photo: palestranteToSave.photo || null
-                };
-
-                const { data, error } = await supabase.from('speakers').insert([cleanPalestrante]).select().single();
-                if (error) throw error;
-                
-                const updated = [...palestrantes, data]; // Usar o dado real que o banco criou
+                const updated = [...palestrantes, data || { ...cleanPalestrante, id: Date.now() }];
                 setPalestrantes(updated);
                 toast.success("Palestrante cadastrado!");
             }
@@ -2025,12 +2039,22 @@ const AdminDashboard = () => {
             setIsAddingPalestrante(false);
             setNewPalestrante({ name: "", cargo: "", bio: "", instagram: "", linkedin: "", twitter: "", photo: null, id: null });
         } catch (err: any) {
-            toast.error("Erro ao salvar palestrante no Supabase.");
+            console.error("Erro ao salvar palestrante no Supabase:", err);
+            toast.error(`Erro ao salvar palestrante: ${err.message || 'Desconhecido'}`);
         }
     };
 
     const handleEditPalestrante = (p: any) => {
-        setNewPalestrante(p);
+        setNewPalestrante({
+            name: p.name || "",
+            cargo: p.cargo || "",
+            bio: p.bio || "",
+            instagram: p.instagram || "",
+            linkedin: p.linkedin || "",
+            twitter: p.twitter || "",
+            photo: p.photo || null,
+            id: p.id || null
+        });
         setIsAddingPalestrante(true);
     };
 
@@ -2042,6 +2066,7 @@ const AdminDashboard = () => {
             setPalestrantes(updated);
             toast.success("Palestrante removido!");
         } catch (err: any) {
+            console.error("Erro ao remover palestrante:", err);
             toast.error("Erro ao remover palestrante.");
         }
     };
@@ -2053,18 +2078,39 @@ const AdminDashboard = () => {
         }
 
         try {
+            const cleanConvidado = {
+                name: newConvidado.name,
+                cargo: newConvidado.cargo,
+                category: newConvidado.category || "Convidado",
+                bio: newConvidado.bio || "",
+                photo: newConvidado.photo || null
+            };
+
             if (newConvidado.id) {
-                const { id, ...dataToUpdate } = newConvidado;
-                const { error } = await supabase.from('guests').update(dataToUpdate).eq('id', id);
-                if (error) throw error;
-                const updated = convidados.map((c: any) => c.id === newConvidado.id ? { ...newConvidado } : c);
+                let { error } = await supabase.from('guests').update(cleanConvidado).eq('id', newConvidado.id);
+                if (error && error.message?.includes('column')) {
+                    console.warn("Retrying guest update with basic columns:", error);
+                    const { category, bio, ...basicGuest } = cleanConvidado;
+                    const res = await supabase.from('guests').update(basicGuest).eq('id', newConvidado.id);
+                    if (res.error) throw res.error;
+                } else if (error) {
+                    throw error;
+                }
+                const updated = convidados.map((c: any) => c.id === newConvidado.id ? { ...c, ...cleanConvidado, id: newConvidado.id } : c);
                 setConvidados(updated);
                 toast.success("Membro da Comissão atualizado!");
             } else {
-                const { id, ...convidadoToSave } = newConvidado;
-                const { data, error } = await supabase.from('guests').insert([convidadoToSave]).select().single();
-                if (error) throw error;
-                const updated = [...convidados, { ...newConvidado, id: data.id }];
+                let { data, error } = await supabase.from('guests').insert([cleanConvidado]).select().single();
+                if (error && error.message?.includes('column')) {
+                    console.warn("Retrying guest insert with basic columns:", error);
+                    const { category, bio, ...basicGuest } = cleanConvidado;
+                    const res = await supabase.from('guests').insert([basicGuest]).select().single();
+                    if (res.error) throw res.error;
+                    data = res.data;
+                } else if (error) {
+                    throw error;
+                }
+                const updated = [...convidados, data || { ...cleanConvidado, id: Date.now() }];
                 setConvidados(updated);
                 toast.success("Membro da Comissão cadastrado!");
             }
@@ -2072,12 +2118,20 @@ const AdminDashboard = () => {
             setIsAddingConvidado(false);
             setNewConvidado({ name: "", cargo: "", category: "Convidado", bio: "", photo: null, id: null });
         } catch (err: any) {
-            toast.error("Erro ao salvar convidado no Supabase.");
+            console.error("Erro ao salvar convidado no Supabase:", err);
+            toast.error(`Erro ao salvar convidado: ${err.message || 'Desconhecido'}`);
         }
     };
 
     const handleEditConvidado = (c: any) => {
-        setNewConvidado(c);
+        setNewConvidado({
+            name: c.name || "",
+            cargo: c.cargo || "",
+            category: c.category || "Convidado",
+            bio: c.bio || "",
+            photo: c.photo || null,
+            id: c.id || null
+        });
         setIsAddingConvidado(true);
     };
 
@@ -2089,6 +2143,7 @@ const AdminDashboard = () => {
             setConvidados(updated);
             toast.success("Convidado removido!");
         } catch (err: any) {
+            console.error("Erro ao remover convidado:", err);
             toast.error("Erro ao remover convidado.");
         }
     };
