@@ -1152,43 +1152,35 @@ export const PainelVotacaoAdmin = () => {
                     </DialogHeader>
 
                     <form onSubmit={handleSaveIndicativoClick} className="space-y-4 mt-2">
-                        <div className="grid grid-cols-4 gap-4">
-                            <div>
-                                <Label className="text-xs text-white/70">Ordem/Nº</Label>
-                                <Input
-                                    type="number"
-                                    required
-                                    value={editingIndicativo.numero || 1}
-                                    onChange={(e) => setEditingIndicativo({ ...editingIndicativo, numero: Number(e.target.value) })}
-                                    className="bg-white/5 border-white/10 text-white"
-                                />
-                            </div>
-                            <div className="col-span-3">
-                                <Label className="text-xs text-white/70">Título / Resumo do Indicativo *</Label>
-                                <Input
-                                    required
-                                    value={editingIndicativo.titulo || ""}
-                                    onChange={(e) => setEditingIndicativo({ ...editingIndicativo, titulo: e.target.value })}
-                                    placeholder="ex: Indicativo 1 - Reestruturação da tabela de subsídios"
-                                    className="bg-white/5 border-white/10 text-white"
-                                />
-                            </div>
+                        <div className="w-32">
+                            <Label className="text-xs font-semibold text-white/80 mb-1.5 block">Número</Label>
+                            <Input
+                                type="number"
+                                required
+                                min={1}
+                                value={editingIndicativo.numero || 1}
+                                onChange={(e) => setEditingIndicativo({ ...editingIndicativo, numero: Number(e.target.value) })}
+                                className="bg-white/5 border-white/10 text-white font-bold"
+                            />
                         </div>
 
                         <div>
-                            <Label className="text-xs text-white/70">Texto Completo da Proposta (Debate da Sala)</Label>
+                            <Label className="text-xs font-semibold text-white/80 mb-1.5 block">Indicativo</Label>
                             <Textarea
                                 rows={5}
-                                value={editingIndicativo.descricao || ""}
-                                onChange={(e) => setEditingIndicativo({ ...editingIndicativo, descricao: e.target.value })}
+                                required
+                                value={editingIndicativo.titulo || ""}
+                                onChange={(e) => setEditingIndicativo({ ...editingIndicativo, titulo: e.target.value })}
                                 placeholder="Redação final do indicativo..."
-                                className="bg-white/5 border-white/10 text-white"
+                                className="bg-white/5 border-white/10 text-white leading-relaxed resize-none font-medium"
                             />
                         </div>
 
                         <DialogFooter className="gap-2 pt-2">
                             <Button type="button" variant="ghost" onClick={() => setIsModalIndicativoOpen(false)}>Cancelar</Button>
-                            <Button type="submit" className="bg-emerald-600 text-white">Salvar Indicativo</Button>
+                            <Button type="submit" className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow-lg px-5">
+                                Salvar
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
