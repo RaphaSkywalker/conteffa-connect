@@ -238,16 +238,19 @@ const PainelSalaOficina: React.FC = () => {
 
                         {/* Status Alert Banner */}
                         {isConcluida ? (
-                            <div className="mt-6 bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-between">
+                            <div className="mt-6 bg-emerald-950/50 border border-emerald-500/40 rounded-xl p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <CheckCheck className="w-6 h-6 text-emerald-400 flex-shrink-0" />
                                     <div>
-                                        <h4 className="text-sm font-semibold text-emerald-300">Sala Concluída com Sucesso</h4>
-                                        <p className="text-xs text-emerald-400/80">
-                                            Os indicativos cadastrados foram enviados em tempo real e a Tese foi liberada para votação!
+                                        <h4 className="text-sm font-bold text-emerald-300">Debate Liberado para Comissão</h4>
+                                        <p className="text-xs text-emerald-400/90 mt-0.5">
+                                            Sala concluída! Os indicativos foram finalizados e disponibilizados para acompanhamento da Comissão em tempo real.
                                         </p>
                                     </div>
                                 </div>
+                                <span className="px-3.5 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs font-bold rounded-xl flex items-center gap-2 shrink-0 shadow-lg shadow-emerald-950/50">
+                                    <CheckCircle className="w-4 h-4" /> Sala Concluída
+                                </span>
                             </div>
                         ) : (
                             <div className="mt-6 bg-rose-950/40 border border-rose-500/30 rounded-xl p-4 flex items-center justify-between">
@@ -288,7 +291,13 @@ const PainelSalaOficina: React.FC = () => {
 
                     <button
                         onClick={handleOpenCreateForm}
-                        className="px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-cyan-950/40 flex items-center gap-1.5 transition-all"
+                        disabled={isConcluida}
+                        className={`px-4 py-2.5 text-white font-semibold text-xs rounded-xl shadow-lg flex items-center gap-1.5 transition-all ${
+                            isConcluida 
+                                ? "bg-slate-800 text-slate-500 cursor-not-allowed opacity-50 shadow-none border border-slate-700" 
+                                : "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-cyan-950/40"
+                        }`}
+                        title={isConcluida ? "Sala concluída - Não é possível adicionar novos indicativos" : "Adicionar Indicativo"}
                     >
                         <Plus className="w-4 h-4" />
                         <span>+ Indicativo</span>
@@ -326,23 +335,25 @@ const PainelSalaOficina: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center space-x-2 shrink-0">
-                                        <button
-                                            onClick={() => handleOpenEditForm(ind)}
-                                            className="h-8 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 leading-none"
-                                            title="Editar Indicativo"
-                                        >
-                                            <Edit className="w-3.5 h-3.5" />
-                                            <span className="hidden sm:inline leading-none">Editar</span>
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteIndicativo(ind.id)}
-                                            className="h-8 w-8 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-xs transition-colors flex items-center justify-center leading-none"
-                                            title="Excluir Indicativo"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
+                                    {!isConcluida && (
+                                        <div className="flex items-center space-x-2 shrink-0">
+                                            <button
+                                                onClick={() => handleOpenEditForm(ind)}
+                                                className="h-8 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 leading-none"
+                                                title="Editar Indicativo"
+                                            >
+                                                <Edit className="w-3.5 h-3.5" />
+                                                <span className="hidden sm:inline leading-none">Editar</span>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteIndicativo(ind.id)}
+                                                className="h-8 w-8 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-xs transition-colors flex items-center justify-center leading-none"
+                                                title="Excluir Indicativo"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}

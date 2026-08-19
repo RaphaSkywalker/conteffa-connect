@@ -245,6 +245,12 @@ export const PainelVotacaoAdmin = () => {
 
     // Controles de Votação por Indicativo
     const handleStartIndicativoVoting = async (ind: Indicativo) => {
+        const parentTese = teses.find(t => String(t.id) === String(ind.tese_id));
+        if (parentTese && parentTese.status !== 'Liberada') {
+            toast.error("A Tese precisa ser LIBERADA PELA COMISSÃO na aba Oficinas antes de iniciar a votação.");
+            return;
+        }
+
         try {
             await iniciarVotacaoIndicativo(ind.id);
             toast.success(`Votação do Indicativo Nº ${ind.numero} INICIADA!`);
@@ -618,7 +624,9 @@ export const PainelVotacaoAdmin = () => {
                                                                                 <Button
                                                                                     size="sm"
                                                                                     onClick={() => handleStartIndicativoVoting(ind)}
-                                                                                    className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1"
+                                                                                    disabled={t.status !== 'Liberada'}
+                                                                                    title={t.status === 'Liberada' ? "Iniciar Votação em Plenária" : "Aguardando Liberação da Comissão (na aba Oficinas)"}
+                                                                                    className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1 disabled:opacity-40 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed border border-transparent disabled:border-slate-700/60"
                                                                                 >
                                                                                     <Play className="w-3.5 h-3.5" /> Iniciar Votação
                                                                                 </Button>
@@ -720,9 +728,9 @@ export const PainelVotacaoAdmin = () => {
                                                 </span>
                                                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
                                                     isLiberada ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
-                                                    isConcluida ? "bg-blue-500/20 text-blue-400 border border-blue-500/30" : "bg-amber-500/20 text-amber-400"
+                                                    isConcluida ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                                                 }`}>
-                                                    {isLiberada ? "Liberada para Votação" : isConcluida ? "Concluída na Oficina" : "Em Oficina"}
+                                                    {isLiberada ? "LIBERADA PARA VOTAÇÃO" : isConcluida ? "CONCLUÍDA" : "EM OFICINA"}
                                                 </span>
                                             </div>
                                             <h4 className="text-lg font-bold text-white mt-1">{t.titulo}</h4>
