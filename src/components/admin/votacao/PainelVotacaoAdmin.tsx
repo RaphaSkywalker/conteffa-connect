@@ -1104,3 +1104,5 @@ export const PainelVotacaoAdmin = () => {
         </div>
     );
 };
+
+export default PainelVotacaoAdmin;

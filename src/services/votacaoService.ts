@@ -863,3 +863,47 @@ export const subscribeToVotacaoRealtime = (
         supabase.removeChannel(channel);
     };
 };
+
+// Aliases para retrocompatibilidade
+export const submitVoto = async (payload: {
+    indicativoId?: string | number;
+    teseId?: string | number;
+    cpf: string;
+    voto: VotoTipo;
+    inscritoId?: string | number | null;
+    ip?: string;
+    userAgent?: string;
+}) => {
+    if (payload.indicativoId) {
+        return submitVotoIndicativo({
+            indicativoId: payload.indicativoId,
+            cpf: payload.cpf,
+            voto: payload.voto,
+            inscritoId: payload.inscritoId,
+            ip: payload.ip,
+            userAgent: payload.userAgent
+        });
+    }
+    // Se passar teseId direta:
+    const targetId = payload.teseId || 1;
+    return submitVotoIndicativo({
+        indicativoId: targetId,
+        cpf: payload.cpf,
+        voto: payload.voto,
+        inscritoId: payload.inscritoId,
+        ip: payload.ip,
+        userAgent: payload.userAgent
+    });
+};
+
+export const checkUserAlreadyVoted = async (targetId: string | number, cpf: string): Promise<boolean> => {
+    return checkUserAlreadyVotedIndicativo(targetId, cpf);
+};
+
+export const getTeseStats = async (teseId: string | number, forcedInscritosTotal?: number): Promise<VotacaoStats> => {
+    return getIndicativoStats(teseId, forcedInscritosTotal);
+};
+
+export const encerrarVotacaoTese = async (teseId: string | number): Promise<void> => {
+    await encerrarVotacaoIndicativo(teseId);
+};
