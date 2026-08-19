@@ -302,84 +302,171 @@ export const PainelVotacaoAdmin = () => {
 
     return (
         <div className="space-y-6 pb-12">
-            {/* Top Navigation & Sub-tabs */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-[#122442] p-6 rounded-3xl shadow-xl border border-white/5">
-                <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-lg">
-                        <Vote className="w-6 h-6" />
-                    </div>
+            {/* Top Action Bar & Cards Grid */}
+            <div className="space-y-4">
+                {/* Header Row: Quick Actions */}
+                <div className="flex items-center justify-between">
                     <div>
-                        <h3 className="font-heading font-black text-xl text-white">Painel de Votação e Oficinas</h3>
-                        <p className="text-white/40 text-[13px] font-medium">
-                            Gestão de Teses, Indicativos das Oficinas e Deliberações Plenárias
+                        <p className="text-xs font-black uppercase tracking-widest text-emerald-400">
+                            Módulo de Deliberação Plenária & Oficinas
                         </p>
                     </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                    {/* Navigation Buttons */}
-                    <div className="flex items-center bg-white/5 p-1 rounded-2xl border border-white/10 overflow-x-auto">
-                        <button
-                            onClick={() => setSubTab("teses")}
-                            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${
-                                subTab === "teses"
-                                    ? "bg-primary text-white shadow-lg shadow-primary/30"
-                                    : "text-white/40 hover:text-white"
-                            }`}
-                        >
-                            <span className="flex items-center gap-1.5">
-                                <Layers className="w-3.5 h-3.5" /> 1. Controle de Votação
-                            </span>
-                        </button>
-
-                        <button
-                            onClick={() => setSubTab("oficinas")}
-                            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${
-                                subTab === "oficinas"
-                                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30"
-                                    : "text-white/40 hover:text-white"
-                            }`}
-                        >
-                            <span className="flex items-center gap-1.5">
-                                <Building2 className="w-3.5 h-3.5" /> 2. Oficinas - Salas de Teses
-                            </span>
-                        </button>
-
-                        <button
-                            onClick={() => setSubTab("acessos")}
-                            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${
-                                subTab === "acessos"
-                                    ? "bg-teal-600 text-white shadow-lg shadow-teal-900/30"
-                                    : "text-white/40 hover:text-white"
-                            }`}
-                        >
-                            <span className="flex items-center gap-1.5">
-                                <Key className="w-3.5 h-3.5" /> 3. Acessos das Oficinas
-                            </span>
-                        </button>
-
-                        <button
-                            onClick={() => setSubTab("status")}
-                            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${
-                                subTab === "status"
-                                    ? "bg-blue-600 text-white shadow-lg shadow-blue-900/30"
-                                    : "text-white/40 hover:text-white"
-                            }`}
-                        >
-                            <span className="flex items-center gap-1.5">
-                                <BarChart3 className="w-3.5 h-3.5" /> 4. Estatísticas
-                            </span>
-                        </button>
-                    </div>
-
                     <Button
                         onClick={handleOpenNewTese}
-                        className="rounded-2xl gap-2 h-11 px-5 bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-emerald-500/20"
+                        className="rounded-2xl gap-2 h-11 px-5 bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]"
                     >
                         <Plus className="w-4 h-4" /> Nova Tese (Tema)
                     </Button>
                 </div>
+
+                {/* Grid of Interactive Cards (Caixas tipo Visão Geral) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Card 1: Controle de Votação */}
+                    <button
+                        type="button"
+                        onClick={() => setSubTab("teses")}
+                        className={`p-5 rounded-3xl text-left border transition-all duration-200 relative overflow-hidden flex flex-col justify-between group ${
+                            subTab === "teses"
+                                ? "bg-[#0E1C38] border-emerald-500 shadow-xl ring-2 ring-emerald-500/20"
+                                : "bg-[#122442]/80 border-white/10 hover:border-white/20 hover:bg-[#122442]"
+                        }`}
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
+                                subTab === "teses" 
+                                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30" 
+                                    : "bg-white/5 text-emerald-400 group-hover:bg-emerald-500/20"
+                            }`}>
+                                <Vote className="w-5 h-5" />
+                            </div>
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
+                                subTab === "teses"
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : "bg-white/5 text-white/40"
+                            }`}>
+                                {teses.length} {teses.length === 1 ? 'Tese' : 'Teses'}
+                            </span>
+                        </div>
+                        <div>
+                            <h4 className="font-heading font-black text-base text-white group-hover:text-emerald-400 transition-colors">
+                                Controle de Votação
+                            </h4>
+                            <p className="text-xs text-white/50 mt-1 line-clamp-1">
+                                Gerenciar teses & indicativos na plenária
+                            </p>
+                        </div>
+                    </button>
+
+                    {/* Card 2: Oficinas - Salas de Teses */}
+                    <button
+                        type="button"
+                        onClick={() => setSubTab("oficinas")}
+                        className={`p-5 rounded-3xl text-left border transition-all duration-200 relative overflow-hidden flex flex-col justify-between group ${
+                            subTab === "oficinas"
+                                ? "bg-[#0E1C38] border-emerald-500 shadow-xl ring-2 ring-emerald-500/20"
+                                : "bg-[#122442]/80 border-white/10 hover:border-white/20 hover:bg-[#122442]"
+                        }`}
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
+                                subTab === "oficinas" 
+                                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30" 
+                                    : "bg-white/5 text-emerald-400 group-hover:bg-emerald-500/20"
+                            }`}>
+                                <Building2 className="w-5 h-5" />
+                            </div>
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
+                                subTab === "oficinas"
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : "bg-white/5 text-white/40"
+                            }`}>
+                                {teses.filter(t => t.em_oficina).length} em Oficina
+                            </span>
+                        </div>
+                        <div>
+                            <h4 className="font-heading font-black text-base text-white group-hover:text-emerald-400 transition-colors">
+                                Salas de Oficina
+                            </h4>
+                            <p className="text-xs text-white/50 mt-1 line-clamp-1">
+                                Acompanhar relatorias e debates
+                            </p>
+                        </div>
+                    </button>
+
+                    {/* Card 3: Acessos das Oficinas */}
+                    <button
+                        type="button"
+                        onClick={() => setSubTab("acessos")}
+                        className={`p-5 rounded-3xl text-left border transition-all duration-200 relative overflow-hidden flex flex-col justify-between group ${
+                            subTab === "acessos"
+                                ? "bg-[#0E1C38] border-emerald-500 shadow-xl ring-2 ring-emerald-500/20"
+                                : "bg-[#122442]/80 border-white/10 hover:border-white/20 hover:bg-[#122442]"
+                        }`}
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
+                                subTab === "acessos" 
+                                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30" 
+                                    : "bg-white/5 text-emerald-400 group-hover:bg-emerald-500/20"
+                            }`}>
+                                <Key className="w-5 h-5" />
+                            </div>
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
+                                subTab === "acessos"
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : "bg-white/5 text-white/40"
+                            }`}>
+                                {acessosOficina.length} Operadores
+                            </span>
+                        </div>
+                        <div>
+                            <h4 className="font-heading font-black text-base text-white group-hover:text-emerald-400 transition-colors">
+                                Acessos das Oficinas
+                            </h4>
+                            <p className="text-xs text-white/50 mt-1 line-clamp-1">
+                                Credenciais dos relatores
+                            </p>
+                        </div>
+                    </button>
+
+                    {/* Card 4: Estatísticas */}
+                    <button
+                        type="button"
+                        onClick={() => setSubTab("status")}
+                        className={`p-5 rounded-3xl text-left border transition-all duration-200 relative overflow-hidden flex flex-col justify-between group ${
+                            subTab === "status"
+                                ? "bg-[#0E1C38] border-emerald-500 shadow-xl ring-2 ring-emerald-500/20"
+                                : "bg-[#122442]/80 border-white/10 hover:border-white/20 hover:bg-[#122442]"
+                        }`}
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
+                                subTab === "status" 
+                                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30" 
+                                    : "bg-white/5 text-emerald-400 group-hover:bg-emerald-500/20"
+                            }`}>
+                                <BarChart3 className="w-5 h-5" />
+                            </div>
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
+                                subTab === "status"
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : "bg-white/5 text-white/40"
+                            }`}>
+                                Métricas
+                            </span>
+                        </div>
+                        <div>
+                            <h4 className="font-heading font-black text-base text-white group-hover:text-emerald-400 transition-colors">
+                                Estatísticas & Votos
+                            </h4>
+                            <p className="text-xs text-white/50 mt-1 line-clamp-1">
+                                Visão geral de participação
+                            </p>
+                        </div>
+                    </button>
+                </div>
             </div>
+
 
             {/* ======================================================== */}
             {/* SUB-ABA 1: CONTROLE DE VOTAÇÃO (TESES + INDICATIVOS)      */}
