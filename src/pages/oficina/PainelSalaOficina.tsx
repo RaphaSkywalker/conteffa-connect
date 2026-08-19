@@ -300,7 +300,7 @@ const PainelSalaOficina: React.FC = () => {
                         title={isConcluida ? "Sala concluída - Não é possível adicionar novos indicativos" : "Adicionar Indicativo"}
                     >
                         <Plus className="w-4 h-4" />
-                        <span>+ Indicativo</span>
+                        <span>Indicativo</span>
                     </button>
                 </div>
 
@@ -322,8 +322,8 @@ const PainelSalaOficina: React.FC = () => {
                                     index % 2 === 0 ? "bg-[#112345]/90" : "bg-[#0A162B]/90"
                                 } hover:bg-cyan-950/30`}
                             >
-                                <div className="flex items-start space-x-3.5 min-w-0">
-                                    <div className="w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-sm">
+                                <div className="flex items-center space-x-3.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
                                         {ind.numero || index + 1}
                                     </div>
                                     <div className="min-w-0">
