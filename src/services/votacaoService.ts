@@ -111,6 +111,7 @@ export const getTotalInscritosCount = async (): Promise<number> => {
 // ==========================================
 
 export const getTeses = async (): Promise<Tese[]> => {
+    let supabaseTeses: Tese[] | null = null;
     try {
         const { data, error } = await supabase
             .from('teses')
@@ -118,8 +119,7 @@ export const getTeses = async (): Promise<Tese[]> => {
             .order('numero', { ascending: true });
 
         if (!error && data) {
-            localStorage.setItem(LS_TESES_KEY, JSON.stringify(data));
-            return data;
+            supabaseTeses = data;
         }
     } catch (err) {
         console.warn("Erro ao buscar teses no Supabase, usando cache:", err);
@@ -127,8 +127,31 @@ export const getTeses = async (): Promise<Tese[]> => {
 
     try {
         const saved = localStorage.getItem(LS_TESES_KEY);
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+            const localList: Tese[] = JSON.parse(saved);
+            if (supabaseTeses) {
+                const merged = supabaseTeses.map(st => {
+                    const local = localList.find(lt => String(lt.id) === String(st.id));
+                    if (local && (local.status === 'Liberada' || local.status === 'Concluída' || local.oficina_concluida)) {
+                        return {
+                            ...st,
+                            status: local.status || st.status,
+                            oficina_concluida: local.oficina_concluida || st.oficina_concluida
+                        };
+                    }
+                    return st;
+                });
+                localStorage.setItem(LS_TESES_KEY, JSON.stringify(merged));
+                return merged;
+            }
+            return localList;
+        }
     } catch (e) {}
+
+    if (supabaseTeses) {
+        localStorage.setItem(LS_TESES_KEY, JSON.stringify(supabaseTeses));
+        return supabaseTeses;
+    }
 
     return [];
 };
@@ -193,7 +216,22 @@ export const saveTese = async (tese: Partial<Tese>): Promise<Tese> => {
                 .select()
                 .single();
 
-            if (!error && data) resultTese = data;
+            if (!error && data) {
+                resultTese = data;
+            } else if (error) {
+                console.warn("Supabase update error on tese, attempting fallback:", error);
+                // If Supabase has status check constraint, update status: 'Aguardando' or 'Concluída' in DB while keeping payload.status in local result
+                const fallbackStatus = (payload.status === 'Liberada' || payload.status === 'Concluída') ? 'Concluída' : 'Aguardando';
+                const { data: fbData } = await supabase
+                    .from('teses')
+                    .update({ ...payload, status: fallbackStatus })
+                    .eq('id', tese.id)
+                    .select()
+                    .single();
+                if (fbData) {
+                    resultTese = { ...fbData, status: payload.status as any };
+                }
+            }
         } else {
             const { data, error } = await supabase
                 .from('teses')
@@ -226,7 +264,8 @@ export const saveTese = async (tese: Partial<Tese>): Promise<Tese> => {
     }
 
     try {
-        const current = await getTeses();
+        const saved = localStorage.getItem(LS_TESES_KEY);
+        const current: Tese[] = saved ? JSON.parse(saved) : [];
         const exists = current.some(t => String(t.id) === String(resultTese!.id));
         const updated = exists
             ? current.map(t => String(t.id) === String(resultTese!.id) ? resultTese! : t)

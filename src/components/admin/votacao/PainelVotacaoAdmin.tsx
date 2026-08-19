@@ -246,7 +246,7 @@ export const PainelVotacaoAdmin = () => {
     // Controles de Votação por Indicativo
     const handleStartIndicativoVoting = async (ind: Indicativo) => {
         const parentTese = teses.find(t => String(t.id) === String(ind.tese_id));
-        if (parentTese && parentTese.status !== 'Liberada') {
+        if (parentTese && parentTese.status !== 'Liberada' && parentTese.status !== 'Concluída' && !parentTese.oficina_concluida) {
             toast.error("A Tese precisa ser LIBERADA PELA COMISSÃO na aba Oficinas antes de iniciar a votação.");
             return;
         }
@@ -624,8 +624,8 @@ export const PainelVotacaoAdmin = () => {
                                                                                 <Button
                                                                                     size="sm"
                                                                                     onClick={() => handleStartIndicativoVoting(ind)}
-                                                                                    disabled={t.status !== 'Liberada'}
-                                                                                    title={t.status === 'Liberada' ? "Iniciar Votação em Plenária" : "Aguardando Liberação da Comissão (na aba Oficinas)"}
+                                                                                    disabled={!isLiberada && !isConcluida}
+                                                                                    title={isLiberada || isConcluida ? "Iniciar Votação em Plenária" : "Aguardando Liberação da Comissão (na aba Oficinas)"}
                                                                                     className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1 disabled:opacity-40 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed border border-transparent disabled:border-slate-700/60"
                                                                                 >
                                                                                     <Play className="w-3.5 h-3.5" /> Iniciar Votação
