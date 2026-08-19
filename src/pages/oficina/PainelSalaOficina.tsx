@@ -36,7 +36,6 @@ const PainelSalaOficina: React.FC = () => {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<number | string | null>(null);
     const [formTitulo, setFormTitulo] = useState("");
-    const [formDescricao, setFormDescricao] = useState("");
     const [formNumero, setFormNumero] = useState(1);
     const [saving, setSaving] = useState(false);
 
@@ -93,7 +92,6 @@ const PainelSalaOficina: React.FC = () => {
     const handleOpenCreateForm = () => {
         setEditingId(null);
         setFormTitulo("");
-        setFormDescricao("");
         const nextNum = indicativos.length > 0 ? Math.max(...indicativos.map(i => i.numero)) + 1 : 1;
         setFormNumero(nextNum);
         setShowForm(true);
@@ -101,8 +99,7 @@ const PainelSalaOficina: React.FC = () => {
 
     const handleOpenEditForm = (ind: Indicativo) => {
         setEditingId(ind.id);
-        setFormTitulo(ind.titulo);
-        setFormDescricao(ind.descricao || "");
+        setFormTitulo(ind.titulo || ind.descricao || "");
         setFormNumero(ind.numero);
         setShowForm(true);
     };
@@ -111,7 +108,7 @@ const PainelSalaOficina: React.FC = () => {
         e.preventDefault();
         if (!tese) return;
         if (!formTitulo.trim()) {
-            toast.error("O título do indicativo é obrigatório.");
+            toast.error("O texto do indicativo é obrigatório.");
             return;
         }
 
@@ -122,7 +119,7 @@ const PainelSalaOficina: React.FC = () => {
                 tese_id: tese.id,
                 numero: formNumero,
                 titulo: formTitulo.trim(),
-                descricao: formDescricao.trim(),
+                descricao: "",
                 tempo_votacao: 180,
                 status: 'Aguardando'
             });
@@ -327,14 +324,12 @@ const PainelSalaOficina: React.FC = () => {
                                             {ind.numero || index + 1}
                                         </div>
                                         <div>
-                                            <h4 className="text-base font-bold text-white mb-1 leading-tight">{ind.titulo}</h4>
+                                            <h4 className="text-base font-bold text-white mb-1 leading-tight whitespace-pre-line">{ind.titulo}</h4>
                                             {ind.descricao ? (
                                                 <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-line bg-slate-950/50 border border-slate-800/80 rounded-lg p-3.5 mt-2">
                                                     {ind.descricao}
                                                 </p>
-                                            ) : (
-                                                <p className="text-xs text-slate-500 italic mt-1">Sem descrição complementar.</p>
-                                            )}
+                                            ) : null}
                                         </div>
                                     </div>
 
@@ -381,45 +376,31 @@ const PainelSalaOficina: React.FC = () => {
                         </p>
 
                         <form onSubmit={handleSaveIndicativo} className="space-y-4">
-                            <div className="grid grid-cols-4 gap-4">
-                                <div className="col-span-1">
-                                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                                        Número
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={formNumero}
-                                        onChange={(e) => setFormNumero(Number(e.target.value))}
-                                        className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-cyan-400"
-                                        min={1}
-                                        required
-                                    />
-                                </div>
-                                <div className="col-span-3">
-                                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                                        Título / Indicativo
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formTitulo}
-                                        onChange={(e) => setFormTitulo(e.target.value)}
-                                        placeholder="ex: Indicativo 1 - Aprovação de piso salarial"
-                                        className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                                        required
-                                    />
-                                </div>
+                            <div className="w-28">
+                                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                                    Número
+                                </label>
+                                <input
+                                    type="number"
+                                    value={formNumero}
+                                    onChange={(e) => setFormNumero(Number(e.target.value))}
+                                    className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-cyan-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    min={1}
+                                    required
+                                />
                             </div>
 
                             <div>
                                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                                    Texto Completo do Indicativo (Proposta)
+                                    Indicativo
                                 </label>
                                 <textarea
-                                    value={formDescricao}
-                                    onChange={(e) => setFormDescricao(e.target.value)}
-                                    placeholder="Escreva a redação final do indicativo para votação..."
+                                    value={formTitulo}
+                                    onChange={(e) => setFormTitulo(e.target.value)}
+                                    placeholder="Escreva a redação do indicativo..."
                                     rows={5}
                                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 leading-relaxed resize-none"
+                                    required
                                 />
                             </div>
 
@@ -437,7 +418,7 @@ const PainelSalaOficina: React.FC = () => {
                                     className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-medium rounded-xl shadow-lg shadow-cyan-950/40 flex items-center gap-2 transition-all disabled:opacity-50"
                                 >
                                     <Save className="w-4 h-4" />
-                                    <span>{saving ? "Salvando..." : "Salvar Indicativo"}</span>
+                                    <span>{saving ? "Salvando..." : "Salvar"}</span>
                                 </button>
                             </div>
                         </form>
