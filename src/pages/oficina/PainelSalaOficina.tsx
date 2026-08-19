@@ -193,9 +193,13 @@ const PainelSalaOficina: React.FC = () => {
                     <div>
                         <h1 className="font-bold text-white text-base leading-tight flex items-center gap-2">
                             <span>Sala de Oficina - CONTEFFA</span>
-                            {isConcluida && (
-                                <span className="bg-cyan-500/20 text-cyan-400 text-xs px-2.5 py-0.5 rounded-full border border-cyan-500/30 flex items-center gap-1 font-medium">
+                            {isConcluida ? (
+                                <span className="bg-emerald-500/20 text-emerald-400 text-xs px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1 font-medium">
                                     <CheckCircle className="w-3 h-3" /> Concluída
+                                </span>
+                            ) : (
+                                <span className="bg-rose-500/20 text-rose-400 text-xs px-2.5 py-0.5 rounded-full border border-rose-500/30 flex items-center gap-1 font-medium">
+                                    <Clock className="w-3 h-3" /> Em Andamento
                                 </span>
                             )}
                         </h1>
@@ -237,24 +241,24 @@ const PainelSalaOficina: React.FC = () => {
 
                         {/* Status Alert Banner */}
                         {isConcluida ? (
-                            <div className="mt-6 bg-cyan-950/40 border border-cyan-500/30 rounded-xl p-4 flex items-center justify-between">
+                            <div className="mt-6 bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <CheckCheck className="w-6 h-6 text-cyan-400 flex-shrink-0" />
+                                    <CheckCheck className="w-6 h-6 text-emerald-400 flex-shrink-0" />
                                     <div>
-                                        <h4 className="text-sm font-semibold text-cyan-300">Sala Concluída com Sucesso</h4>
-                                        <p className="text-xs text-cyan-400/80">
-                                            Os indicativos cadastrados foram enviados em tempo real para validação da Comissão do CONTEFFA.
+                                        <h4 className="text-sm font-semibold text-emerald-300">Sala Concluída com Sucesso</h4>
+                                        <p className="text-xs text-emerald-400/80">
+                                            Os indicativos cadastrados foram enviados em tempo real e a Tese foi liberada para votação!
                                         </p>
                                     </div>
                                 </div>
                             </div>
                         ) : (
-                            <div className="mt-6 bg-amber-950/30 border border-amber-500/30 rounded-xl p-4 flex items-center justify-between">
+                            <div className="mt-6 bg-rose-950/40 border border-rose-500/30 rounded-xl p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <Clock className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                                    <Clock className="w-5 h-5 text-rose-400 flex-shrink-0" />
                                     <div>
-                                        <h4 className="text-sm font-semibold text-amber-300">Debates em Andamento</h4>
-                                        <p className="text-xs text-amber-400/80">
+                                        <h4 className="text-sm font-semibold text-rose-300">Debates em Andamento</h4>
+                                        <p className="text-xs text-rose-400/80">
                                             Cadastre os indicativos resultantes do debate da sala abaixo e clique em "Concluir Sala" ao finalizar.
                                         </p>
                                     </div>
@@ -317,13 +321,13 @@ const PainelSalaOficina: React.FC = () => {
                                 key={ind.id}
                                 className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-5 shadow-lg transition-all group"
                             >
-                                <div className="flex items-start justify-between">
+                                <div className="flex items-start justify-between gap-4">
                                     <div className="flex items-start space-x-3">
-                                        <span className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
+                                        <div className="w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center font-bold text-xs leading-none shrink-0 mt-0.5">
                                             {ind.numero || index + 1}
-                                        </span>
+                                        </div>
                                         <div>
-                                            <h4 className="text-base font-bold text-white mb-1">{ind.titulo}</h4>
+                                            <h4 className="text-base font-bold text-white mb-1 leading-tight">{ind.titulo}</h4>
                                             {ind.descricao ? (
                                                 <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-line bg-slate-950/50 border border-slate-800/80 rounded-lg p-3.5 mt-2">
                                                     {ind.descricao}
@@ -334,18 +338,18 @@ const PainelSalaOficina: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center space-x-1 opacity-90 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center space-x-2 shrink-0">
                                         <button
                                             onClick={() => handleOpenEditForm(ind)}
-                                            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs transition-colors flex items-center gap-1.5"
+                                            className="h-8 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 leading-none"
                                             title="Editar Indicativo"
                                         >
                                             <Edit className="w-3.5 h-3.5" />
-                                            <span className="hidden sm:inline">Editar</span>
+                                            <span className="hidden sm:inline leading-none">Editar</span>
                                         </button>
                                         <button
                                             onClick={() => handleDeleteIndicativo(ind.id)}
-                                            className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-xs transition-colors"
+                                            className="h-8 w-8 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-xs transition-colors flex items-center justify-center leading-none"
                                             title="Excluir Indicativo"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
