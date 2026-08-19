@@ -771,32 +771,47 @@ export const PainelVotacaoAdmin = () => {
                                                 A sala desta Tese ainda não enviou nenhum indicativo.
                                             </p>
                                         ) : (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {indicativos.map((ind) => (
-                                                    <div key={ind.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                                                        <div className="flex items-start justify-between">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="w-6 h-6 rounded-md bg-emerald-500/10 text-emerald-400 font-bold text-xs flex items-center justify-center">
-                                                                    {ind.numero}
-                                                                </span>
-                                                                <h6 className="text-sm font-bold text-white">{ind.titulo}</h6>
+                                            <div className="bg-[#0F1C36] border border-slate-800/80 rounded-2xl overflow-hidden shadow-lg">
+                                                {indicativos.map((ind, idx) => (
+                                                    <div
+                                                        key={ind.id}
+                                                        className={`p-3.5 sm:p-4 transition-colors border-b border-white/5 last:border-b-0 flex items-center justify-between gap-4 ${
+                                                            idx % 2 === 0 ? "bg-[#112345]/90" : "bg-[#0A162B]/90"
+                                                        } hover:bg-cyan-950/30`}
+                                                    >
+                                                        <div className="flex items-center space-x-3 min-w-0">
+                                                            <div className="w-7 h-7 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+                                                                {ind.numero}
                                                             </div>
+                                                            <div className="min-w-0">
+                                                                <h6 className="text-xs sm:text-sm font-bold text-white leading-snug truncate">{ind.titulo}</h6>
+                                                                {ind.descricao && (
+                                                                    <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-2 rounded-lg border border-slate-800 mt-1 truncate">
+                                                                        {ind.descricao}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center space-x-2 shrink-0">
                                                             <button
                                                                 onClick={() => {
                                                                     setEditingIndicativo(ind);
                                                                     setIsModalIndicativoOpen(true);
                                                                 }}
-                                                                className="text-xs text-slate-400 hover:text-white p-1"
+                                                                className="w-7 h-7 rounded-full border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 transition-all flex items-center justify-center shadow-sm"
                                                                 title="Editar Conteúdo"
                                                             >
                                                                 <Edit className="w-3.5 h-3.5" />
                                                             </button>
+                                                            <button
+                                                                onClick={() => handleDeleteIndicativoClick(ind.id)}
+                                                                className="w-7 h-7 rounded-full border border-rose-500/40 text-rose-400 hover:bg-rose-500/20 hover:border-rose-400 transition-all flex items-center justify-center shadow-sm"
+                                                                title="Excluir Indicativo"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
                                                         </div>
-                                                        {ind.descricao && (
-                                                            <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-                                                                {ind.descricao}
-                                                            </p>
-                                                        )}
                                                     </div>
                                                 ))}
                                             </div>

@@ -314,47 +314,48 @@ const PainelSalaOficina: React.FC = () => {
                         </p>
                     </div>
                 ) : (
-                    <div className="space-y-4">
+                    <div className="bg-[#0F1C36] border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl">
                         {indicativos.map((ind, index) => (
                             <div
                                 key={ind.id}
-                                className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-5 shadow-lg transition-all group"
+                                className={`p-4 sm:p-5 transition-colors border-b border-white/5 last:border-b-0 flex items-center justify-between gap-4 ${
+                                    index % 2 === 0 ? "bg-[#112345]/90" : "bg-[#0A162B]/90"
+                                } hover:bg-cyan-950/30`}
                             >
-                                <div className="flex items-start justify-between gap-4">
-                                    <div className="flex items-start space-x-3">
-                                        <div className="w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center font-bold text-xs leading-none shrink-0 mt-0.5">
-                                            {ind.numero || index + 1}
-                                        </div>
-                                        <div>
-                                            <h4 className="text-base font-bold text-white mb-1 leading-tight whitespace-pre-line">{ind.titulo}</h4>
-                                            {ind.descricao ? (
-                                                <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-line bg-slate-950/50 border border-slate-800/80 rounded-lg p-3.5 mt-2">
-                                                    {ind.descricao}
-                                                </p>
-                                            ) : null}
-                                        </div>
+                                <div className="flex items-start space-x-3.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-sm">
+                                        {ind.numero || index + 1}
                                     </div>
-
-                                    {!isConcluida && (
-                                        <div className="flex items-center space-x-2 shrink-0">
-                                            <button
-                                                onClick={() => handleOpenEditForm(ind)}
-                                                className="h-8 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 leading-none"
-                                                title="Editar Indicativo"
-                                            >
-                                                <Edit className="w-3.5 h-3.5" />
-                                                <span className="hidden sm:inline leading-none">Editar</span>
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteIndicativo(ind.id)}
-                                                className="h-8 w-8 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-xs transition-colors flex items-center justify-center leading-none"
-                                                title="Excluir Indicativo"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        </div>
-                                    )}
+                                    <div className="min-w-0">
+                                        <h4 className="text-sm sm:text-base font-bold text-white leading-snug whitespace-pre-line break-words">
+                                            {ind.titulo}
+                                        </h4>
+                                        {ind.descricao ? (
+                                            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed whitespace-pre-line bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 mt-2">
+                                                {ind.descricao}
+                                            </p>
+                                        ) : null}
+                                    </div>
                                 </div>
+
+                                {!isConcluida && (
+                                    <div className="flex items-center space-x-2 shrink-0">
+                                        <button
+                                            onClick={() => handleOpenEditForm(ind)}
+                                            className="w-8 h-8 rounded-full border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 transition-all flex items-center justify-center shadow-sm"
+                                            title="Editar Indicativo"
+                                        >
+                                            <Edit className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteIndicativo(ind.id)}
+                                            className="w-8 h-8 rounded-full border border-rose-500/40 text-rose-400 hover:bg-rose-500/20 hover:border-rose-400 transition-all flex items-center justify-center shadow-sm"
+                                            title="Excluir Indicativo"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
