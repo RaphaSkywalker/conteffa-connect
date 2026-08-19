@@ -288,10 +288,10 @@ const PainelSalaOficina: React.FC = () => {
 
                     <button
                         onClick={handleOpenCreateForm}
-                        className="px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium text-xs rounded-xl shadow-lg shadow-cyan-950/40 flex items-center gap-2 transition-all"
+                        className="px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-cyan-950/40 flex items-center gap-1.5 transition-all"
                     >
                         <Plus className="w-4 h-4" />
-                        <span>Adicionar Indicativo</span>
+                        <span>+ Indicativo</span>
                     </button>
                 </div>
 
@@ -300,16 +300,9 @@ const PainelSalaOficina: React.FC = () => {
                     <div className="bg-slate-900/50 border border-dashed border-slate-800 rounded-2xl p-12 text-center">
                         <MessageSquareQuote className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                         <h4 className="text-base font-semibold text-slate-300">Nenhum indicativo cadastrado</h4>
-                        <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
-                            Sua sala de oficina ainda não registrou nenhum indicativo para esta Tese. Clique no botão acima para adicionar o primeiro item debatido.
+                        <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                            Sua sala de oficina ainda não registrou nenhum indicativo para esta Tese. Clique no botão "+ Indicativo" acima para adicionar o primeiro item debatido.
                         </p>
-                        <button
-                            onClick={handleOpenCreateForm}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-medium hover:bg-cyan-600/30 transition-colors"
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span>Adicionar Primeiro Indicativo</span>
-                        </button>
                     </div>
                 ) : (
                     <div className="space-y-4">
