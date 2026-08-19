@@ -1,8 +1,12 @@
 import React, { useState } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { loginOficina } from "@/services/votacaoService";
 import { toast } from "sonner";
-import { Lock, User, FileText, CheckCircle2, ArrowRight, ShieldCheck } from "lucide-react";
+import { Lock, User, ArrowRight, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import heroBg from "@/assets/hero-home-v3.jpg";
 
 const LoginOficina: React.FC = () => {
     const [username, setUsername] = useState("");
@@ -36,85 +40,101 @@ const LoginOficina: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 relative overflow-hidden">
-            {/* Background Decorative Gradients */}
-            <div className="absolute top-1/4 -left-32 w-96 h-96 bg-emerald-600/20 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
+            {/* Background Image */}
+            <div
+                className="absolute inset-0 bg-cover bg-fixed bg-center"
+                style={{ backgroundImage: `url(${heroBg})` }}
+            />
+            <div className="absolute inset-0 bg-black/40" />
 
-            <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 backdrop-blur-xl rounded-2xl p-8 shadow-2xl z-10">
-                <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 text-emerald-400 shadow-inner">
-                        <FileText className="w-8 h-8" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-white tracking-tight">Portal de Oficina</h1>
-                    <p className="text-slate-400 text-sm mt-1">
-                        Área restrita do Relator / Operador da Sala de Tese
-                    </p>
-                </div>
+            {/* Animated background logos */}
+            <div className="absolute bottom-[15%] -left-32 w-[420px] h-[420px] opacity-[0.05] pointer-events-none animate-bounce [animation-duration:9s]">
+                <img src="/bg-logo.png" alt="" className="w-full h-full object-contain" />
+            </div>
+            <div className="absolute top-[15%] -right-32 w-[420px] h-[420px] opacity-[0.05] pointer-events-none animate-bounce [animation-duration:8s]">
+                <img src="/bg-logo.png" alt="" className="w-full h-full object-contain" />
+            </div>
 
-                <form onSubmit={handleLogin} className="space-y-5">
-                    <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-                            Usuário da Sala
-                        </label>
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                                <User className="w-4 h-4" />
-                            </div>
-                            <input
-                                type="text"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                placeholder="ex: sala-tese-01"
-                                className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm"
-                                required
-                            />
+            <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="relative z-10 w-full max-w-md mx-4"
+            >
+                <div className="bg-[#0B1B32]/80 backdrop-blur-2xl border border-white/10 p-10 md:p-12 rounded-[3rem] shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-bl-[5rem] pointer-events-none" />
+
+                    <div className="flex flex-col items-center mb-8 relative z-10">
+                        <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 border border-white/10 shadow-lg glow">
+                            <ShieldCheck className="w-10 h-10 text-primary" />
                         </div>
+                        <h1 className="text-3xl font-heading font-black text-white text-center">
+                            Acesso <span className="text-primary">Oficinas</span>
+                        </h1>
+                        <p className="text-white/60 text-sm mt-3 text-center">
+                            Área restrita do Relator / Operador da Sala de Tese
+                        </p>
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-                            Senha de Acesso
-                        </label>
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                                <Lock className="w-4 h-4" />
+                    <form onSubmit={handleLogin} className="space-y-6 relative z-10">
+                        <div className="space-y-4">
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 group-focus-within:text-primary transition-colors">
+                                    <User className="w-5 h-5" />
+                                </div>
+                                <Input
+                                    type="text"
+                                    placeholder="Usuário"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    className="h-14 bg-white/5 border-white/10 text-white pl-12 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary transition-all text-base placeholder:text-white/40"
+                                    required
+                                />
                             </div>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                                className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm"
-                                required
-                            />
+
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 group-focus-within:text-primary transition-colors">
+                                    <Lock className="w-5 h-5" />
+                                </div>
+                                <Input
+                                    type="password"
+                                    placeholder="Senha"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="h-14 bg-white/5 border-white/10 text-white pl-12 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary transition-all text-base placeholder:text-white/40"
+                                    required
+                                />
+                            </div>
                         </div>
-                    </div>
+
+                        <Button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full h-14 rounded-full text-[15px] font-bold uppercase tracking-wider relative overflow-hidden group shadow-[0_0_30px_rgba(0,171,229,0.3)] hover:shadow-[0_0_40px_rgba(0,171,229,0.5)] transition-all"
+                        >
+                            <div className="absolute inset-0 w-0 bg-white/20 transition-all duration-300 ease-out group-hover:w-full" />
+                            <span className="relative flex items-center justify-center gap-2">
+                                {loading ? (
+                                    "Autenticando..."
+                                ) : (
+                                    <>
+                                        ACESSAR PAINEL <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                    </>
+                                )}
+                            </span>
+                        </Button>
+                    </form>
 
                     <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium rounded-xl shadow-lg shadow-emerald-900/30 flex items-center justify-center space-x-2 transition-all transform active:scale-95 disabled:opacity-50"
+                        type="button"
+                        onClick={() => navigate("/")}
+                        className="w-full text-center mt-8 text-sm text-white/50 hover:text-white transition-colors uppercase tracking-wider font-medium"
                     >
-                        {loading ? (
-                            <span>Autenticando...</span>
-                        ) : (
-                            <>
-                                <span>Acessar Sala de Oficina</span>
-                                <ArrowRight className="w-4 h-4" />
-                            </>
-                        )}
+                        VOLTAR PARA O SITE
                     </button>
-                </form>
-
-                <div className="mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
-                    <span className="flex items-center gap-1.5">
-                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                        CONTEFFA Connect
-                    </span>
-                    <span>Sistema de Votação</span>
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 };
