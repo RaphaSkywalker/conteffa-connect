@@ -319,7 +319,7 @@ export const PainelVotacaoAdmin = () => {
                     onClick={handleOpenNewTese}
                     className="rounded-2xl gap-2 h-11 px-5 bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]"
                 >
-                    <Plus className="w-4 h-4" /> Nova Tese (Tema)
+                    <Plus className="w-4 h-4" /> Nova Tese
                 </Button>
             </div>
 
@@ -604,19 +604,6 @@ export const PainelVotacaoAdmin = () => {
                                                                             )}
                                                                         </div>
 
-                                                                        {/* Mini Stats Badges */}
-                                                                        <div className="flex items-center gap-2 text-xs">
-                                                                            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                                                                                SIM: {stats.total_sim} ({stats.percentual_sim}%)
-                                                                            </span>
-                                                                            <span className="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold">
-                                                                                NÃO: {stats.total_nao} ({stats.percentual_nao}%)
-                                                                            </span>
-                                                                            <span className="px-2.5 py-1 rounded-lg bg-slate-500/10 text-slate-400 border border-slate-500/20 font-bold">
-                                                                                ABS: {stats.total_abster} ({stats.percentual_abster}%)
-                                                                            </span>
-                                                                        </div>
-
                                                                         {/* Ações de Votação por Indicativo */}
                                                                         <div className="flex items-center space-x-2">
                                                                             {isVoting ? (
@@ -625,7 +612,7 @@ export const PainelVotacaoAdmin = () => {
                                                                                     onClick={() => handleEndIndicativoVoting(ind)}
                                                                                     className="h-8 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs gap-1"
                                                                                 >
-                                                                                    <Square className="w-3.5 h-3.5" /> Encerrar
+                                                                                    <Square className="w-3.5 h-3.5" /> Encerrar Votação
                                                                                 </Button>
                                                                             ) : (
                                                                                 <Button
@@ -633,7 +620,7 @@ export const PainelVotacaoAdmin = () => {
                                                                                     onClick={() => handleStartIndicativoVoting(ind)}
                                                                                     className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1"
                                                                                 >
-                                                                                    <Play className="w-3.5 h-3.5" /> Votantes
+                                                                                    <Play className="w-3.5 h-3.5" /> Iniciar Votação
                                                                                 </Button>
                                                                             )}
 
@@ -949,6 +936,131 @@ export const PainelVotacaoAdmin = () => {
                                 <Vote className="w-6 h-6" />
                             </div>
                         </div>
+                    </div>
+
+                    {/* Detalhamento de Métricas e Gráficos de Votação por Tese */}
+                    <div className="bg-[#122442] rounded-3xl border border-white/5 shadow-2xl p-6 space-y-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h4 className="font-heading font-black text-lg text-white flex items-center gap-2">
+                                    <BarChart3 className="w-5 h-5 text-cyan-400" />
+                                    <span>Métricas e Resultados de Votação por Indicativo</span>
+                                </h4>
+                                <p className="text-xs text-white/40 mt-1">
+                                    Acompanhe a apuração detalhada dos votos (Sim, Não, Abstenções e participação) em tempo real.
+                                </p>
+                            </div>
+                        </div>
+
+                        {teses.length === 0 ? (
+                            <div className="py-12 text-center text-white/40 border border-dashed border-white/10 rounded-2xl">
+                                Nenhuma Tese cadastrada para exibir métricas.
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {teses.map((t) => {
+                                    const list = indicativosMap[t.id] || [];
+                                    return (
+                                        <div key={t.id} className="bg-slate-900/90 border border-white/10 rounded-2xl p-5 space-y-4">
+                                            <div className="flex items-center justify-between pb-3 border-b border-white/5">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="bg-primary/20 text-primary border border-primary/30 text-xs font-black px-2.5 py-0.5 rounded-lg">
+                                                        TESE Nº {t.numero}
+                                                    </span>
+                                                    <h5 className="font-bold text-white text-base">{t.titulo}</h5>
+                                                </div>
+                                                <span className="text-xs text-white/50 font-mono">
+                                                    {list.length} {list.length === 1 ? "indicativo" : "indicativos"}
+                                                </span>
+                                            </div>
+
+                                            {list.length === 0 ? (
+                                                <p className="text-xs text-white/40 italic">Nenhum indicativo nesta tese.</p>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    {list.map((ind) => {
+                                                        const stats = statsMap[ind.id] || {
+                                                            indicativo_id: ind.id,
+                                                            total_inscritos: totalInscritos,
+                                                            total_votantes: 0,
+                                                            percentual_participacao: 0,
+                                                            total_sim: 0,
+                                                            total_nao: 0,
+                                                            total_abster: 0,
+                                                            percentual_sim: 0,
+                                                            percentual_nao: 0,
+                                                            percentual_abster: 0
+                                                        };
+
+                                                        return (
+                                                            <div key={ind.id} className="bg-slate-950/70 border border-white/5 rounded-xl p-4 space-y-3">
+                                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="w-6 h-6 rounded-md bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center justify-center shrink-0">
+                                                                            {ind.numero}
+                                                                        </span>
+                                                                        <span className="font-bold text-white text-sm">{ind.titulo}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 shrink-0">
+                                                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                                                            ind.status === 'Em votação' ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse" :
+                                                                            ind.status === 'Encerrada' ? "bg-rose-500/20 text-rose-400" : "bg-white/10 text-white/50"
+                                                                        }`}>
+                                                                            {ind.status}
+                                                                        </span>
+                                                                        <span className="text-xs text-white/70 font-mono bg-white/5 px-2.5 py-0.5 rounded-lg border border-white/5">
+                                                                            {stats.total_votantes} votos ({stats.percentual_participacao}% part.)
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Barra de Progresso Visual dos Votos */}
+                                                                <div className="w-full bg-slate-900 rounded-full h-3.5 flex overflow-hidden border border-white/10">
+                                                                    <div 
+                                                                        style={{ width: `${stats.percentual_sim}%` }} 
+                                                                        className="bg-emerald-500 transition-all duration-500" 
+                                                                        title={`SIM: ${stats.percentual_sim}%`}
+                                                                    />
+                                                                    <div 
+                                                                        style={{ width: `${stats.percentual_nao}%` }} 
+                                                                        className="bg-rose-500 transition-all duration-500" 
+                                                                        title={`NÃO: ${stats.percentual_nao}%`}
+                                                                    />
+                                                                    <div 
+                                                                        style={{ width: `${stats.percentual_abster}%` }} 
+                                                                        className="bg-slate-500 transition-all duration-500" 
+                                                                        title={`ABSTENÇÃO: ${stats.percentual_abster}%`}
+                                                                    />
+                                                                </div>
+
+                                                                {/* Detalhamento das Opções em Cards */}
+                                                                <div className="grid grid-cols-3 gap-3 text-center text-xs pt-1">
+                                                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5">
+                                                                        <span className="text-[10px] font-black uppercase text-emerald-400 block">SIM</span>
+                                                                        <span className="font-bold text-white text-base">{stats.total_sim}</span>
+                                                                        <span className="text-[10px] text-emerald-400/80 block font-mono">({stats.percentual_sim}%)</span>
+                                                                    </div>
+                                                                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-2.5">
+                                                                        <span className="text-[10px] font-black uppercase text-rose-400 block">NÃO</span>
+                                                                        <span className="font-bold text-white text-base">{stats.total_nao}</span>
+                                                                        <span className="text-[10px] text-rose-400/80 block font-mono">({stats.percentual_nao}%)</span>
+                                                                    </div>
+                                                                    <div className="bg-slate-500/10 border border-slate-500/20 rounded-xl p-2.5">
+                                                                        <span className="text-[10px] font-black uppercase text-slate-400 block">ABSTENÇÃO</span>
+                                                                        <span className="font-bold text-white text-base">{stats.total_abster}</span>
+                                                                        <span className="text-[10px] text-slate-400/80 block font-mono">({stats.percentual_abster}%)</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
