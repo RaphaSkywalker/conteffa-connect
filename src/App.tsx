@@ -69,6 +69,7 @@ const App = () => (
 
           {/* Salas de Oficina */}
           <Route path="/oficina" element={<LoginOficina />} />
+          <Route path="/oficinas" element={<LoginOficina />} />
           <Route path="/oficina/sala" element={<PainelSalaOficina />} />
 
           {/* Admin Routes */}
