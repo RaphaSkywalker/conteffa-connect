@@ -175,7 +175,7 @@ export const saveTese = async (tese: Partial<Tese>): Promise<Tese> => {
         qr_code: qrTargetUrl,
         slug,
         status: tese.status || 'Aguardando',
-        em_oficina: tese.em_oficina ?? false,
+        em_oficina: tese.em_oficina ?? true,
         oficina_concluida: tese.oficina_concluida ?? false,
         data_inicio: tese.data_inicio || null,
         data_fim: tese.data_fim || null,

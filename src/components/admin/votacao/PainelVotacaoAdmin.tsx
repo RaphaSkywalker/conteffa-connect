@@ -377,7 +377,7 @@ export const PainelVotacaoAdmin = () => {
                             2. OFICINAS
                         </span>
                         <h4 className="text-2xl font-black font-heading text-white">
-                            {teses.filter(t => t.em_oficina).length}
+                            {teses.length}
                         </h4>
                     </div>
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
