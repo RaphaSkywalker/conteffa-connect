@@ -112,23 +112,30 @@ export const PainelVotacaoAdmin = () => {
                 getOficinaUsuarios()
             ]);
 
-            setTeses(dbTeses);
-            setTotalInscritos(countInscritos);
-            setOficinaUsuarios(dbUsers);
+            const safeTeses = Array.isArray(dbTeses) ? dbTeses : [];
+            const safeIndicativos = Array.isArray(dbIndicativos) ? dbIndicativos : [];
+            const safeUsers = Array.isArray(dbUsers) ? dbUsers : [];
+            const safeInscritosCount = typeof countInscritos === 'number' ? countInscritos : 0;
+
+            setTeses(safeTeses);
+            setTotalInscritos(safeInscritosCount);
+            setOficinaUsuarios(safeUsers);
 
             // Mapear indicativos por tese_id
             const indMap: Record<string | number, Indicativo[]> = {};
             const statsRecord: Record<string | number, VotacaoStats> = {};
 
-            for (const t of dbTeses) {
-                indMap[t.id] = dbIndicativos.filter(i => String(i.tese_id) === String(t.id));
+            for (const t of safeTeses) {
+                indMap[t.id] = safeIndicativos.filter(i => String(i.tese_id) === String(t.id));
             }
             setIndicativosMap(indMap);
 
             // Carregar estatísticas de cada indicativo
-            for (const ind of dbIndicativos) {
-                const s = await getIndicativoStats(ind.id, countInscritos);
-                statsRecord[ind.id] = s;
+            for (const ind of safeIndicativos) {
+                const s = await getIndicativoStats(ind.id, safeInscritosCount);
+                if (s) {
+                    statsRecord[ind.id] = s;
+                }
             }
             setStatsMap(statsRecord);
 
