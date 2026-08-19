@@ -325,7 +325,7 @@ export const PainelVotacaoAdmin = () => {
 
             {/* Grid de Caixas Separadas (Estilo do Anexo) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* CAIXA 1: CONTROLE DE VOTAÇÃO */}
+                {/* CAIXA 1: VOTAÇÃO */}
                 <button
                     type="button"
                     onClick={() => setSubTab("teses")}
@@ -339,10 +339,10 @@ export const PainelVotacaoAdmin = () => {
                         <span className={`text-[10px] font-black uppercase tracking-wider block ${
                             subTab === "teses" ? "text-cyan-400" : "text-white/40"
                         }`}>
-                            1. CONTROLE DE VOTAÇÃO
+                            1. VOTAÇÃO
                         </span>
                         <h4 className="text-2xl font-black font-heading text-white">
-                            {teses.length} <span className="text-xs font-normal text-white/50 uppercase tracking-widest">Teses</span>
+                            {teses.length}
                         </h4>
                     </div>
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
@@ -354,7 +354,7 @@ export const PainelVotacaoAdmin = () => {
                     </div>
                 </button>
 
-                {/* CAIXA 2: OFICINAS - SALAS DE TESES */}
+                {/* CAIXA 2: OFICINAS */}
                 <button
                     type="button"
                     onClick={() => setSubTab("oficinas")}
@@ -368,10 +368,10 @@ export const PainelVotacaoAdmin = () => {
                         <span className={`text-[10px] font-black uppercase tracking-wider block ${
                             subTab === "oficinas" ? "text-cyan-400" : "text-white/40"
                         }`}>
-                            2. OFICINAS - SALAS DE TESES
+                            2. OFICINAS
                         </span>
                         <h4 className="text-2xl font-black font-heading text-white">
-                            {teses.filter(t => t.em_oficina).length} <span className="text-xs font-normal text-white/50 uppercase tracking-widest">em Oficina</span>
+                            {teses.filter(t => t.em_oficina).length}
                         </h4>
                     </div>
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
@@ -383,7 +383,7 @@ export const PainelVotacaoAdmin = () => {
                     </div>
                 </button>
 
-                {/* CAIXA 3: ACESSOS DAS OFICINAS */}
+                {/* CAIXA 3: USUÁRIOS */}
                 <button
                     type="button"
                     onClick={() => setSubTab("acessos")}
@@ -397,10 +397,10 @@ export const PainelVotacaoAdmin = () => {
                         <span className={`text-[10px] font-black uppercase tracking-wider block ${
                             subTab === "acessos" ? "text-cyan-400" : "text-white/40"
                         }`}>
-                            3. ACESSOS DAS OFICINAS
+                            3. USUÁRIOS
                         </span>
                         <h4 className="text-2xl font-black font-heading text-white">
-                            {oficinaUsuarios.length} <span className="text-xs font-normal text-white/50 uppercase tracking-widest">Operadores</span>
+                            {oficinaUsuarios.length}
                         </h4>
                     </div>
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
@@ -429,7 +429,7 @@ export const PainelVotacaoAdmin = () => {
                             4. ESTATÍSTICAS
                         </span>
                         <h4 className="text-2xl font-black font-heading text-white">
-                            Métricas <span className="text-xs font-normal text-white/50 uppercase tracking-widest">& Votos</span>
+                            Métricas
                         </h4>
                     </div>
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
