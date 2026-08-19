@@ -739,6 +739,7 @@ export const checkUserAlreadyVotedIndicativo = async (
 
 export const getVotosByIndicativo = async (indicativoId: string | number): Promise<Voto[]> => {
     const numericId = Number(indicativoId);
+    let dbVotos: Voto[] = [];
 
     try {
         let query = supabase.from('votos').select('*');
@@ -749,7 +750,9 @@ export const getVotosByIndicativo = async (indicativoId: string | number): Promi
         }
 
         const { data, error } = await query;
-        if (!error && data) return data;
+        if (!error && data) {
+            dbVotos = data;
+        }
     } catch (err) {
         console.warn("Erro ao buscar votos por indicativo no Supabase:", err);
     }
@@ -757,12 +760,22 @@ export const getVotosByIndicativo = async (indicativoId: string | number): Promi
     try {
         const saved = localStorage.getItem(LS_VOTOS_KEY);
         if (saved) {
-            const votos: Voto[] = JSON.parse(saved);
-            return votos.filter(v => String(v.indicativo_id) === String(indicativoId));
+            const localVotos: Voto[] = JSON.parse(saved);
+            const filteredLocal = localVotos.filter(v => String(v.indicativo_id) === String(indicativoId));
+            
+            const combinedMap = new Map<string, Voto>();
+            dbVotos.forEach(v => combinedMap.set(normalizeCPF(v.cpf) || String(v.id), v));
+            filteredLocal.forEach(v => {
+                const key = normalizeCPF(v.cpf) || String(v.id);
+                if (!combinedMap.has(key)) {
+                    combinedMap.set(key, v);
+                }
+            });
+            return Array.from(combinedMap.values());
         }
     } catch (e) {}
 
-    return [];
+    return dbVotos;
 };
 
 export const submitVotoIndicativo = async (payload: {
@@ -828,13 +841,17 @@ export const submitVotoIndicativo = async (payload: {
 
         if (error) {
             console.error("Erro ao inserir voto no Supabase:", error);
+            // Se for erro de restrição única
             if (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate')) {
-                return { success: false, message: "Você já registrou seu voto neste indicativo." };
+                // Checar se o usuário já votou REALMENTE neste indicativo
+                const hasVotedThisInd = await checkUserAlreadyVotedIndicativo(payload.indicativoId, cleanCpf);
+                if (hasVotedThisInd) {
+                    return { success: false, message: "Você já registrou seu voto neste indicativo." };
+                }
+                console.warn("Restrição de chave única antiga (tese) detectada no banco Supabase. Salvando voto em fallback local.");
+            } else {
+                console.warn("Aviso ao salvar voto no Supabase, salvando em fallback local:", error);
             }
-            return { 
-                success: false, 
-                message: `Erro ao salvar voto no banco: ${error.message || 'Verifique a tabela de votos'}` 
-            };
         }
 
         if (data) {
@@ -847,8 +864,11 @@ export const submitVotoIndicativo = async (payload: {
     try {
         const saved = localStorage.getItem(LS_VOTOS_KEY);
         const list: Voto[] = saved ? JSON.parse(saved) : [];
-        list.push(newVoto);
-        localStorage.setItem(LS_VOTOS_KEY, JSON.stringify(list));
+        const existsLocally = list.some(v => String(v.indicativo_id) === String(payload.indicativoId) && normalizeCPF(v.cpf) === cleanCpf);
+        if (!existsLocally) {
+            list.push(newVoto);
+            localStorage.setItem(LS_VOTOS_KEY, JSON.stringify(list));
+        }
     } catch (e) {}
 
     return {
