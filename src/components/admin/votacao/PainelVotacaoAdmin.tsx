@@ -393,7 +393,7 @@ export const PainelVotacaoAdmin = () => {
                             3. ACESSOS DAS OFICINAS
                         </span>
                         <h4 className="text-2xl font-black font-heading text-white">
-                            {acessosOficina.length} <span className="text-xs font-normal text-white/50 uppercase tracking-widest">Operadores</span>
+                            {oficinaUsuarios.length} <span className="text-xs font-normal text-white/50 uppercase tracking-widest">Operadores</span>
                         </h4>
                     </div>
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
