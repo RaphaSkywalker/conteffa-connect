@@ -21,7 +21,6 @@ const menuItems = [
     children: [
       { label: "Programação", path: "/programacao" },
       { label: "Comissão", path: "/comissao" },
-      { label: "Inscrição", path: "/inscricao" },
       {
         label: "Local",
         path: "/local",

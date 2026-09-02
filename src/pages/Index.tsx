@@ -334,11 +334,9 @@ const Index = () => {
             transition={{ delay: 0.8 }}
             className="flex flex-col md:flex-row justify-center items-center gap-5"
           >
-            <Link to="/inscricao">
-              <Button className="text-[15px] font-medium uppercase tracking-wider px-10 h-12 rounded-full group shadow-xl shadow-primary/20">
-                INSCRIÇÃO
-              </Button>
-            </Link>
+            <Button disabled className="text-[15px] font-medium uppercase tracking-wider px-10 h-12 rounded-full group shadow-xl shadow-primary/20 cursor-not-allowed">
+              INSCRIÇÃO
+            </Button>
             <Link to="/programacao">
               <Button variant="outline" className="text-[15px] font-medium uppercase tracking-wider px-10 h-12 rounded-full border-2 border-white bg-transparent text-white hover:bg-white/10 hover:text-white transition-all">
                 VER PROGRAMAÇÃO
