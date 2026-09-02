@@ -295,9 +295,9 @@ const Index = () => {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
-            className="inline-block bg-primary/20 backdrop-blur-md px-6 py-2 rounded-full border border-primary/30 text-primary font-bold text-sm uppercase tracking-widest mb-4"
+            className="inline-block bg-red-500/20 backdrop-blur-md px-6 py-2 rounded-full border border-red-500/40 text-red-400 font-bold text-sm uppercase tracking-widest mb-4"
           >
-            INSCRIÇÕES ABERTAS
+            INSCRIÇÕES ENCERRADAS
           </motion.div>
 
           <motion.h1
@@ -332,11 +332,8 @@ const Index = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8 }}
-            className="flex flex-col md:flex-row justify-center items-center gap-5"
+            className="flex justify-center items-center"
           >
-            <Button disabled className="text-[15px] font-medium uppercase tracking-wider px-10 h-12 rounded-full group shadow-xl shadow-primary/20 cursor-not-allowed">
-              INSCRIÇÃO
-            </Button>
             <Link to="/programacao">
               <Button variant="outline" className="text-[15px] font-medium uppercase tracking-wider px-10 h-12 rounded-full border-2 border-white bg-transparent text-white hover:bg-white/10 hover:text-white transition-all">
                 VER PROGRAMAÇÃO
@@ -650,13 +647,13 @@ const Index = () => {
             <p className="text-white/80 text-xl md:text-2xl max-w-2xl font-body mx-auto mb-12">
               Garanta agora sua participação no maior evento nacional da categoria. O primeiro lote está disponível por tempo limitado.
             </p>
-            <Link to="/inscricao">
+            <Link to="/programacao">
               <Button
                 size="lg"
                 variant="secondary"
                 className="font-body font-medium text-[15px] px-10 h-12 rounded-full hover:scale-105 transition-transform shadow-2xl shadow-black/20 uppercase tracking-widest"
               >
-                FAÇA SUA INSCRIÇÃO
+                VER PROGRAMAÇÃO
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
