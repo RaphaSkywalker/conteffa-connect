@@ -24,6 +24,8 @@ import AdminDashboard from "./pages/admin/Dashboard";
 // Votação Online Pages
 import TesePublica from "./pages/TesePublica";
 import VotarTese from "./pages/VotarTese";
+import PainelEnquete from "./pages/enquete/PainelEnquete";
+import VotarEnquete from "./pages/enquete/VotarEnquete";
 
 // Oficina Pages
 import LoginOficina from "./pages/oficina/LoginOficina";
@@ -66,6 +68,10 @@ const App = () => (
           {/* Votação Online */}
           <Route path="/tese/:id" element={<TesePublica />} />
           <Route path="/votar/:id" element={<VotarTese />} />
+
+          {/* Enquetes */}
+          <Route path="/enquete/:id" element={<PainelEnquete />} />
+          <Route path="/enquete/votar/:id" element={<VotarEnquete />} />
 
           {/* Salas de Oficina */}
           <Route path="/oficina" element={<LoginOficina />} />

@@ -11,7 +11,6 @@ import {
     getTeses, 
     saveTese, 
     deleteTese, 
-    duplicateTese, 
     concluirOficinaTese,
     liberarTeseVotacao,
     getIndicativosByTese,
@@ -64,9 +63,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import PainelEnquetesAdmin from "./PainelEnquetesAdmin";
+import { ListChecks } from "lucide-react";
 
 export const PainelVotacaoAdmin = () => {
-    const [subTab, setSubTab] = useState<"teses" | "oficinas" | "acessos" | "status">("teses");
+    const [subTab, setSubTab] = useState<"teses" | "oficinas" | "acessos" | "status" | "enquetes">("teses");
     const [teses, setTeses] = useState<Tese[]>([]);
     const [indicativosMap, setIndicativosMap] = useState<Record<string | number, Indicativo[]>>({});
     const [statsMap, setStatsMap] = useState<Record<string | number, VotacaoStats>>({});
@@ -330,7 +331,7 @@ export const PainelVotacaoAdmin = () => {
             </div>
 
             {/* Grid de Caixas Separadas (Estilo do Anexo) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 {/* CAIXA 1: VOTAÇÃO */}
                 <button
                     type="button"
@@ -446,7 +447,38 @@ export const PainelVotacaoAdmin = () => {
                         <BarChart3 className="w-6 h-6" />
                     </div>
                 </button>
+
+                {/* CAIXA 5: ENQUETES */}
+                <button
+                    type="button"
+                    onClick={() => setSubTab("enquetes")}
+                    className={`p-6 rounded-3xl text-left transition-all duration-200 border relative flex items-center justify-between group ${
+                        subTab === "enquetes"
+                            ? "bg-[#0E1C38] border-amber-400/80 shadow-2xl shadow-amber-950/40 ring-2 ring-amber-400/30"
+                            : "bg-[#122442] border-white/5 hover:border-white/20 hover:bg-[#152849]"
+                    }`}
+                >
+                    <div className="space-y-1">
+                        <span className={`text-[10px] font-black uppercase tracking-wider block ${
+                            subTab === "enquetes" ? "text-amber-400" : "text-white/40"
+                        }`}>
+                            5. ENQUETES
+                        </span>
+                        <h4 className="text-2xl font-black font-heading text-white">
+                            SIM/NÃO
+                        </h4>
+                    </div>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
+                        subTab === "enquetes"
+                            ? "bg-amber-500/20 text-amber-400 border border-amber-400/30 shadow-lg"
+                            : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white"
+                    }`}>
+                        <ListChecks className="w-6 h-6" />
+                    </div>
+                </button>
             </div>
+
+            {subTab === "enquetes" && <PainelEnquetesAdmin />}
 
 
             {/* ======================================================== */}
