@@ -103,8 +103,13 @@ export const PainelVotacaoAdmin = () => {
 
     const [qrModalItem, setQrModalItem] = useState<{ title: string; subtitle: string; url: string } | null>(null);
     const [fullscreenTeseId, setFullscreenTeseId] = useState<string | number | null>(null);
+    const [collapsedFsIndIds, setCollapsedFsIndIds] = useState<Record<string | number, boolean>>({});
     const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
     const fullscreenRef = useRef<HTMLDivElement>(null);
+
+    const toggleFsIndicativo = (indId: string | number) => {
+        setCollapsedFsIndIds(prev => ({ ...prev, [indId]: !prev[indId] }));
+    };
 
     const openFullscreenTese = (teseId: string | number) => {
         setFullscreenTeseId(teseId);
@@ -1507,8 +1512,9 @@ export const PainelVotacaoAdmin = () => {
                                     </div>
 
                                     {/* Cards detalhados de cada indicativo */}
-                                    <div className="grid grid-cols-1 gap-6">
+                                    <div className="grid grid-cols-1 gap-4">
                                         {fsList.map((ind) => {
+                                            const isCollapsed = Boolean(collapsedFsIndIds[ind.id]);
                                             const stats = statsMap[ind.id] || {
                                                 indicativo_id: ind.id,
                                                 total_inscritos: totalInscritos,
@@ -1523,19 +1529,36 @@ export const PainelVotacaoAdmin = () => {
                                             };
 
                                             return (
-                                                <div key={ind.id} className="bg-[#0B1730] border border-white/10 rounded-3xl p-6 md:p-8 space-y-5 shadow-xl">
-                                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                                        <div className="flex items-start gap-3.5">
-                                                            <span className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 font-black text-lg flex items-center justify-center shrink-0 border border-emerald-500/30">
+                                                <div key={ind.id} className="bg-[#0B1730] border border-white/10 rounded-3xl p-5 md:p-7 space-y-5 shadow-xl transition-all">
+                                                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                                        <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => toggleFsIndicativo(ind.id)}
+                                                                title={isCollapsed ? "Clique para expandir o indicativo" : "Clique para ocultar o conteúdo do indicativo"}
+                                                                aria-expanded={!isCollapsed}
+                                                                className="w-10 h-10 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-400 font-black text-lg flex items-center justify-center shrink-0 border border-emerald-500/30 transition-all cursor-pointer active:scale-95"
+                                                            >
                                                                 {ind.numero}
-                                                            </span>
-                                                            <div>
-                                                                <span className="text-[10px] font-black uppercase tracking-widest text-white/40 block">
-                                                                    Indicativo Nº {ind.numero}
-                                                                </span>
-                                                                <h4 className="font-bold text-white text-lg md:text-2xl leading-snug">
-                                                                    {ind.titulo}
-                                                                </h4>
+                                                            </button>
+                                                            <div className="min-w-0 flex-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => toggleFsIndicativo(ind.id)}
+                                                                    className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-white/50 hover:text-emerald-400 transition-colors"
+                                                                >
+                                                                    <span>Indicativo Nº {ind.numero}</span>
+                                                                    {isCollapsed ? (
+                                                                        <ChevronDown className="w-4 h-4 text-emerald-400" />
+                                                                    ) : (
+                                                                        <ChevronUp className="w-4 h-4 text-white/40" />
+                                                                    )}
+                                                                </button>
+                                                                {!isCollapsed && (
+                                                                    <h4 className="font-bold text-white text-lg md:text-2xl leading-snug mt-1">
+                                                                        {ind.titulo}
+                                                                    </h4>
+                                                                )}
                                                             </div>
                                                         </div>
 
@@ -1555,43 +1578,47 @@ export const PainelVotacaoAdmin = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* Barra de Progresso Ampliada */}
-                                                    <div className="w-full bg-slate-950 rounded-full h-6 flex overflow-hidden border border-white/10">
-                                                        <div
-                                                            style={{ width: `${stats.percentual_sim}%` }}
-                                                            className="bg-emerald-500 transition-all duration-500"
-                                                            title={`SIM: ${stats.percentual_sim}%`}
-                                                        />
-                                                        <div
-                                                            style={{ width: `${stats.percentual_nao}%` }}
-                                                            className="bg-rose-500 transition-all duration-500"
-                                                            title={`NÃO: ${stats.percentual_nao}%`}
-                                                        />
-                                                        <div
-                                                            style={{ width: `${stats.percentual_abster}%` }}
-                                                            className="bg-slate-500 transition-all duration-500"
-                                                            title={`ABSTENÇÃO: ${stats.percentual_abster}%`}
-                                                        />
-                                                    </div>
+                                                    {!isCollapsed && (
+                                                        <>
+                                                            {/* Barra de Progresso Ampliada */}
+                                                            <div className="w-full bg-slate-950 rounded-full h-6 flex overflow-hidden border border-white/10">
+                                                                <div
+                                                                    style={{ width: `${stats.percentual_sim}%` }}
+                                                                    className="bg-emerald-500 transition-all duration-500"
+                                                                    title={`SIM: ${stats.percentual_sim}%`}
+                                                                />
+                                                                <div
+                                                                    style={{ width: `${stats.percentual_nao}%` }}
+                                                                    className="bg-rose-500 transition-all duration-500"
+                                                                    title={`NÃO: ${stats.percentual_nao}%`}
+                                                                />
+                                                                <div
+                                                                    style={{ width: `${stats.percentual_abster}%` }}
+                                                                    className="bg-slate-500 transition-all duration-500"
+                                                                    title={`ABSTENÇÃO: ${stats.percentual_abster}%`}
+                                                                />
+                                                            </div>
 
-                                                    {/* Placar Destacado */}
-                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-                                                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
-                                                            <span className="text-xs font-black uppercase tracking-widest text-emerald-400 block">SIM</span>
-                                                            <span className="font-heading font-black text-white text-3xl md:text-4xl block mt-1">{stats.total_sim}</span>
-                                                            <span className="text-sm text-emerald-300 font-mono font-bold">({stats.percentual_sim}%)</span>
-                                                        </div>
-                                                        <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
-                                                            <span className="text-xs font-black uppercase tracking-widest text-rose-400 block">NÃO</span>
-                                                            <span className="font-heading font-black text-white text-3xl md:text-4xl block mt-1">{stats.total_nao}</span>
-                                                            <span className="text-sm text-rose-300 font-mono font-bold">({stats.percentual_nao}%)</span>
-                                                        </div>
-                                                        <div className="bg-slate-500/10 border border-slate-500/30 rounded-2xl p-4">
-                                                            <span className="text-xs font-black uppercase tracking-widest text-slate-300 block">ABSTENÇÃO</span>
-                                                            <span className="font-heading font-black text-white text-3xl md:text-4xl block mt-1">{stats.total_abster}</span>
-                                                            <span className="text-sm text-slate-300 font-mono font-bold">({stats.percentual_abster}%)</span>
-                                                        </div>
-                                                    </div>
+                                                            {/* Placar Destacado */}
+                                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                                                                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
+                                                                    <span className="text-xs font-black uppercase tracking-widest text-emerald-400 block">SIM</span>
+                                                                    <span className="font-heading font-black text-white text-3xl md:text-4xl block mt-1">{stats.total_sim}</span>
+                                                                    <span className="text-sm text-emerald-300 font-mono font-bold">({stats.percentual_sim}%)</span>
+                                                                </div>
+                                                                <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
+                                                                    <span className="text-xs font-black uppercase tracking-widest text-rose-400 block">NÃO</span>
+                                                                    <span className="font-heading font-black text-white text-3xl md:text-4xl block mt-1">{stats.total_nao}</span>
+                                                                    <span className="text-sm text-rose-300 font-mono font-bold">({stats.percentual_nao}%)</span>
+                                                                </div>
+                                                                <div className="bg-slate-500/10 border border-slate-500/30 rounded-2xl p-4">
+                                                                    <span className="text-xs font-black uppercase tracking-widest text-slate-300 block">ABSTENÇÃO</span>
+                                                                    <span className="font-heading font-black text-white text-3xl md:text-4xl block mt-1">{stats.total_abster}</span>
+                                                                    <span className="text-sm text-slate-300 font-mono font-bold">({stats.percentual_abster}%)</span>
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </div>
                                             );
                                         })}

@@ -254,15 +254,15 @@ export const TesePublica = () => {
                         <div>
                             {/* Linha 1 (Fonte Menor / Badge Secundário): Nome da Tese (Tema) */}
                             {tese && (
-                                <div className="mb-4">
-                                    <span className="inline-block text-xs md:text-sm font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-1.5 rounded-xl mb-1">
+                                <div className="mb-3">
+                                    <span className="inline-block text-[14px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-1.5 rounded-xl mb-1 leading-snug">
                                         TESE Nº {tese.numero}: {tese.titulo}
                                     </span>
                                 </div>
                             )}
 
                             {/* Linha 2 (Destaque Principal H1): Nome/Título do Indicativo */}
-                            <h2 className={`font-heading font-black text-2xl md:text-3xl lg:text-4xl tracking-tight mb-4 leading-snug ${
+                            <h2 className={`font-heading font-bold text-[14px] tracking-normal mb-4 leading-relaxed ${
                                 isDarkMode ? "text-white" : "text-slate-900"
                             }`}>
                                 {indicativo ? `INDICATIVO Nº ${indicativo.numero}: ${indicativo.titulo}` : (tese ? tese.titulo : "Carregando Votação...")}
