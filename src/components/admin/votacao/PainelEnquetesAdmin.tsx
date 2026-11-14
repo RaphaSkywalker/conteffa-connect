@@ -296,7 +296,7 @@ export const PainelEnquetesAdmin = () => {
                                     <Input
                                         value={o.titulo}
                                         onChange={(ev) => updateOpcao(idx, ev.target.value)}
-                                        placeholder={form.tipo === "disputa" ? (idx === 0 ? "Ex.: SP" : "Ex.: DF") : "Descrição do item"}
+                                        placeholder={form.tipo === "disputa" ? (idx === 0 ? "Ex.: São Paulo" : "Ex.: Pará") : "Descrição do item"}
                                         aria-label={`Opção ${idx + 1}`}
                                         className="bg-white/5 border-white/10 text-white"
                                     />
