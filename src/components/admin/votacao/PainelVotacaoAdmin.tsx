@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { 
     Tese, 
@@ -60,11 +60,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, LabelList } from "recharts";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import PainelEnquetesAdmin from "./PainelEnquetesAdmin";
-import { ListChecks } from "lucide-react";
+import { ListChecks, Maximize2, Minimize2 } from "lucide-react";
 
 export const PainelVotacaoAdmin = () => {
     const [subTab, setSubTab] = useState<"teses" | "oficinas" | "acessos" | "status" | "enquetes">("teses");
@@ -102,6 +102,46 @@ export const PainelVotacaoAdmin = () => {
     });
 
     const [qrModalItem, setQrModalItem] = useState<{ title: string; subtitle: string; url: string } | null>(null);
+    const [fullscreenTeseId, setFullscreenTeseId] = useState<string | number | null>(null);
+    const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
+    const fullscreenRef = useRef<HTMLDivElement>(null);
+
+    const openFullscreenTese = (teseId: string | number) => {
+        setFullscreenTeseId(teseId);
+        setTimeout(() => {
+            fullscreenRef.current?.requestFullscreen?.().catch(() => {});
+        }, 50);
+    };
+
+    const closeFullscreenTese = () => {
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        }
+        setFullscreenTeseId(null);
+    };
+
+    const toggleBrowserFullscreen = () => {
+        if (!document.fullscreenElement) {
+            fullscreenRef.current?.requestFullscreen?.().catch(() => {});
+        } else {
+            document.exitFullscreen().catch(() => {});
+        }
+    };
+
+    useEffect(() => {
+        const onFsChange = () => setIsBrowserFullscreen(Boolean(document.fullscreenElement));
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && !document.fullscreenElement) {
+                setFullscreenTeseId(null);
+            }
+        };
+        document.addEventListener("fullscreenchange", onFsChange);
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            document.removeEventListener("fullscreenchange", onFsChange);
+            window.removeEventListener("keydown", onKeyDown);
+        };
+    }, []);
 
     // Carregar todos os dados
     const loadAllData = async () => {
@@ -1017,16 +1057,28 @@ export const PainelVotacaoAdmin = () => {
                                     const list = indicativosMap[t.id] || [];
                                     return (
                                         <div key={t.id} className="bg-slate-900/90 border border-white/10 rounded-2xl p-5 space-y-4">
-                                            <div className="flex items-center justify-between pb-3 border-b border-white/5">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
                                                 <div className="flex items-center gap-3">
                                                     <span className="bg-primary/20 text-primary border border-primary/30 text-xs font-black px-2.5 py-0.5 rounded-lg">
                                                         TESE Nº {t.numero}
                                                     </span>
                                                     <h5 className="font-bold text-white text-base">{t.titulo}</h5>
                                                 </div>
-                                                <span className="text-xs text-white/50 font-mono">
-                                                    {list.length} {list.length === 1 ? "indicativo" : "indicativos"}
-                                                </span>
+                                                <div className="flex items-center gap-3 self-end sm:self-auto">
+                                                    <span className="text-xs text-white/50 font-mono">
+                                                        {list.length} {list.length === 1 ? "indicativo" : "indicativos"}
+                                                    </span>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        onClick={() => openFullscreenTese(t.id)}
+                                                        className="h-8 px-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-bold gap-1.5"
+                                                        title="Visualizar gráficos desta Tese em tela cheia"
+                                                    >
+                                                        <Maximize2 className="w-3.5 h-3.5" />
+                                                        Tela Cheia
+                                                    </Button>
+                                                </div>
                                             </div>
 
                                             {list.length === 0 ? (
@@ -1322,6 +1374,234 @@ export const PainelVotacaoAdmin = () => {
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* VISUALIZAÇÃO EM TELA CHEIA DAS MÉTRICAS DE UMA TESE */}
+            {fullscreenTeseId !== null && (() => {
+                const fsTese = teses.find(t => String(t.id) === String(fullscreenTeseId));
+                if (!fsTese) return null;
+                const fsList = indicativosMap[fsTese.id] || [];
+                const chartData = fsList.map((ind) => {
+                    const st = statsMap[ind.id];
+                    return {
+                        name: `Ind. Nº ${ind.numero}`,
+                        titulo: ind.titulo,
+                        SIM: st?.total_sim ?? 0,
+                        NAO: st?.total_nao ?? 0,
+                        ABSTER: st?.total_abster ?? 0,
+                    };
+                });
+
+                return (
+                    <div
+                        ref={fullscreenRef}
+                        className="fixed inset-0 z-[100] bg-[#050B17] text-white flex flex-col overflow-y-auto"
+                    >
+                        <header className="sticky top-0 z-20 bg-[#071124]/95 backdrop-blur-md border-b border-white/10 px-6 md:px-10 py-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2.5">
+                                    <span className="bg-primary/20 text-primary border border-primary/30 text-xs font-black px-3 py-1 rounded-lg uppercase">
+                                        TESE Nº {fsTese.numero}
+                                    </span>
+                                    <span className="text-xs font-black uppercase tracking-widest text-cyan-400">
+                                        IX CONTEFFA • PAINEL DE MÉTRICAS DOS INDICATIVOS
+                                    </span>
+                                </div>
+                                <h2 className="text-2xl md:text-4xl font-heading font-black text-white leading-tight">
+                                    {fsTese.titulo}
+                                </h2>
+                            </div>
+
+                            <div className="flex items-center gap-3 shrink-0">
+                                <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 text-xs font-mono text-white/70">
+                                    <Users className="w-4 h-4 text-cyan-400" />
+                                    <span>{totalInscritos} inscritos aptos</span>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={toggleBrowserFullscreen}
+                                    className="h-11 px-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold gap-2"
+                                    title={isBrowserFullscreen ? "Restaurar janela" : "Expandir tela cheia do navegador"}
+                                >
+                                    {isBrowserFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                                    <span className="hidden sm:inline">{isBrowserFullscreen ? "Janela" : "Expandir"}</span>
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={closeFullscreenTese}
+                                    className="h-11 px-5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black uppercase tracking-wider gap-2"
+                                >
+                                    <X className="w-4 h-4" /> Fechar Tela Cheia
+                                </Button>
+                            </div>
+                        </header>
+
+                        <main className="flex-1 p-6 md:p-10 max-w-7xl w-full mx-auto space-y-8">
+                            {fsList.length === 0 ? (
+                                <div className="py-24 text-center text-white/40 border border-dashed border-white/10 rounded-3xl">
+                                    Nenhum indicativo cadastrado nesta Tese.
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Gráfico comparativo geral dos indicativos da Tese */}
+                                    <div className="bg-[#0B1730] border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl space-y-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                            <div>
+                                                <h3 className="text-sm font-black uppercase tracking-widest text-cyan-400">
+                                                    Comparativo Geral dos Indicativos ({fsList.length})
+                                                </h3>
+                                                <p className="text-xs text-white/50">
+                                                    Quantidade de votos SIM, NÃO e ABSTENÇÃO por indicativo em tempo real
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs font-black">
+                                                <span className="flex items-center gap-1.5 text-emerald-400">
+                                                    <span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" /> SIM
+                                                </span>
+                                                <span className="flex items-center gap-1.5 text-rose-400">
+                                                    <span className="w-3 h-3 rounded-sm bg-rose-500 inline-block" /> NÃO
+                                                </span>
+                                                <span className="flex items-center gap-1.5 text-slate-400">
+                                                    <span className="w-3 h-3 rounded-sm bg-slate-500 inline-block" /> ABSTENÇÃO
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-full" style={{ height: Math.max(260, fsList.length * 75) }}>
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 50, top: 10, bottom: 10 }} barGap={4}>
+                                                    <XAxis type="number" hide allowDecimals={false} />
+                                                    <YAxis
+                                                        type="category"
+                                                        dataKey="name"
+                                                        tick={{ fill: "#e2e8f0", fontSize: 14, fontWeight: 800 }}
+                                                        width={110}
+                                                        axisLine={false}
+                                                        tickLine={false}
+                                                    />
+                                                    <Tooltip
+                                                        cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                                                        contentStyle={{
+                                                            background: "#0E1C38",
+                                                            border: "1px solid rgba(255,255,255,0.15)",
+                                                            borderRadius: 12,
+                                                            color: "#fff"
+                                                        }}
+                                                        formatter={(value: number, key: string) => [
+                                                            `${value} votos`,
+                                                            key === "NAO" ? "NÃO" : key === "ABSTER" ? "ABSTENÇÃO" : "SIM"
+                                                        ]}
+                                                    />
+                                                    <Bar dataKey="SIM" fill="#10b981" radius={[0, 8, 8, 0]}>
+                                                        <LabelList dataKey="SIM" position="right" fill="#10b981" fontSize={14} fontWeight={900} />
+                                                    </Bar>
+                                                    <Bar dataKey="NAO" fill="#f43f5e" radius={[0, 8, 8, 0]}>
+                                                        <LabelList dataKey="NAO" position="right" fill="#f43f5e" fontSize={14} fontWeight={900} />
+                                                    </Bar>
+                                                    <Bar dataKey="ABSTER" fill="#64748b" radius={[0, 8, 8, 0]}>
+                                                        <LabelList dataKey="ABSTER" position="right" fill="#94a3b8" fontSize={14} fontWeight={900} />
+                                                    </Bar>
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+
+                                    {/* Cards detalhados de cada indicativo */}
+                                    <div className="grid grid-cols-1 gap-6">
+                                        {fsList.map((ind) => {
+                                            const stats = statsMap[ind.id] || {
+                                                indicativo_id: ind.id,
+                                                total_inscritos: totalInscritos,
+                                                total_votantes: 0,
+                                                percentual_participacao: 0,
+                                                total_sim: 0,
+                                                total_nao: 0,
+                                                total_abster: 0,
+                                                percentual_sim: 0,
+                                                percentual_nao: 0,
+                                                percentual_abster: 0
+                                            };
+
+                                            return (
+                                                <div key={ind.id} className="bg-[#0B1730] border border-white/10 rounded-3xl p-6 md:p-8 space-y-5 shadow-xl">
+                                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                        <div className="flex items-start gap-3.5">
+                                                            <span className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 font-black text-lg flex items-center justify-center shrink-0 border border-emerald-500/30">
+                                                                {ind.numero}
+                                                            </span>
+                                                            <div>
+                                                                <span className="text-[10px] font-black uppercase tracking-widest text-white/40 block">
+                                                                    Indicativo Nº {ind.numero}
+                                                                </span>
+                                                                <h4 className="font-bold text-white text-lg md:text-2xl leading-snug">
+                                                                    {ind.titulo}
+                                                                </h4>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-3 shrink-0">
+                                                            <span className={`px-3.5 py-1 rounded-full text-xs font-black uppercase ${
+                                                                ind.status === 'Em votação'
+                                                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse"
+                                                                    : ind.status === 'Encerrada'
+                                                                        ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                                                        : "bg-white/10 text-white/50"
+                                                            }`}>
+                                                                {ind.status}
+                                                            </span>
+                                                            <span className="text-sm text-white font-mono font-bold bg-white/5 px-4 py-1.5 rounded-xl border border-white/10">
+                                                                {stats.total_votantes} votos ({stats.percentual_participacao}% part.)
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Barra de Progresso Ampliada */}
+                                                    <div className="w-full bg-slate-950 rounded-full h-6 flex overflow-hidden border border-white/10">
+                                                        <div
+                                                            style={{ width: `${stats.percentual_sim}%` }}
+                                                            className="bg-emerald-500 transition-all duration-500"
+                                                            title={`SIM: ${stats.percentual_sim}%`}
+                                                        />
+                                                        <div
+                                                            style={{ width: `${stats.percentual_nao}%` }}
+                                                            className="bg-rose-500 transition-all duration-500"
+                                                            title={`NÃO: ${stats.percentual_nao}%`}
+                                                        />
+                                                        <div
+                                                            style={{ width: `${stats.percentual_abster}%` }}
+                                                            className="bg-slate-500 transition-all duration-500"
+                                                            title={`ABSTENÇÃO: ${stats.percentual_abster}%`}
+                                                        />
+                                                    </div>
+
+                                                    {/* Placar Destacado */}
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                                                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
+                                                            <span className="text-xs font-black uppercase tracking-widest text-emerald-400 block">SIM</span>
+                                                            <span className="font-heading font-black text-white text-3xl md:text-4xl block mt-1">{stats.total_sim}</span>
+                                                            <span className="text-sm text-emerald-300 font-mono font-bold">({stats.percentual_sim}%)</span>
+                                                        </div>
+                                                        <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
+                                                            <span className="text-xs font-black uppercase tracking-widest text-rose-400 block">NÃO</span>
+                                                            <span className="font-heading font-black text-white text-3xl md:text-4xl block mt-1">{stats.total_nao}</span>
+                                                            <span className="text-sm text-rose-300 font-mono font-bold">({stats.percentual_nao}%)</span>
+                                                        </div>
+                                                        <div className="bg-slate-500/10 border border-slate-500/30 rounded-2xl p-4">
+                                                            <span className="text-xs font-black uppercase tracking-widest text-slate-300 block">ABSTENÇÃO</span>
+                                                            <span className="font-heading font-black text-white text-3xl md:text-4xl block mt-1">{stats.total_abster}</span>
+                                                            <span className="text-sm text-slate-300 font-mono font-bold">({stats.percentual_abster}%)</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            )}
+                        </main>
+                    </div>
+                );
+            })()}
         </div>
     );
 };
