@@ -30,6 +30,71 @@ const LS_INDICATIVOS_KEY = "conteffa_indicativos_votacao";
 const LS_OFICINA_USERS_KEY = "conteffa_oficina_usuarios";
 const LS_VOTOS_KEY = "conteffa_votos_votacao";
 const LS_INSCRICOES_KEY = "conteffa_inscricoes";
+const LS_CLIENT_IP_KEY = "conteffa_client_ip";
+
+let cachedClientIp: string | null = null;
+
+// Helper: Obter IP público do cliente (com fallback para identificador persistente caso APIs de IP estejam inacessíveis)
+export const getClientIP = async (): Promise<string> => {
+    if (cachedClientIp) return cachedClientIp;
+
+    const endpoints = [
+        "https://api.ipify.org?format=json",
+        "https://api64.ipify.org?format=json",
+        "https://ipinfo.io/json"
+    ];
+
+    for (const url of endpoints) {
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3500);
+            const res = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeout);
+            if (res.ok) {
+                const data = await res.json();
+                if (data?.ip && typeof data.ip === "string") {
+                    cachedClientIp = data.ip.trim();
+                    try {
+                        localStorage.setItem(LS_CLIENT_IP_KEY, cachedClientIp);
+                    } catch {}
+                    return cachedClientIp;
+                }
+            }
+        } catch {}
+    }
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch("https://www.cloudflare.com/cdn-cgi/trace", { signal: controller.signal });
+        clearTimeout(timeout);
+        if (res.ok) {
+            const text = await res.text();
+            const match = text.match(/^ip=(.+)$/m);
+            if (match?.[1]) {
+                cachedClientIp = match[1].trim();
+                try {
+                    localStorage.setItem(LS_CLIENT_IP_KEY, cachedClientIp);
+                } catch {}
+                return cachedClientIp;
+            }
+        }
+    } catch {}
+
+    try {
+        const saved = localStorage.getItem(LS_CLIENT_IP_KEY);
+        if (saved) {
+            cachedClientIp = saved;
+            return saved;
+        }
+        const generated = `ip-local-${Math.random().toString(36).substring(2, 10)}`;
+        localStorage.setItem(LS_CLIENT_IP_KEY, generated);
+        cachedClientIp = generated;
+        return generated;
+    } catch {
+        return "127.0.0.1";
+    }
+};
 
 // ==========================================
 // 1. AUTENTICAÇÃO E VALIDAÇÃO DE INSCRITOS
@@ -688,24 +753,24 @@ export const checkUserAlreadyVotedIndicativo = async (
 ): Promise<boolean> => {
     let targetIndId: string | number | undefined = undefined;
     let targetTeseId: string | number | undefined = undefined;
-    let rawCpfInput: string = "";
+    let rawIdentifier: string = "";
 
     if (arg3 && typeof arg3 === 'string') {
         targetIndId = arg1;
         targetTeseId = arg2;
-        rawCpfInput = arg3;
+        rawIdentifier = arg3;
     } else if (arg2 && typeof arg2 === 'string') {
         targetIndId = arg1;
-        rawCpfInput = arg2;
+        rawIdentifier = arg2;
     } else if (arg1 && typeof arg1 === 'string') {
-        rawCpfInput = arg1;
+        rawIdentifier = arg1;
     }
 
-    const cleanCpf = normalizeCPF(rawCpfInput);
-    if (!cleanCpf) return false;
+    const cleanId = (rawIdentifier || "").trim();
+    if (!cleanId) return false;
 
     try {
-        let query = supabase.from('votos').select('id, cpf, indicativo_id, tese_id');
+        let query = supabase.from('votos').select('id, cpf, ip, indicativo_id, tese_id');
         if (targetIndId !== undefined && targetIndId !== null) {
             query = query.eq('indicativo_id', targetIndId);
         } else if (targetTeseId !== undefined && targetTeseId !== null) {
@@ -715,11 +780,14 @@ export const checkUserAlreadyVotedIndicativo = async (
         const { data, error } = await query;
 
         if (!error && data) {
-            const hasVoted = data.some((v: any) => v.cpf && normalizeCPF(v.cpf) === cleanCpf);
+            const hasVoted = data.some((v: any) =>
+                (v.ip && String(v.ip).trim() === cleanId) ||
+                (v.cpf && String(v.cpf).trim() === cleanId)
+            );
             if (hasVoted) return true;
         }
     } catch (err) {
-        console.warn("Erro ao checar voto no Supabase:", err);
+        console.warn("Erro ao checar voto por IP no Supabase:", err);
     }
 
     try {
@@ -728,8 +796,8 @@ export const checkUserAlreadyVotedIndicativo = async (
             const votos: Voto[] = JSON.parse(saved);
             return votos.some(v => {
                 const matchInd = targetIndId ? String(v.indicativo_id) === String(targetIndId) : true;
-                const matchCpf = v.cpf && normalizeCPF(v.cpf) === cleanCpf;
-                return matchInd && matchCpf;
+                const matchIp = (v.ip && String(v.ip).trim() === cleanId) || (v.cpf && String(v.cpf).trim() === cleanId);
+                return matchInd && matchIp;
             });
         }
     } catch (e) {}
@@ -764,9 +832,9 @@ export const getVotosByIndicativo = async (indicativoId: string | number): Promi
             const filteredLocal = localVotos.filter(v => String(v.indicativo_id) === String(indicativoId));
             
             const combinedMap = new Map<string, Voto>();
-            dbVotos.forEach(v => combinedMap.set(normalizeCPF(v.cpf) || String(v.id), v));
+            dbVotos.forEach(v => combinedMap.set(String(v.ip || v.cpf || v.id).trim(), v));
             filteredLocal.forEach(v => {
-                const key = normalizeCPF(v.cpf) || String(v.id);
+                const key = String(v.ip || v.cpf || v.id).trim();
                 if (!combinedMap.has(key)) {
                     combinedMap.set(key, v);
                 }
@@ -780,13 +848,13 @@ export const getVotosByIndicativo = async (indicativoId: string | number): Promi
 
 export const submitVotoIndicativo = async (payload: {
     indicativoId: string | number;
-    cpf: string;
+    cpf?: string;
     voto: VotoTipo;
     inscritoId?: string | number | null;
     ip?: string;
     userAgent?: string;
 }): Promise<{ success: boolean; message: string; voto?: Voto }> => {
-    const cleanCpf = normalizeCPF(payload.cpf);
+    const clientIp = (payload.ip || payload.cpf || await getClientIP()).trim();
     const numericIndicativoId = !isNaN(Number(payload.indicativoId)) ? Number(payload.indicativoId) : payload.indicativoId;
 
     // 1. Validar Indicativo e Status
@@ -809,25 +877,19 @@ export const submitVotoIndicativo = async (payload: {
         return { success: false, message: "O tempo para votação deste indicativo encerrou." };
     }
 
-    // 2. Validar CPF do Inscrito
-    const inscrito = await validateInscritoByCPF(cleanCpf);
-    if (!inscrito) {
-        return { success: false, message: "CPF não encontrado na lista de inscritos." };
-    }
-
-    // 3. Verificar duplicidade de voto no Indicativo
-    const alreadyVoted = await checkUserAlreadyVotedIndicativo(payload.indicativoId, cleanCpf);
+    // 2. Verificar duplicidade de voto por IP neste Indicativo
+    const alreadyVoted = await checkUserAlreadyVotedIndicativo(payload.indicativoId, clientIp);
     if (alreadyVoted) {
-        return { success: false, message: "Você já registrou seu voto neste indicativo." };
+        return { success: false, message: "Você já votou neste processo. Não é permitido votar mais de uma vez com o mesmo IP." };
     }
 
     const newVoto: any = {
         indicativo_id: numericIndicativoId,
         tese_id: indicativo.tese_id,
-        inscrito_id: payload.inscritoId ? String(payload.inscritoId) : (inscrito?.id ? String(inscrito.id) : null),
-        cpf: cleanCpf,
+        inscrito_id: payload.inscritoId ? String(payload.inscritoId) : null,
+        cpf: clientIp,
         voto: payload.voto,
-        ip: payload.ip || "127.0.0.1",
+        ip: clientIp,
         user_agent: payload.userAgent || (typeof navigator !== "undefined" ? navigator.userAgent : ""),
         data_hora: new Date().toISOString()
     };
@@ -841,12 +903,10 @@ export const submitVotoIndicativo = async (payload: {
 
         if (error) {
             console.error("Erro ao inserir voto no Supabase:", error);
-            // Se for erro de restrição única
             if (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate')) {
-                // Checar se o usuário já votou REALMENTE neste indicativo
-                const hasVotedThisInd = await checkUserAlreadyVotedIndicativo(payload.indicativoId, cleanCpf);
+                const hasVotedThisInd = await checkUserAlreadyVotedIndicativo(payload.indicativoId, clientIp);
                 if (hasVotedThisInd) {
-                    return { success: false, message: "Você já registrou seu voto neste indicativo." };
+                    return { success: false, message: "Você já votou neste processo. Não é permitido votar mais de uma vez com o mesmo IP." };
                 }
                 console.warn("Restrição de chave única antiga (tese) detectada no banco Supabase. Salvando voto em fallback local.");
             } else {
@@ -864,7 +924,10 @@ export const submitVotoIndicativo = async (payload: {
     try {
         const saved = localStorage.getItem(LS_VOTOS_KEY);
         const list: Voto[] = saved ? JSON.parse(saved) : [];
-        const existsLocally = list.some(v => String(v.indicativo_id) === String(payload.indicativoId) && normalizeCPF(v.cpf) === cleanCpf);
+        const existsLocally = list.some(v =>
+            String(v.indicativo_id) === String(payload.indicativoId) &&
+            (String(v.ip || "").trim() === clientIp || String(v.cpf || "").trim() === clientIp)
+        );
         if (!existsLocally) {
             list.push(newVoto);
             localStorage.setItem(LS_VOTOS_KEY, JSON.stringify(list));
@@ -966,7 +1029,7 @@ export const subscribeToVotacaoRealtime = (
 export const submitVoto = async (payload: {
     indicativoId?: string | number;
     teseId?: string | number;
-    cpf: string;
+    cpf?: string;
     voto: VotoTipo;
     inscritoId?: string | number | null;
     ip?: string;

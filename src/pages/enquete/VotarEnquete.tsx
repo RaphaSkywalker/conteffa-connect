@@ -1,34 +1,29 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, ArrowRight, CheckCircle2, ShieldCheck, Trophy, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ShieldCheck, Trophy, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Enquete, EnqueteVotoTipo } from "@/types/enquete";
-import { InscritoValidado } from "@/types/votacao";
-import { maskCPF, normalizeCPF, validateInscritoByCPF } from "@/services/votacaoService";
+import { getClientIP } from "@/services/votacaoService";
 import {
     getEnqueteById,
-    getOpcoesVotadasPorCpf,
+    getOpcoesVotadasPorIp,
     submitVotosEnquete,
     subscribeToEnquetesRealtime,
 } from "@/services/enqueteService";
 
-type Step = "cpf" | "voto" | "sucesso";
+type Step = "voto" | "sucesso";
 
 const VotarEnquete = () => {
     const { id } = useParams<{ id: string }>();
     const [enquete, setEnquete] = useState<Enquete | null>(null);
     const [loading, setLoading] = useState(true);
+    const [clientIp, setClientIp] = useState<string>("");
+    const [alreadyVotedIp, setAlreadyVotedIp] = useState(false);
 
-    const [step, setStep] = useState<Step>("cpf");
-    const [cpfInput, setCpfInput] = useState("");
-    const [cpfError, setCpfError] = useState<string | null>(null);
-    const [validating, setValidating] = useState(false);
-    const [inscrito, setInscrito] = useState<InscritoValidado | null>(null);
-
+    const [step, setStep] = useState<Step>("voto");
     const [jaVotadas, setJaVotadas] = useState<number[]>([]);
     const [escolhasIndividual, setEscolhasIndividual] = useState<Record<number, EnqueteVotoTipo>>({});
     const [escolhaDisputa, setEscolhaDisputa] = useState<number | null>(null);
@@ -38,7 +33,22 @@ const VotarEnquete = () => {
     const load = async () => {
         if (!id) return;
         try {
-            setEnquete(await getEnqueteById(id));
+            const [data, ip] = await Promise.all([
+                getEnqueteById(id),
+                getClientIP(),
+            ]);
+            setEnquete(data);
+            setClientIp(ip);
+
+            if (data && ip) {
+                const votadas = await getOpcoesVotadasPorIp(data.id, ip);
+                setJaVotadas(votadas);
+                const isDisp = data.tipo === "disputa";
+                const jaVotouTudo = isDisp
+                    ? votadas.length > 0
+                    : data.opcoes.length > 0 && votadas.length >= data.opcoes.length;
+                setAlreadyVotedIp(jaVotouTudo);
+            }
         } catch (err) {
             console.error("Erro ao carregar enquete:", err);
         } finally {
@@ -55,54 +65,24 @@ const VotarEnquete = () => {
     const isDisputa = enquete?.tipo === "disputa";
     const opcoesPendentes = enquete?.opcoes.filter((o) => !jaVotadas.includes(o.id)) ?? [];
 
-    const handleCpf = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setCpfError(null);
-        if (!enquete) return;
-
-        const cpf = normalizeCPF(cpfInput);
-        if (cpf.length !== 11) return setCpfError("Digite um CPF válido com 11 dígitos.");
-        if (status !== "Em votação") {
-            return setCpfError(status === "Encerrada" ? "Esta enquete já foi encerrada." : "A enquete ainda não foi iniciada.");
-        }
-
-        setValidating(true);
-        try {
-            const found = await validateInscritoByCPF(cpf);
-            if (!found) return setCpfError("CPF não encontrado na lista de inscritos.");
-
-            const votadas = await getOpcoesVotadasPorCpf(enquete.id, cpf);
-            const jaVotouTudo = isDisputa ? votadas.length > 0 : votadas.length >= enquete.opcoes.length;
-            if (jaVotouTudo) return setCpfError("Você já registrou seu voto nesta enquete.");
-
-            setJaVotadas(votadas);
-            setInscrito(found);
-            setStep("voto");
-            toast.success(`Bem-vindo(a), ${found.nomeCompleto}!`);
-        } catch (err) {
-            console.error(err);
-            setCpfError("Erro ao validar inscrição. Tente novamente.");
-        } finally {
-            setValidating(false);
-        }
-    };
-
-    const canSubmit = isDisputa
-        ? escolhaDisputa !== null
-        : opcoesPendentes.length > 0 && opcoesPendentes.every((o) => escolhasIndividual[o.id]);
+    const canSubmit = status === "Em votação" && (
+        isDisputa
+            ? escolhaDisputa !== null
+            : opcoesPendentes.length > 0 && opcoesPendentes.every((o) => escolhasIndividual[o.id])
+    );
 
     const handleConfirm = async () => {
-        if (!enquete || !inscrito) return;
+        if (!enquete) return;
         setSubmitting(true);
         try {
+            const ip = clientIp || await getClientIP();
             const votos = isDisputa
                 ? [{ opcao_id: escolhaDisputa!, voto: null }]
                 : opcoesPendentes.map((o) => ({ opcao_id: o.id, voto: escolhasIndividual[o.id] }));
 
             const res = await submitVotosEnquete({
                 enqueteId: enquete.id,
-                cpf: inscrito.cpf,
-                inscritoId: inscrito.id,
+                ip,
                 votos,
             });
 
@@ -112,8 +92,9 @@ const VotarEnquete = () => {
                 toast.success("Voto computado com sucesso!");
             } else {
                 toast.error(res.message);
-                setCpfError(res.message);
-                setStep("cpf");
+                if (res.message.includes("já votou") || res.message.includes("já registrou")) {
+                    setAlreadyVotedIp(true);
+                }
             }
         } finally {
             setSubmitting(false);
@@ -158,15 +139,38 @@ const VotarEnquete = () => {
 
             <main className="flex-1 p-5 md:p-8 max-w-xl w-full mx-auto flex flex-col justify-center relative z-10">
                 <AnimatePresence mode="wait">
-                    {step === "cpf" && (
-                        <motion.div key="cpf" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
-                            <div className="bg-[#0E1C38] p-6 rounded-3xl border border-white/10 shadow-xl space-y-3">
-                                <h2 className="text-xl font-heading font-black text-white leading-snug">{enquete.titulo}</h2>
+                    {alreadyVotedIp && step !== "sucesso" ? (
+                        <motion.div
+                            key="already-voted"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-[#0E1C38] p-8 md:p-10 rounded-[2.5rem] border border-amber-500/30 shadow-2xl text-center space-y-5"
+                        >
+                            <div className="w-20 h-20 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mx-auto">
+                                <AlertTriangle className="w-10 h-10 text-amber-400" />
+                            </div>
+                            <div className="space-y-2">
+                                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 block">
+                                    ACESSO BLOQUEADO POR DUPLICIDADE
+                                </span>
+                                <h2 className="text-2xl font-heading font-black text-white">
+                                    Você já votou neste processo!
+                                </h2>
+                                <p className="text-xs text-white/60 leading-relaxed">
+                                    Já identificamos um voto registrado a partir do seu endereço IP ({clientIp}) para esta enquete. Não é permitido votar mais de uma vez.
+                                </p>
+                            </div>
+                        </motion.div>
+                    ) : step === "voto" ? (
+                        <motion.div key="voto" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-5">
+                            <div className="bg-[#0E1C38] p-6 rounded-3xl border border-white/10 shadow-xl space-y-2 text-center">
+                                <h2 className="text-xl font-heading font-black text-white">{enquete.titulo}</h2>
                                 {enquete.descricao && (
-                                    <p className="text-xs text-white/60 leading-relaxed bg-white/5 p-4 rounded-2xl border border-white/5">
-                                        {enquete.descricao}
-                                    </p>
+                                    <p className="text-xs text-white/60 leading-relaxed">{enquete.descricao}</p>
                                 )}
+                                <p className="text-xs text-emerald-400 font-bold pt-1">
+                                    {isDisputa ? "Escolha apenas UMA opção." : "Vote SIM ou NÃO em cada item."}
+                                </p>
                             </div>
 
                             {status !== "Em votação" && (
@@ -178,50 +182,6 @@ const VotarEnquete = () => {
                                 </div>
                             )}
 
-                            <form onSubmit={handleCpf} className="bg-[#0E1C38] p-6 md:p-8 rounded-[2.5rem] border border-white/10 shadow-2xl space-y-6">
-                                <div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label htmlFor="cpf" className="text-xs font-bold text-white uppercase tracking-wider">Informe seu CPF</label>
-                                        <span className="text-[10px] text-white/40">Apenas congressistas inscritos</span>
-                                    </div>
-                                    <Input
-                                        id="cpf"
-                                        required
-                                        type="tel"
-                                        inputMode="numeric"
-                                        value={cpfInput}
-                                        onChange={(e) => { setCpfInput(maskCPF(e.target.value)); setCpfError(null); }}
-                                        placeholder="000.000.000-00"
-                                        disabled={status !== "Em votação" || validating}
-                                        className="h-14 rounded-2xl bg-white/5 border-white/10 text-white text-lg font-bold tracking-wider placeholder:text-white/20 text-center"
-                                        autoFocus
-                                    />
-                                    {cpfError && <p className="text-rose-400 text-xs font-bold mt-3 text-center">{cpfError}</p>}
-                                </div>
-                                <Button
-                                    type="submit"
-                                    disabled={status !== "Em votação" || validating}
-                                    className="w-full h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest gap-2"
-                                >
-                                    {validating ? "Validando..." : <>Acessar votação <ArrowRight className="w-4 h-4" /></>}
-                                </Button>
-                                <p className="text-[10px] text-white/40 text-center flex items-center justify-center gap-1.5">
-                                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Um voto por inscrito. Voto não pode ser alterado.
-                                </p>
-                            </form>
-                        </motion.div>
-                    )}
-
-                    {step === "voto" && (
-                        <motion.div key="voto" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-5">
-                            <div className="text-center space-y-1">
-                                <p className="text-xs text-white/50">Votando como <span className="text-emerald-400 font-bold">{inscrito?.nomeCompleto}</span></p>
-                                <h2 className="text-xl font-heading font-black text-white">{enquete.titulo}</h2>
-                                <p className="text-xs text-white/50">
-                                    {isDisputa ? "Escolha apenas UMA opção." : "Vote SIM ou NÃO em cada item."}
-                                </p>
-                            </div>
-
                             {isDisputa ? (
                                 <div className="grid gap-3">
                                     {enquete.opcoes.map((o) => {
@@ -230,9 +190,10 @@ const VotarEnquete = () => {
                                             <button
                                                 key={o.id}
                                                 type="button"
+                                                disabled={status !== "Em votação"}
                                                 onClick={() => setEscolhaDisputa(o.id)}
                                                 aria-pressed={selected}
-                                                className={`p-6 rounded-3xl border-2 text-left flex items-center justify-between transition-all ${selected ? "border-emerald-400 bg-emerald-500/15 shadow-lg shadow-emerald-500/20" : "border-white/10 bg-[#0E1C38] hover:border-white/30"}`}
+                                                className={`p-6 rounded-3xl border-2 text-left flex items-center justify-between transition-all disabled:opacity-40 disabled:cursor-not-allowed ${selected ? "border-emerald-400 bg-emerald-500/15 shadow-lg shadow-emerald-500/20" : "border-white/10 bg-[#0E1C38] hover:border-white/30"}`}
                                             >
                                                 <span className="text-xl font-heading font-black text-white">{o.titulo}</span>
                                                 {selected ? <CheckCircle2 className="w-7 h-7 text-emerald-400" /> : <span className="w-7 h-7 rounded-full border-2 border-white/20" />}
@@ -256,9 +217,10 @@ const VotarEnquete = () => {
                                                         <button
                                                             key={v}
                                                             type="button"
+                                                            disabled={status !== "Em votação"}
                                                             aria-pressed={selected}
                                                             onClick={() => setEscolhasIndividual((prev) => ({ ...prev, [o.id]: v }))}
-                                                            className={`h-14 rounded-2xl border-2 font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+                                                            className={`h-14 rounded-2xl border-2 font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                                                                 selected
                                                                     ? isSim ? "bg-emerald-600 border-emerald-400 text-white" : "bg-rose-600 border-rose-400 text-white"
                                                                     : "bg-white/5 border-white/10 text-white/70 hover:border-white/30"
@@ -282,10 +244,12 @@ const VotarEnquete = () => {
                             >
                                 Confirmar voto
                             </Button>
-                        </motion.div>
-                    )}
 
-                    {step === "sucesso" && (
+                            <p className="text-[10px] text-white/40 text-center flex items-center justify-center gap-1.5">
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Voto único validado por endereço IP
+                            </p>
+                        </motion.div>
+                    ) : (
                         <motion.div key="ok" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-5 bg-[#0E1C38] p-10 rounded-[2.5rem] border border-emerald-500/30">
                             <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center">
                                 <CheckCircle2 className="w-12 h-12 text-emerald-400" />
@@ -346,4 +310,3 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 export default VotarEnquete;
-

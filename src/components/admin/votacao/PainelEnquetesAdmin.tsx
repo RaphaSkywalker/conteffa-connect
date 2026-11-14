@@ -161,7 +161,7 @@ export const PainelEnquetesAdmin = () => {
                         </h4>
                         <p className="text-xs text-white/40 mt-1">
                             <strong className="text-white/70">Individual:</strong> cada item recebe SIM ou NÃO. {" "}
-                            <strong className="text-white/70">Disputa:</strong> o inscrito escolhe uma única opção (ex.: SP × DF). Um voto por CPF inscrito.
+                            <strong className="text-white/70">Disputa:</strong> o participante escolhe uma única opção (ex.: São Paulo × Pará). Acesso direto com validação de 1 voto por IP.
                         </p>
                     </div>
                     <Button onClick={openNew} className="bg-amber-500 hover:bg-amber-600 text-white font-black text-xs uppercase tracking-widest rounded-xl gap-2">

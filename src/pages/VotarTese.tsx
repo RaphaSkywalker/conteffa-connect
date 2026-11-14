@@ -3,17 +3,14 @@ import { useParams, useNavigate } from "react-router-dom";
 import { 
     Tese, 
     Indicativo,
-    VotoTipo, 
-    InscritoValidado 
+    VotoTipo
 } from "@/types/votacao";
 import { 
     getTeseById, 
     getIndicativoById,
-    validateInscritoByCPF, 
     checkUserAlreadyVotedIndicativo, 
     submitVoto, 
-    maskCPF, 
-    normalizeCPF,
+    getClientIP,
     subscribeToVotacaoRealtime
 } from "@/services/votacaoService";
 import { 
@@ -21,15 +18,10 @@ import {
     XCircle, 
     MinusCircle, 
     ShieldCheck, 
-    Lock, 
     AlertTriangle, 
-    UserCheck, 
-    ArrowRight, 
-    Check,
-    FileText
+    Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,31 +33,42 @@ export const VotarTese = () => {
     const [indicativo, setIndicativo] = useState<Indicativo | null>(null);
     const [tese, setTese] = useState<Tese | null>(null);
     const [loading, setLoading] = useState(true);
+    const [clientIp, setClientIp] = useState<string>("");
+    const [alreadyVotedIp, setAlreadyVotedIp] = useState(false);
 
-    // Etapas do fluxo: 'cpf' | 'voto' | 'sucesso'
-    const [step, setStep] = useState<'cpf' | 'voto' | 'sucesso'>('cpf');
-    const [cpfInput, setCpfInput] = useState("");
-    const [validatingCpf, setValidatingCpf] = useState(false);
-    const [cpfError, setCpfError] = useState<string | null>(null);
-    const [inscrito, setInscrito] = useState<InscritoValidado | null>(null);
+    // Etapas do fluxo: 'voto' | 'sucesso'
+    const [step, setStep] = useState<'voto' | 'sucesso'>('voto');
 
     // Opção de voto selecionada
     const [selectedOption, setSelectedOption] = useState<VotoTipo | null>(null);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [submittingVote, setSubmittingVote] = useState(false);
 
-    // Carregar informações do Indicativo e da Tese
+    // Carregar informações do Indicativo, da Tese e validar IP
     const loadVotingItem = async () => {
         if (!id) return;
         try {
-            const indData = await getIndicativoById(id);
+            const [indData, ip] = await Promise.all([
+                getIndicativoById(id),
+                getClientIP()
+            ]);
+            setClientIp(ip);
+
+            let resolvedTese: Tese | null = null;
             if (indData) {
                 setIndicativo(indData);
-                const parentTese = await getTeseById(indData.tese_id);
-                setTese(parentTese);
+                resolvedTese = await getTeseById(indData.tese_id);
+                setTese(resolvedTese);
             } else {
-                const directTese = await getTeseById(id);
-                setTese(directTese);
+                resolvedTese = await getTeseById(id);
+                setTese(resolvedTese);
+            }
+
+            const targetIndId = indData ? indData.id : undefined;
+            const targetTeseId = resolvedTese ? resolvedTese.id : undefined;
+            if (ip && (targetIndId || targetTeseId)) {
+                const voted = await checkUserAlreadyVotedIndicativo(targetIndId, targetTeseId, ip);
+                setAlreadyVotedIp(voted);
             }
         } catch (err) {
             console.error("Erro ao carregar item para votação:", err);
@@ -89,73 +92,19 @@ export const VotarTese = () => {
     const activeItem = indicativo || tese;
     const currentStatus = activeItem?.status || 'Aguardando';
 
-    // Tratar Login por CPF
-    const handleLoginCPF = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setCpfError(null);
-
-        const clean = normalizeCPF(cpfInput);
-        if (clean.length !== 11) {
-            setCpfError("Digite um CPF válido com 11 dígitos.");
-            return;
-        }
-
-        if (!activeItem) return;
-
-        if (currentStatus !== 'Em votação') {
-            setCpfError(
-                currentStatus === 'Encerrada'
-                    ? "A votação deste item já foi encerrada."
-                    : "A votação deste item ainda não foi iniciada no telão."
-            );
-            return;
-        }
-
-        setValidatingCpf(true);
-
-        try {
-            // 1. Validar se CPF existe na tabela de inscritos
-            const foundInscrito = await validateInscritoByCPF(clean);
-            if (!foundInscrito) {
-                setCpfError("CPF não encontrado na lista de inscritos.");
-                setValidatingCpf(false);
-                return;
-            }
-
-            // 2. Verificar se já votou neste indicativo (ou tese)
-            const targetIndId = indicativo ? indicativo.id : undefined;
-            const targetTeseId = tese ? tese.id : undefined;
-
-            const alreadyVoted = await checkUserAlreadyVotedIndicativo(targetIndId, targetTeseId, clean);
-            if (alreadyVoted) {
-                setCpfError("Você já registrou seu voto nesta votação.");
-                setValidatingCpf(false);
-                return;
-            }
-
-            setInscrito(foundInscrito);
-            setStep('voto');
-            toast.success(`Bem-vindo(a), ${foundInscrito.nomeCompleto}!`);
-        } catch (err) {
-            console.error("Erro na validação do CPF:", err);
-            setCpfError("Erro ao validar inscrição. Tente novamente.");
-        } finally {
-            setValidatingCpf(false);
-        }
-    };
-
     // Submissão do Voto após confirmação no modal
     const handleConfirmVote = async () => {
-        if (!selectedOption || !activeItem || !inscrito) return;
+        if (!selectedOption || !activeItem) return;
 
         setSubmittingVote(true);
         try {
+            const ip = clientIp || await getClientIP();
             const res = await submitVoto({
                 indicativoId: indicativo?.id,
                 teseId: tese?.id || indicativo?.tese_id,
-                cpf: inscrito.cpf,
-                voto: selectedOption,
-                inscritoId: inscrito.id
+                ip,
+                cpf: ip,
+                voto: selectedOption
             });
 
             if (res.success) {
@@ -165,9 +114,8 @@ export const VotarTese = () => {
             } else {
                 toast.error(res.message);
                 setIsConfirmModalOpen(false);
-                if (res.message.includes("já registrou") || res.message.includes("encerrada")) {
-                    setCpfError(res.message);
-                    setStep('cpf');
+                if (res.message.includes("já votou") || res.message.includes("já registrou")) {
+                    setAlreadyVotedIp(true);
                 }
             }
         } catch (err) {
@@ -250,36 +198,54 @@ export const VotarTese = () => {
             {/* Conteúdo Principal */}
             <main className="flex-1 p-5 md:p-8 max-w-xl w-full mx-auto flex flex-col justify-center relative z-10">
                 <AnimatePresence mode="wait">
-                    
-                    {/* ETAPA 1: LOGIN / IDENTIFICAÇÃO POR CPF */}
-                    {step === 'cpf' && (
+                    {alreadyVotedIp && step !== 'sucesso' ? (
                         <motion.div
-                            key="step-cpf"
+                            key="already-voted"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-[#0E1C38] p-8 md:p-10 rounded-[2.5rem] border border-amber-500/30 shadow-2xl text-center space-y-5"
+                        >
+                            <div className="w-20 h-20 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mx-auto">
+                                <AlertTriangle className="w-10 h-10 text-amber-400" />
+                            </div>
+                            <div className="space-y-2">
+                                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 block">
+                                    ACESSO BLOQUEADO POR DUPLICIDADE
+                                </span>
+                                <h2 className="text-2xl font-heading font-black text-white">
+                                    Você já votou neste processo!
+                                </h2>
+                                <p className="text-xs text-white/60 leading-relaxed">
+                                    Já identificamos um voto registrado a partir do seu endereço IP ({clientIp}) para esta votação. Não é permitido votar mais de uma vez.
+                                </p>
+                            </div>
+                        </motion.div>
+                    ) : step === 'voto' ? (
+                        <motion.div
+                            key="step-voto"
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             className="space-y-6"
                         >
-                            {/* Card do Indicativo / Tese */}
+                            {/* Informações da Proposta */}
                             <div className="bg-[#0E1C38] p-6 rounded-3xl border border-white/10 shadow-xl space-y-3">
                                 {tese && (
-                                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20 inline-block">
+                                    <span className="px-3 py-1 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-emerald-400 uppercase tracking-widest inline-block">
                                         Tese Nº {tese.numero}: {tese.titulo}
                                     </span>
                                 )}
-
-                                <h2 className="text-xl font-heading font-black text-white leading-snug">
+                                <h3 className="font-heading font-black text-lg text-white">
                                     {indicativo ? `Indicativo Nº ${indicativo.numero}: ${indicativo.titulo}` : tese?.titulo}
-                                </h2>
-
+                                </h3>
                                 {(indicativo?.descricao || tese?.descricao) && (
-                                    <p className="text-xs text-white/60 leading-relaxed bg-white/5 p-4 rounded-2xl border border-white/5 max-h-36 overflow-y-auto">
+                                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-xs text-white/70 leading-relaxed max-h-40 overflow-y-auto">
                                         {indicativo?.descricao || tese?.descricao}
-                                    </p>
+                                    </div>
                                 )}
                             </div>
 
-                            {/* Alerta de Status */}
+                            {/* Alerta de Status quando não está em votação */}
                             {currentStatus !== 'Em votação' && (
                                 <div className={`p-5 rounded-2xl border flex items-start gap-3.5 ${
                                     currentStatus === 'Encerrada'
@@ -300,122 +266,6 @@ export const VotarTese = () => {
                                 </div>
                             )}
 
-                            {/* Formulário de CPF */}
-                            <form 
-                                onSubmit={handleLoginCPF} 
-                                className="bg-[#0E1C38] p-6 md:p-8 rounded-[2.5rem] border border-white/10 shadow-2xl space-y-6"
-                            >
-                                <div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className="text-xs font-bold text-white uppercase tracking-wider">
-                                            Informe seu CPF
-                                        </label>
-                                        <span className="text-[10px] text-white/40 font-medium">Apenas congressistas inscritos</span>
-                                    </div>
-                                    <Input
-                                        required
-                                        type="tel"
-                                        inputMode="numeric"
-                                        value={cpfInput}
-                                        onChange={(e) => {
-                                            setCpfInput(maskCPF(e.target.value));
-                                            setCpfError(null);
-                                        }}
-                                        placeholder="000.000.000-00"
-                                        disabled={currentStatus !== 'Em votação' || validatingCpf}
-                                        className="h-14 rounded-2xl bg-white/5 border-white/10 text-white text-lg font-bold tracking-wider placeholder:text-white/20 focus:border-emerald-500/50 text-center"
-                                        autoFocus
-                                    />
-                                    {cpfError && (
-                                        <motion.p 
-                                            initial={{ opacity: 0, y: -5 }} 
-                                            animate={{ opacity: 1, y: 0 }} 
-                                            className="text-xs text-rose-400 font-bold mt-2 flex items-center gap-1.5"
-                                        >
-                                            <AlertTriangle className="w-4 h-4 shrink-0" />
-                                            {cpfError}
-                                        </motion.p>
-                                    )}
-                                </div>
-
-                                <Button
-                                    type="submit"
-                                    disabled={currentStatus !== 'Em votação' || validatingCpf || cpfInput.length < 14}
-                                    className="w-full h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-heading font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-600/30 hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                                >
-                                    {validatingCpf ? (
-                                        <>
-                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                            Verificando CPF...
-                                        </>
-                                    ) : (
-                                        <>
-                                            Entrar na Votação <ArrowRight className="w-4 h-4" />
-                                        </>
-                                    )}
-                                </Button>
-
-                                <div className="text-center">
-                                    <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest flex items-center justify-center gap-1.5">
-                                        <Lock className="w-3.5 h-3.5 text-emerald-400" /> Voto seguro e individual por CPF
-                                    </p>
-                                </div>
-                            </form>
-                        </motion.div>
-                    )}
-
-                    {/* ETAPA 2: ESCOLHA DO VOTO */}
-                    {step === 'voto' && inscrito && (
-                        <motion.div
-                            key="step-voto"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            className="space-y-6"
-                        >
-                            {/* Participante Autenticado */}
-                            <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                                        <UserCheck className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 block">
-                                            Congressista Confirmado
-                                        </span>
-                                        <h4 className="font-heading font-bold text-sm text-white">
-                                            {inscrito.nomeCompleto}
-                                        </h4>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => {
-                                        setStep('cpf');
-                                        setSelectedOption(null);
-                                    }}
-                                    className="text-[10px] text-white/40 hover:text-white underline font-bold uppercase tracking-wider"
-                                >
-                                    Trocar
-                                </button>
-                            </div>
-
-                            {/* Informações da Proposta */}
-                            <div className="bg-[#0E1C38] p-6 rounded-3xl border border-white/10 shadow-xl space-y-3">
-                                {tese && (
-                                    <span className="px-3 py-1 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-emerald-400 uppercase tracking-widest inline-block">
-                                        Tese Nº {tese.numero}: {tese.titulo}
-                                    </span>
-                                )}
-                                <h3 className="font-heading font-black text-lg text-white">
-                                    {indicativo ? `Indicativo Nº ${indicativo.numero}: ${indicativo.titulo}` : tese?.titulo}
-                                </h3>
-                                {(indicativo?.descricao || tese?.descricao) && (
-                                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-xs text-white/70 leading-relaxed max-h-40 overflow-y-auto">
-                                        {indicativo?.descricao || tese?.descricao}
-                                    </div>
-                                )}
-                            </div>
-
                             {/* Opções SIM / NÃO / ABSTER */}
                             <div className="space-y-3">
                                 <label className="text-xs font-black uppercase tracking-widest text-white/40 block ml-1">
@@ -424,8 +274,9 @@ export const VotarTese = () => {
 
                                 <button
                                     type="button"
+                                    disabled={currentStatus !== 'Em votação'}
                                     onClick={() => setSelectedOption('SIM')}
-                                    className={`w-full p-5 rounded-2xl border text-left transition-all flex items-start gap-4 ${
+                                    className={`w-full p-5 rounded-2xl border text-left transition-all flex items-start gap-4 disabled:opacity-40 disabled:cursor-not-allowed ${
                                         selectedOption === 'SIM'
                                             ? "bg-emerald-500/20 border-emerald-500 ring-2 ring-emerald-500/30 scale-[1.02]"
                                             : "bg-[#0E1C38] border-white/10 hover:border-emerald-500/40"
@@ -444,8 +295,9 @@ export const VotarTese = () => {
 
                                 <button
                                     type="button"
+                                    disabled={currentStatus !== 'Em votação'}
                                     onClick={() => setSelectedOption('NAO')}
-                                    className={`w-full p-5 rounded-2xl border text-left transition-all flex items-start gap-4 ${
+                                    className={`w-full p-5 rounded-2xl border text-left transition-all flex items-start gap-4 disabled:opacity-40 disabled:cursor-not-allowed ${
                                         selectedOption === 'NAO'
                                             ? "bg-rose-500/20 border-rose-500 ring-2 ring-rose-500/30 scale-[1.02]"
                                             : "bg-[#0E1C38] border-white/10 hover:border-rose-500/40"
@@ -464,8 +316,9 @@ export const VotarTese = () => {
 
                                 <button
                                     type="button"
+                                    disabled={currentStatus !== 'Em votação'}
                                     onClick={() => setSelectedOption('ABSTER')}
-                                    className={`w-full p-5 rounded-2xl border text-left transition-all flex items-start gap-4 ${
+                                    className={`w-full p-5 rounded-2xl border text-left transition-all flex items-start gap-4 disabled:opacity-40 disabled:cursor-not-allowed ${
                                         selectedOption === 'ABSTER'
                                             ? "bg-slate-500/30 border-slate-400 ring-2 ring-slate-400/30 scale-[1.02]"
                                             : "bg-[#0E1C38] border-white/10 hover:border-slate-500/40"
@@ -484,17 +337,18 @@ export const VotarTese = () => {
                             </div>
 
                             <Button
-                                disabled={!selectedOption}
+                                disabled={!selectedOption || currentStatus !== 'Em votação'}
                                 onClick={() => setIsConfirmModalOpen(true)}
                                 className="w-full h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-heading font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-600/30 hover:scale-[1.01] active:scale-[0.98] transition-all"
                             >
                                 Confirmar Voto ({selectedOption || "Selecione"})
                             </Button>
-                        </motion.div>
-                    )}
 
-                    {/* ETAPA 3: TELA DE SUCESSO */}
-                    {step === 'sucesso' && (
+                            <p className="text-[10px] text-white/40 text-center flex items-center justify-center gap-1.5">
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Voto único validado por endereço IP
+                            </p>
+                        </motion.div>
+                    ) : (
                         <motion.div
                             key="step-sucesso"
                             initial={{ scale: 0.9, opacity: 0 }}
@@ -541,7 +395,6 @@ export const VotarTese = () => {
                             </Button>
                         </motion.div>
                     )}
-
                 </AnimatePresence>
             </main>
 

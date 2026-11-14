@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { getTotalInscritosCount, normalizeCPF } from "@/services/votacaoService";
+import { getClientIP, getTotalInscritosCount } from "@/services/votacaoService";
 import {
     Enquete,
     EnqueteInput,
@@ -106,25 +106,31 @@ export const zerarVotosEnquete = async (id: number): Promise<void> => {
 // VOTOS
 // ==========================================
 
-/** Retorna os IDs das opções em que o CPF já votou nesta enquete */
-export const getOpcoesVotadasPorCpf = async (enqueteId: number, rawCpf: string): Promise<number[]> => {
+/** Retorna os IDs das opções em que o IP já votou nesta enquete */
+export const getOpcoesVotadasPorIp = async (enqueteId: number, rawIp: string): Promise<number[]> => {
+    const cleanIp = (rawIp || "").trim();
+    if (!cleanIp) return [];
+
     const { data, error } = await supabase
         .from("enquete_votos")
         .select("opcao_id")
         .eq("enquete_id", enqueteId)
-        .eq("cpf", normalizeCPF(rawCpf));
+        .eq("cpf", cleanIp);
 
     if (error) throw error;
     return (data || []).map((v) => v.opcao_id);
 };
 
+export const getOpcoesVotadasPorCpf = getOpcoesVotadasPorIp;
+
 export const submitVotosEnquete = async (params: {
     enqueteId: number;
-    cpf: string;
+    ip?: string;
+    cpf?: string;
     inscritoId?: string | number | null;
     votos: EnqueteVotoInput[];
 }): Promise<{ success: boolean; message: string }> => {
-    const cpf = normalizeCPF(params.cpf);
+    const clientIp = (params.ip || params.cpf || await getClientIP()).trim();
     const enquete = await getEnqueteById(params.enqueteId);
 
     if (!enquete) return { success: false, message: "Enquete não encontrada." };
@@ -143,19 +149,19 @@ export const submitVotosEnquete = async (params: {
         return { success: false, message: "Na disputa é permitido escolher apenas uma opção." };
     }
 
-    const jaVotadas = await getOpcoesVotadasPorCpf(enquete.id, cpf);
+    const jaVotadas = await getOpcoesVotadasPorIp(enquete.id, clientIp);
     if (isDisputa && jaVotadas.length > 0) {
-        return { success: false, message: "Você já registrou seu voto nesta enquete." };
+        return { success: false, message: "Você já votou neste processo. Não é permitido votar mais de uma vez com o mesmo IP." };
     }
     const pendentes = params.votos.filter((v) => !jaVotadas.includes(v.opcao_id));
     if (pendentes.length === 0) {
-        return { success: false, message: "Você já votou em todos os itens selecionados." };
+        return { success: false, message: "Você já votou neste processo. Não é permitido votar mais de uma vez com o mesmo IP." };
     }
 
     const rows = pendentes.map((v) => ({
         enquete_id: enquete.id,
         opcao_id: v.opcao_id,
-        cpf,
+        cpf: clientIp,
         inscrito_id: params.inscritoId ? String(params.inscritoId) : null,
         voto: isDisputa ? null : v.voto,
         user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
@@ -164,7 +170,7 @@ export const submitVotosEnquete = async (params: {
     const { error } = await supabase.from("enquete_votos").insert(rows);
     if (error) {
         if (error.code === "23505") {
-            return { success: false, message: "Você já registrou seu voto nesta enquete." };
+            return { success: false, message: "Você já votou neste processo. Não é permitido votar mais de uma vez com o mesmo IP." };
         }
         console.error("Erro ao registrar voto da enquete:", error);
         return { success: false, message: "Não foi possível registrar seu voto. Tente novamente." };
